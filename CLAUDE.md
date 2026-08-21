@@ -59,10 +59,11 @@ src/stewards/
   monitors/trend.py          30-snapshot series
   monitors/email_draft.py    the publisher email draft
   knowledge/loader.py        markdown front matter, search, tags, headings
-  components/…               theme, layout, nav, filters, incident_table, trend_chart,
-                             email_draft, errors, monitor_page, overview_page,
-                             contact_queue_page, docs_page
-  pages/…                    one 3-line module per page, zero logic
+  components/…               theme, surface, layout, nav, filters, incident_table,
+                             trend_chart, email_draft, errors, monitor_page,
+                             overview_page, contact_queue_page, docs_page
+  views/…                    one 3-line module per page, zero logic
+                             (NOT `pages/` — see hard rule 8)
   docs/*.md                  knowledge base content, with front matter
 tests/
   unit/                      pure logic: thresholds, registry, transforms, email, docs
@@ -94,6 +95,10 @@ tests/
    `render_error_header` instead — no snapshot caption, because there is no snapshot.
 7. Secrets only via `.streamlit/secrets.toml` / env. Never commit tokens, never log the API
    token, never log or display a full user email (`auth.google.mask_email`).
+8. **The page modules live in `views/`, never `pages/`.** A folder named `pages` beside the
+   entrypoint switches Streamlit into v1 multipage mode, where every page file becomes its
+   own entrypoint — a deep link then runs the page script directly and never executes
+   `app.py`, silently bypassing the auth gate. `tests/smoke/test_pages.py` guards this.
 
 ## Configuration
 
@@ -150,6 +155,23 @@ uv run mypy src
   `_fetch_*` function stays cache-free so tests call it directly.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
   params, so the controls respond without a refetch and stay unit-testable.
+- The full brand palette lives in `components/theme.py`; `.streamlit/config.toml` mirrors it
+  onto Streamlit's own tokens (including `[theme.sidebar]` for the dark sidebar and the
+  red/orange/yellow/green/gray/blue slots that back `:red[…]` and the alert boxes).
+  `tests/unit/test_theme.py` fails if the two drift apart, so change both or neither, and
+  it also fails on any hex inlined outside `theme.py`.
+- The page background is the canvas tint; cards are white. Streamlit has no theme token for
+  a container's fill, so `components/surface.py` holds the app's **only** stylesheet and
+  cards opt in with `card("name")` — never a bare `st.container(border=True)`.
+- Streamlit's built-in sidebar nav takes a plain-text label, so it is hidden
+  (`st.navigation(..., position="hidden")`) and `components/nav.render_sidebar` draws the
+  grouped sidebar with `st.page_link` plus an `st.badge` count pill per item.
+- Charts are Altair, built by `monitors/trend.py` and passed their colours by the caller:
+  `st.line_chart` cannot draw a dashed series or a transparent plot area. Tile sparklines
+  are axis-less; the trend chart is solid teal over dashed red.
+- Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
+- Route URLs drop the filename's numeric prefix: `views/12_http_failures.py` serves
+  `/http_failures`.
 
 ## Before you finish a task
 

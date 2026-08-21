@@ -13,8 +13,9 @@ from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.auth.google import require_login
 from stewards.components import nav
+from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
-from stewards.monitors.overview import sidebar_counts
+from stewards.monitors.overview import NavBadge, nav_badges
 
 st.set_page_config(
     page_title="Data Stewards · OpenActive",
@@ -23,12 +24,12 @@ st.set_page_config(
 )
 
 
-def _nav_counts() -> tuple[dict[str, int], int | None]:
+def _nav_badges() -> dict[str, NavBadge]:
+    """Sidebar count pills. An unavailable summary yields no pills, not a broken sidebar."""
     try:
-        summary = repository.fetch_summary().data
+        return nav_badges(repository.fetch_summary().data)
     except ApiError:
-        return {}, None
-    return sidebar_counts(summary), summary.past_threshold
+        return {}
 
 
 def main() -> None:
@@ -39,8 +40,10 @@ def main() -> None:
         st.stop()
 
     require_login(settings)
-    counts, past_threshold = _nav_counts()
-    nav.build_navigation(counts, past_threshold).run()
+    inject_card_styles()
+    page = nav.build_navigation()
+    nav.render_sidebar(_nav_badges())
+    page.run()
 
 
 main()

@@ -7,8 +7,9 @@ import pytest
 from stewards.api.models import MonitorCount, Summary, SummaryResponse
 from stewards.monitors.overview import (
     STATE_LABELS,
+    NavBadge,
     build_tiles,
-    nav_label,
+    nav_badges,
     sidebar_counts,
     tile_note,
     tile_state,
@@ -59,12 +60,45 @@ def test_tile_note(count: int, past: int, fragment: str) -> None:
     assert fragment in tile_note(get_monitor("http_failure"), count, past)
 
 
-@pytest.mark.parametrize(
-    ("count", "expected"),
-    [(None, "Contact queue"), (0, "Contact queue (0)"), (14, "Contact queue (14)")],
-)
-def test_nav_label(count: int | None, expected: str) -> None:
-    assert nav_label("Contact queue", count) == expected
+def test_nav_badges_carry_the_count_and_the_tile_tone(summary: SummaryResponse) -> None:
+    badges = nav_badges(summary.data)
+    assert badges["single_feed_stall"] == NavBadge("23", Tone.RED)
+    assert badges["http_failure"] == NavBadge("9", Tone.RED)
+    assert badges["contact_queue"] == NavBadge("10", Tone.RED)
+
+
+def test_a_monitor_with_nothing_open_gets_no_badge() -> None:
+    summary = Summary(
+        publishers_monitored=170,
+        monitors=(
+            MonitorCount(monitor_id="single_feed_stall", count=0),
+            MonitorCount(monitor_id="http_failure", count=4, past_threshold_count=0),
+        ),
+    )
+    badges = nav_badges(summary)
+    assert "single_feed_stall" not in badges
+    assert badges["http_failure"] == NavBadge("4", Tone.AMBER)
+
+
+def test_no_contact_queue_badge_when_nothing_is_past_threshold() -> None:
+    assert "contact_queue" not in nav_badges(Summary(publishers_monitored=170))
+
+
+def test_an_all_clear_snapshot_has_no_badges_at_all(payload) -> None:
+    summary = SummaryResponse.model_validate(payload("summary_zero")).data
+    assert nav_badges(summary) == {}
+
+
+def test_a_monitor_the_api_does_not_report_gets_no_badge() -> None:
+    assert nav_badges(Summary(publishers_monitored=170)) == {}
+
+
+def test_badge_tone_agrees_with_the_tile_tone(summary: SummaryResponse) -> None:
+    """The sidebar and the overview must never disagree about a monitor's state."""
+    badges = nav_badges(summary.data)
+    for tile in build_tiles(summary.data):
+        if tile.count > 0:
+            assert badges[tile.monitor.id].tone is tile.state
 
 
 def test_tiles_cover_the_whole_registry_in_order(summary: SummaryResponse) -> None:

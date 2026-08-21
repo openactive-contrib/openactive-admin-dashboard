@@ -10,6 +10,7 @@ from stewards.components import layout
 from stewards.components.email_draft import render_email_draft
 from stewards.components.errors import render_api_error
 from stewards.components.incident_table import render_table
+from stewards.components.surface import card
 from stewards.config import get_settings
 from stewards.monitors import contact_queue
 from stewards.monitors.registry import get_monitor
@@ -39,7 +40,7 @@ def render_contact_queue_page() -> None:
     if get_settings().use_sample_data:
         layout.render_sample_data_notice()
 
-    with st.container(border=True):
+    with card("blurb_contact_queue"):
         st.markdown(
             f"Every incident open longer than the {threshold_days}-day threshold, across all "
             "monitors, oldest first. This is the list a steward works through when writing to "
@@ -56,10 +57,10 @@ def render_contact_queue_page() -> None:
             )
         )
 
-    for column, (label, value, tone) in zip(
-        st.columns(3), contact_queue.queue_kpis(incidents), strict=True
+    for index, (column, (label, value, tone)) in enumerate(
+        zip(st.columns(3), contact_queue.queue_kpis(incidents), strict=True)
     ):
-        with column:
+        with column, card(f"kpi_queue_{index}"):
             layout.tone_metric(label, value, tone)
 
     skipped = contact_queue.unknown_monitor_ids(incidents)

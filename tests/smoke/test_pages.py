@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-PAGES_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "pages"
+VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 
 PAGES = [
     "00_overview.py",
@@ -25,7 +25,7 @@ MONITOR_PAGES = ["10_single_feed_stalls.py", "12_http_failures.py"]
 
 
 def run(name: str) -> AppTest:
-    app = AppTest.from_file(str(PAGES_DIR / name), default_timeout=30)
+    app = AppTest.from_file(str(VIEWS_DIR / name), default_timeout=30)
     app.run()
     return app
 
@@ -98,10 +98,22 @@ def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
 
     app = run("00_overview.py")
-    assert len(app.button) == 1 + len(MONITOR_REGISTRY)  # contact queue + one Open per tile
+    assert len(app.button) == 1  # only the contact-queue call to action; tiles use page links
     markdown = " ".join(m.value for m in app.markdown)
     for monitor in MONITOR_REGISTRY:
         assert monitor.name in markdown
+        assert monitor.unit in " ".join(c.value for c in app.caption)
+
+
+def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
+    from stewards.monitors.registry import MONITOR_REGISTRY
+
+    app = run("00_overview.py")
+    markdown = " ".join(m.value for m in app.markdown)
+    assert markdown.count("-badge[") >= len(MONITOR_REGISTRY)
+    assert "CRITICAL" in markdown
+    # One sparkline per tile, drawn as an Altair chart.
+    assert len(app.get("vega_lite_chart")) == len(MONITOR_REGISTRY)
 
 
 def test_overview_banner_names_the_threshold() -> None:
@@ -138,7 +150,7 @@ def test_sample_data_mode_is_announced_on_every_data_page() -> None:
 
 # --- the entry point ---------------------------------------------------------------------
 
-APP_FILE = PAGES_DIR.parent / "app.py"
+APP_FILE = VIEWS_DIR.parent / "app.py"
 
 
 def test_the_app_boots_and_lands_on_the_overview() -> None:
@@ -163,3 +175,24 @@ def test_the_app_reports_a_missing_configuration_instead_of_crashing(
     app.run()
     assert any("not configured" in error.value for error in app.error)
     config.get_settings.cache_clear()
+
+
+def test_no_pages_directory_sits_beside_the_entrypoint() -> None:
+    """Regression guard for an auth bypass.
+
+    Streamlit sets `PagesManager.uses_pages_directory` when a folder literally named
+    `pages` exists next to the entrypoint, which switches the app into v1 multipage mode.
+    In that mode every page file becomes its own entrypoint, so a deep link like
+    `/single_feed_stalls` runs the page script directly and never executes `app.py` — and
+    therefore never runs the auth gate. The page modules live in `views/` for this reason.
+    """
+    assert not (APP_FILE.parent / "pages").exists()
+    assert (APP_FILE.parent / "views").is_dir()
+
+
+def test_every_registered_monitor_page_lives_under_views() -> None:
+    from stewards.monitors.registry import MONITOR_REGISTRY
+
+    for monitor in MONITOR_REGISTRY:
+        assert monitor.page.startswith("views/")
+        assert (APP_FILE.parent / monitor.page).is_file()

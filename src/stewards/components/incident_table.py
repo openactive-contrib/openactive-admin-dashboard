@@ -77,7 +77,7 @@ def render_table(
         style_rag(frame, tones, rag_columns),
         column_config=column_config(columns),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         on_select="rerun",
         selection_mode="single-row",
         key=key,

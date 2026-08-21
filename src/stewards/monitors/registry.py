@@ -147,7 +147,7 @@ SINGLE_FEED_STALL = Monitor(
         FilterSpec("status", "Status"),
     ),
     query="monitor_single_feed_stall_v2",
-    page="pages/10_single_feed_stalls.py",
+    page="views/10_single_feed_stalls.py",
     kpi_labels=("feeds stalled", "publishers affected", "past threshold"),
 )
 
@@ -179,7 +179,7 @@ HTTP_FAILURE = Monitor(
     ),
     schedule="daily 04:00 UTC · suppress 1 day",
     query="monitor_http_failure_v3",
-    page="pages/12_http_failures.py",
+    page="views/12_http_failures.py",
     kpi_labels=("endpoints failing", "publishers affected", "past threshold"),
 )
 

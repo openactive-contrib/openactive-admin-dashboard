@@ -13,6 +13,7 @@ from enum import StrEnum
 
 import streamlit as st
 
+from stewards.components.surface import card
 from stewards.config import Settings
 
 
@@ -52,7 +53,7 @@ def mask_email(email: str | None) -> str:
 
 def render_login_screen(domain: str) -> None:
     _, middle, _ = st.columns([1, 2, 1])
-    with middle, st.container(border=True):
+    with middle, card("login"):
         st.title("Data Stewards", anchor=False)
         st.caption("OpenActive · internal")
         st.markdown(
@@ -64,7 +65,7 @@ def render_login_screen(domain: str) -> None:
             key="auth_login",
             type="primary",
             on_click=st.login,
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -79,7 +80,7 @@ def render_identity(email: str | None) -> None:
         st.divider()
         st.caption(mask_email(email))
         st.caption("Google SSO · steward")
-        st.button("Sign out", key="auth_signout", on_click=st.logout, use_container_width=True)
+        st.button("Sign out", key="auth_signout", on_click=st.logout, width="stretch")
 
 
 def render_dev_bypass_warning() -> None:

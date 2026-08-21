@@ -16,7 +16,8 @@ Everything below is achievable with native widgets — do not write custom compo
    (monitor id, severity, contact threshold, schedule) via `st.caption`/`st.code` inline.
 3. **KPIs** — exactly three `st.metric` in `st.columns(3)`, right-aligned block.
 4. **Trend** — one 30-snapshot chart: solid line = open incidents, dashed = past threshold.
-   `st.line_chart` or an Altair chart; y starts at 0; x labels are snapshot dates.
+   Built by `monitors.trend.trend_chart` (Altair — `st.line_chart` cannot dash a series or
+   drop its grey plot panel); y starts at 0; x labels are snapshot dates.
 5. **Filters** — a `st.text_input` search, 2–3 `st.selectbox`, and a
    `st.toggle("Past threshold only")` **only when `monitor.has_threshold_filter`**
    (informational monitors like schema drift and Active Places coverage do not get it, and
@@ -34,7 +35,8 @@ Everything below is achievable with native widgets — do not write custom compo
 | DATE | `TextColumn` with ISO strings (not `DateColumn` — no timezone confusion) |
 | DAYS | `TextColumn` showing `"12d"`, RAG-styled via the Styler |
 | PERCENT / SCORE | `ProgressColumn(min_value=0, max_value=100, format="%d")` |
-| SPARKLINE | `LineChartColumn(y_min=0, width="small")` |
+| SPARKLINE | `LineChartColumn(y_min=0, width="small")` (in tables; tiles use
+             `monitors.trend.sparkline_chart`) |
 | STATUS | `TextColumn`, RAG-styled |
 | LINK | `LinkColumn(display_text="feed ↗")` |
 
@@ -52,17 +54,20 @@ grey `#F1F4F5`/`#5C6B76`. Never colour a whole row.
 
 ## Overview page
 
-Four `st.metric` (publishers monitored, publishers with issues, open incidents, past
+Four KPI cards (publishers monitored, publishers with issues, open incidents, past
 threshold), then an amber banner when the contact queue is non-empty linking to it, then a
 grid of monitor tiles built by iterating `MONITOR_REGISTRY` — `st.columns(3)` of
-`st.container(border=True)`, each with name, group, state chip, count, unit, sparkline and a
-button that navigates via `st.switch_page`.
+`surface.card(...)`, each laid out as: name + `st.badge` state chip on one row, group
+caption, then the count beside its sparkline, then a rule and a note beside an
+`st.page_link` to the monitor.
 
 ## Theme
 
-`.streamlit/config.toml`: `primaryColor = "#0E8F8A"`, background `#FFFFFF`, secondary
-background `#F1F4F5`, text `#16202A`, sans-serif. Semantic colours live in
-`components/theme.py` as constants — never inline a hex anywhere else.
+The palette lives in `components/theme.py`; `.streamlit/config.toml` mirrors it onto
+Streamlit's tokens (main area, `[theme.sidebar]` for the dark sidebar, and the semantic
+colour slots behind `:red[…]`, `st.badge` and the alert boxes). Never inline a hex outside
+`theme.py` — a test enforces it. The page background is the canvas tint and cards are white
+via `components/surface.py`, the app's only stylesheet; wrap a card with `card("name")`.
 
 ## Copy
 

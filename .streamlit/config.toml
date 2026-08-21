@@ -1,10 +1,61 @@
+# Every colour here comes from src/stewards/components/theme.py.
+# tests/unit/test_theme.py asserts the two stay in step — change both or neither.
+
 [theme]
 base = "light"
+font = "sans serif"
+
+# brand
 primaryColor = "#0E8F8A"
-backgroundColor = "#FFFFFF"
+linkColor = "#0E8F8A"
+
+# neutrals. The main area is the canvas tint; cards get their white fill from
+# components/surface.py, because Streamlit has no theme token for container background.
+backgroundColor = "#EEF1F3"
 secondaryBackgroundColor = "#F1F4F5"
 textColor = "#16202A"
-font = "sans serif"
+borderColor = "#E2E6E9"
+dataframeBorderColor = "#EDF0F2"
+dataframeHeaderBackgroundColor = "#F7F9F9"
+codeBackgroundColor = "#F1F4F5"
+codeTextColor = "#2B3A45"
+showWidgetBorder = true
+
+# RAG pairs. These back `:red[…]` and the alert boxes: st.error uses red, st.warning uses
+# yellow, st.success green, st.info blue — so amber is mapped onto both orange and yellow,
+# and blue onto the brand teal, to keep an off-brand colour from ever appearing.
+redColor = "#C6413B"
+redBackgroundColor = "#FBEDEC"
+redTextColor = "#C6413B"
+orangeColor = "#C77F1A"
+orangeBackgroundColor = "#FDF3E3"
+orangeTextColor = "#C77F1A"
+yellowColor = "#C77F1A"
+yellowBackgroundColor = "#FDF3E3"
+yellowTextColor = "#C77F1A"
+greenColor = "#1F7A4C"
+greenBackgroundColor = "#EAF4EE"
+greenTextColor = "#1F7A4C"
+grayColor = "#5C6B76"
+grayBackgroundColor = "#F1F4F5"
+grayTextColor = "#5C6B76"
+blueColor = "#0E8F8A"
+blueBackgroundColor = "#EAF3F3"
+blueTextColor = "#0B6F6B"
+
+# the teal series first, then the RAG tones, so a chart never invents a colour
+chartCategoricalColors = ["#0E8F8A", "#C6413B", "#C77F1A", "#1F7A4C", "#5C6B76"]
+
+[theme.sidebar]
+backgroundColor = "#10202B"
+secondaryBackgroundColor = "#182F3C"
+textColor = "#C8D4DB"
+borderColor = "#24404F"
+primaryColor = "#0E8F8A"
+linkColor = "#0E8F8A"
+grayColor = "#5E7480"
+codeBackgroundColor = "#1B333F"
+codeTextColor = "#C8D4DB"
 
 [server]
 headless = true

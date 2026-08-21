@@ -1,0 +1,3 @@
+from stewards.components.contact_queue_page import render_contact_queue_page
+
+render_contact_queue_page()

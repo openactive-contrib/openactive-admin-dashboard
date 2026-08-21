@@ -336,7 +336,7 @@ def _navigation_script() -> None:
     from stewards.components import nav
     from stewards.monitors.registry import MONITOR_REGISTRY
 
-    nav.build_navigation({"single_feed_stall": 23, "http_failure": 9}, 10)
+    nav.build_navigation()
     assert nav.page_for("overview") is not None
     assert nav.page_for("contact_queue") is not None
     assert nav.page_for("docs") is not None
@@ -344,23 +344,77 @@ def _navigation_script() -> None:
     for monitor in MONITOR_REGISTRY:
         page = nav.page_for(monitor.id)
         assert page is not None
-        assert str(page._page).endswith(monitor.page.removeprefix("pages/"))
+        assert str(page._page).endswith(monitor.page.removeprefix("views/"))
     nav.switch_to("no_such_monitor")  # a missing key must be a no-op
+
+
+def _url_path_script() -> None:
+    from stewards.components import nav
+
+    nav.build_navigation()
+    # Streamlit strips the numeric ordering prefix, so these are the real deep links.
+    expected = {
+        "overview": "",
+        "contact_queue": "contact_queue",
+        "single_feed_stall": "single_feed_stalls",
+        "http_failure": "http_failures",
+        "docs": "docs",
+    }
+    actual = {key: nav.page_for(key).url_path for key in expected}
+    assert actual == expected, actual
 
 
 def test_navigation_builds_a_page_per_registry_entry_with_count_badges() -> None:
     run(_navigation_script)
 
 
-def _nav_label_script() -> None:
+def test_the_page_url_paths_drop_the_numeric_prefix() -> None:
+    """The nav filenames are ordered `12_http_failures.py`; the route is `/http_failures`."""
+    run(_url_path_script)
+
+
+def _sidebar_script() -> None:
+    from stewards.components import nav
+    from stewards.monitors.overview import NavBadge
+    from stewards.monitors.thresholds import Tone
+
+    nav.build_navigation()
+    nav.render_sidebar(
+        {
+            "contact_queue": NavBadge("10", Tone.RED),
+            "single_feed_stall": NavBadge("23", Tone.RED),
+            "http_failure": NavBadge("9", Tone.AMBER),
+        }
+    )
+
+
+def test_the_sidebar_renders_a_link_per_page_and_a_pill_per_count() -> None:
+    app = run(_sidebar_script)
+    captions = [c.value for c in app.caption]
+    for section in ("OVERVIEW", "AVAILABILITY", "KNOWLEDGE BASE"):
+        assert section in captions
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Data Stewards" in markdown
+    # Badges render as markdown colour directives carrying the count.
+    for count, colour in (("10", "red"), ("23", "red"), ("9", "orange")):
+        assert f":{colour}-badge[{count}]" in markdown
+
+
+def _sidebar_without_badges_script() -> None:
     from stewards.components import nav
 
-    nav.build_navigation({}, None)
+    nav.build_navigation()
+    nav.render_sidebar({})
     assert nav.page_for("single_feed_stall") is not None
 
 
-def test_navigation_still_builds_when_the_summary_is_unavailable() -> None:
-    run(_nav_label_script)
+def test_the_sidebar_still_renders_when_the_summary_is_unavailable() -> None:
+    app = run(_sidebar_without_badges_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Data Stewards" in markdown
+    # The brand mark is a badge; no *count* pill should appear.
+    for colour in ("red", "orange", "green", "gray"):
+        assert f":{colour}-badge[" not in markdown
 
 
 def test_meta_and_summary_models_are_importable_here() -> None:

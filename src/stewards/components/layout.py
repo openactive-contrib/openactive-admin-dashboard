@@ -39,7 +39,7 @@ def render_header(
                 data=csv_bytes(export),
                 file_name=f"{export_name}_{meta.snapshot_date.isoformat()}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
                 help="Exports the rows currently shown, after filters.",
             )
     st.divider()

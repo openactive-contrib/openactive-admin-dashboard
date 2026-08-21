@@ -14,6 +14,7 @@ from stewards.components.email_draft import render_email_draft
 from stewards.components.errors import render_api_error
 from stewards.components.filters import render_filters
 from stewards.components.incident_table import render_monitor_table
+from stewards.components.surface import card
 from stewards.components.trend_chart import render_trend
 from stewards.config import get_settings
 from stewards.monitors import transforms
@@ -21,15 +22,15 @@ from stewards.monitors.registry import Monitor
 
 
 def render_blurb(monitor: Monitor) -> None:
-    with st.container(border=True):
+    with card(f"blurb_{monitor.id}"):
         st.markdown(monitor.blurb)
         st.caption(" · ".join(f"`{chip}`" for chip in monitor.meta_chips))
 
 
 def render_kpis(monitor: Monitor, incidents: Sequence[Incident]) -> None:
     kpis = transforms.monitor_kpis(monitor, incidents)
-    for column, kpi in zip(st.columns(3), kpis, strict=True):
-        with column:
+    for index, (column, kpi) in enumerate(zip(st.columns(3), kpis, strict=True)):
+        with column, card(f"kpi_{monitor.id}_{index}"):
             layout.tone_metric(kpi.label, kpi.value, kpi.tone)
 
 
@@ -44,7 +45,20 @@ def render_monitor_page(monitor: Monitor) -> None:
         return
 
     incidents = list(page.data)
-    state = render_filters(monitor, incidents)
+
+    # Everything above the filters is rendered into reserved slots, because the header's
+    # Export CSV button and the KPIs both need the *filtered* frame, which only exists once
+    # the filter widgets have been read. The slots keep the on-screen order the brief
+    # specifies: header, blurb, KPIs, trend, filters, table.
+    header_slot = st.container()
+    blurb_slot = st.container()
+    kpi_slot = st.container()
+    trend_slot = st.container()
+    filter_slot = st.container()
+
+    with filter_slot:
+        state = render_filters(monitor, incidents)
+
     shown = transforms.sort_by_age(
         transforms.apply_filters(
             monitor,
@@ -57,14 +71,18 @@ def render_monitor_page(monitor: Monitor) -> None:
     frame = transforms.to_dataframe(monitor, shown)
     tones = transforms.tone_frame(monitor, shown)
 
-    layout.render_header(
-        monitor.crumb, monitor.name, page.meta, export=frame, export_name=monitor.id
-    )
-    if get_settings().use_sample_data:
-        layout.render_sample_data_notice()
-    render_blurb(monitor)
-    render_kpis(monitor, shown)
-    render_trend(monitor, trend.data)
+    with header_slot:
+        layout.render_header(
+            monitor.crumb, monitor.name, page.meta, export=frame, export_name=monitor.id
+        )
+        if get_settings().use_sample_data:
+            layout.render_sample_data_notice()
+    with blurb_slot:
+        render_blurb(monitor)
+    with kpi_slot:
+        render_kpis(monitor, shown)
+    with trend_slot, card(f"trend_{monitor.id}"):
+        render_trend(monitor, trend.data)
 
     st.caption(
         f"{len(shown):,} of {len(incidents):,} incidents shown. "

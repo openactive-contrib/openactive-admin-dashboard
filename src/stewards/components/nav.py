@@ -1,7 +1,12 @@
-"""Navigation: grouped sections built from the registry, with open-incident count badges.
+"""Navigation.
 
-The page objects are held here so the overview tiles can navigate to a monitor by id
-without app.py having to pass them down.
+Streamlit's own sidebar nav renders a plain-text label per page, so it cannot show the
+count pill the design calls for. The built-in nav is therefore hidden and the sidebar is
+drawn here from the registry: `st.page_link` for the row, `st.badge` for the count. Both are
+native widgets, and the badge colours resolve through the RAG slots in `config.toml`.
+
+The page objects are held in this module so the overview tiles can link to a monitor by id
+without `app.py` having to pass them down.
 """
 
 from __future__ import annotations
@@ -12,49 +17,84 @@ from pathlib import Path
 import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 
-from stewards.monitors.overview import nav_label
+from stewards.components import theme
+from stewards.monitors.overview import NavBadge
 from stewards.monitors.registry import MONITOR_REGISTRY, groups
 
 #: Page paths are resolved against the package, not the working directory, so the
 #: navigation builds identically however the app was launched.
 APP_DIR = Path(__file__).resolve().parent.parent
 
-OVERVIEW_PAGE = "pages/00_overview.py"
-CONTACT_QUEUE_PAGE = "pages/01_contact_queue.py"
-DOCS_PAGE = "pages/90_docs.py"
+OVERVIEW_PAGE = "views/00_overview.py"
+CONTACT_QUEUE_PAGE = "views/01_contact_queue.py"
+DOCS_PAGE = "views/90_docs.py"
+
+OVERVIEW_SECTION = "Overview"
+DOCS_SECTION = "Knowledge base"
 
 _pages: dict[str, StreamlitPage] = {}
+_sections: dict[str, list[tuple[str, StreamlitPage]]] = {}
 
 
-def build_navigation(counts: Mapping[str, int], past_threshold: int | None) -> StreamlitPage:
-    """Build the grouped sidebar and return the selected page."""
+def build_navigation() -> StreamlitPage:
+    """Build the page set and return the selected page.
+
+    The sidebar itself is drawn by `render_sidebar`, which needs the counts; keeping the two
+    apart means the navigation still resolves when the summary endpoint is unavailable.
+    """
     _pages.clear()
+    _sections.clear()
+
     _pages["overview"] = st.Page(
         APP_DIR / OVERVIEW_PAGE, title="Monitor overview", default=True
     )
-    _pages["contact_queue"] = st.Page(
-        APP_DIR / CONTACT_QUEUE_PAGE, title=nav_label("Contact queue", past_threshold)
-    )
-    sections: dict[str, list[StreamlitPage]] = {
-        "Overview": [_pages["overview"], _pages["contact_queue"]]
-    }
+    _pages["contact_queue"] = st.Page(APP_DIR / CONTACT_QUEUE_PAGE, title="Contact queue")
+    _sections[OVERVIEW_SECTION] = [
+        ("overview", _pages["overview"]),
+        ("contact_queue", _pages["contact_queue"]),
+    ]
 
     for group in groups():
-        section: list[StreamlitPage] = []
+        section: list[tuple[str, StreamlitPage]] = []
         for monitor in MONITOR_REGISTRY:
             if monitor.group is not group:
                 continue
-            page = st.Page(
-                APP_DIR / monitor.page, title=nav_label(monitor.name, counts.get(monitor.id))
-            )
+            page = st.Page(APP_DIR / monitor.page, title=monitor.name)
             _pages[monitor.id] = page
-            section.append(page)
-        sections[group.value] = section
+            section.append((monitor.id, page))
+        _sections[group.value] = section
 
     _pages["docs"] = st.Page(APP_DIR / DOCS_PAGE, title="Documentation")
-    sections["Knowledge base"] = [_pages["docs"]]
+    _sections[DOCS_SECTION] = [("docs", _pages["docs"])]
 
-    return st.navigation(sections)
+    return st.navigation(
+        {name: [page for _, page in items] for name, items in _sections.items()},
+        position="hidden",
+    )
+
+
+def render_brand() -> None:
+    st.markdown(":primary-badge[OA] **Data Stewards**")
+    st.caption("OpenActive · internal")
+
+
+def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
+    """The grouped sidebar: section heading, page link, count pill."""
+    with st.sidebar:
+        render_brand()
+        for section, items in _sections.items():
+            st.caption(section.upper())
+            for key, page in items:
+                badge = badges.get(key)
+                row = st.container(
+                    horizontal=True,
+                    horizontal_alignment="distribute",
+                    vertical_alignment="center",
+                )
+                with row:
+                    st.page_link(page, label=page.title)
+                    if badge is not None:
+                        st.badge(badge.text, color=theme.markdown_colour(badge.tone))
 
 
 def page_for(key: str) -> StreamlitPage | None:

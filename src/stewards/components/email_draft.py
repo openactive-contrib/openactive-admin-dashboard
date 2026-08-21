@@ -14,7 +14,7 @@ from stewards.monitors.registry import Monitor
 def render_email_draft(monitor: Monitor, incident: Incident, snapshot_date: date) -> None:
     """A popover holding the copyable message for the selected row."""
     label = f"Draft email · {incident.publisher_name}"
-    with st.popover(label, use_container_width=False):
+    with st.popover(label, width="content"):
         st.caption(
             "Copy this into your mail client. The dashboard does not send email and does not "
             "record that you did."

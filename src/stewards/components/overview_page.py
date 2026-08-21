@@ -7,11 +7,13 @@ import streamlit as st
 from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.api.models import Summary
-from stewards.components import layout, nav
+from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
+from stewards.components.surface import card
 from stewards.config import get_settings
 from stewards.monitors.overview import Tile, build_tiles
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.trend import sparkline_chart
 
 TILES_PER_ROW = 3
 
@@ -48,8 +50,10 @@ def render_fleet_kpis(summary: Summary) -> None:
             Tone.RED,
         ),
     )
-    for column, (label, value, sub, tone) in zip(st.columns(4), cells, strict=True):
-        with column, st.container(border=True):
+    for index, (column, (label, value, sub, tone)) in enumerate(
+        zip(st.columns(4), cells, strict=True)
+    ):
+        with column, card(f"kpi_{index}"):
             layout.tone_metric(label, value, tone if value != "0" else Tone.GREEN)
             st.caption(sub)
 
@@ -70,21 +74,38 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
             icon=":material/schedule:",
         )
     with action:
-        if st.button("Review contact queue", use_container_width=True, type="primary"):
+        if st.button("Review contact queue", width="stretch", type="primary"):
             nav.switch_to("contact_queue")
 
 
 def render_tile(tile: Tile) -> None:
-    with st.container(border=True):
-        st.markdown(f"**{tile.monitor.name}**")
+    """Name and state chip, then the count beside its sparkline, then the note and a link."""
+    colour = theme.markdown_colour(tile.state)
+    with card(f"tile_{tile.monitor.id}"):
+        with st.container(
+            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        ):
+            st.markdown(f"**{tile.monitor.name}**")
+            st.badge(tile.state_label.upper(), color=colour)
         st.caption(tile.monitor.group.value)
-        layout.tone_metric(tile.state_label, tile.value, tile.state)
-        st.caption(tile.monitor.unit)
-        if tile.sparkline:
-            st.line_chart(list(tile.sparkline), height=70, use_container_width=True)
-        st.caption(tile.note)
-        if st.button("Open", key=f"open_{tile.monitor.id}", use_container_width=True):
-            nav.switch_to(tile.monitor.id)
+
+        count_col, spark_col = st.columns([1, 1], vertical_alignment="center")
+        with count_col:
+            st.markdown(f"## :{colour}[{tile.value}]")
+            st.caption(tile.monitor.unit)
+        with spark_col:
+            chart = sparkline_chart(tile.sparkline, theme.FOREGROUND[tile.state])
+            if chart is not None:
+                st.altair_chart(chart, width="stretch")
+
+        st.divider()
+        with st.container(
+            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        ):
+            st.markdown(f":{colour}[●] :gray[{tile.note}]")
+            page = nav.page_for(tile.monitor.id)
+            if page is not None:
+                st.page_link(page, label="Open")
 
 
 def render_overview_page() -> None:
@@ -96,7 +117,12 @@ def render_overview_page() -> None:
         return
 
     summary = response.data
-    layout.render_header("Overview", "Health of the publisher fleet", response.meta)
+    title = (
+        f"Health of {summary.publishers_monitored:,} publishers"
+        if summary.publishers_monitored
+        else "Health of the publisher fleet"
+    )
+    layout.render_header("Overview", title, response.meta)
     if get_settings().use_sample_data:
         layout.render_sample_data_notice()
 
@@ -105,11 +131,12 @@ def render_overview_page() -> None:
     render_threshold_banner(summary, threshold_days)
 
     tiles = build_tiles(summary)
-    st.subheader("Monitors", anchor=False)
-    st.caption(
-        f"{len(tiles)} registered · monitors register themselves here as their API "
-        "endpoints go live"
-    )
+    with st.container(horizontal=True, vertical_alignment="bottom"):
+        st.markdown("**Monitors**")
+        st.caption(
+            f"{len(tiles)} registered · monitors register themselves here as their API "
+            "endpoints go live"
+        )
     for start in range(0, len(tiles), TILES_PER_ROW):
         row = tiles[start : start + TILES_PER_ROW]
         for column, tile in zip(st.columns(TILES_PER_ROW), row, strict=False):

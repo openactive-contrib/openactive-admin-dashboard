@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from stewards.components import layout
+from stewards.components.surface import card
 from stewards.knowledge.loader import Doc, all_docs, all_tags, get_doc, search_docs
 
 SELECTED_KEY = "docs_selected_slug"
@@ -17,7 +18,7 @@ def _select(slug: str) -> None:
 
 
 def render_index(docs: tuple[Doc, ...]) -> None:
-    with st.container(border=True):
+    with card("docs_search"):
         term = st.text_input(
             "Search",
             key="docs_search",
@@ -39,7 +40,7 @@ def render_index(docs: tuple[Doc, ...]) -> None:
         return
 
     for doc in results:
-        with st.container(border=True):
+        with card(f"doc_{doc.slug}"):
             body, side = st.columns([4, 1], vertical_alignment="top")
             with body:
                 st.markdown(f"**{doc.title}**")
@@ -53,7 +54,7 @@ def render_index(docs: tuple[Doc, ...]) -> None:
                     key=f"open_doc_{doc.slug}",
                     on_click=_select,
                     args=(doc.slug,),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 

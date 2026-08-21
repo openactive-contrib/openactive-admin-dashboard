@@ -38,11 +38,31 @@ def tile_note(monitor: Monitor, count: int, past_threshold_count: int) -> str:
     return f"none past the {monitor.threshold_days}-day threshold yet"
 
 
-def nav_label(name: str, count: int | None) -> str:
-    """Sidebar label carrying the open-incident count. Streamlit nav labels are plain text."""
-    if count is None:
-        return name
-    return f"{name} ({count})"
+@dataclass(frozen=True, slots=True)
+class NavBadge:
+    """The count pill beside a sidebar item."""
+
+    text: str
+    tone: Tone
+
+
+def nav_badges(summary: Summary) -> dict[str, NavBadge]:
+    """Badge per sidebar item, keyed by monitor id plus `contact_queue`.
+
+    A monitor with nothing open gets no badge, so the sidebar shows only what needs
+    attention. Tone matches the monitor tile, so the sidebar and the overview never disagree.
+    """
+    badges: dict[str, NavBadge] = {}
+    if summary.past_threshold > 0:
+        badges["contact_queue"] = NavBadge(str(summary.past_threshold), Tone.RED)
+    for monitor in MONITOR_REGISTRY:
+        counts = summary.count_for(monitor.id)
+        if counts is None or counts.count <= 0:
+            continue
+        badges[monitor.id] = NavBadge(
+            str(counts.count), tile_state(monitor, counts.count, counts.past_threshold_count)
+        )
+    return badges
 
 
 @dataclass(frozen=True, slots=True)

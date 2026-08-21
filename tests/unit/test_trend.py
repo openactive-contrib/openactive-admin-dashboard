@@ -48,3 +48,57 @@ def test_sample_trend_covers_thirty_snapshots(stall_trend: TrendResponse) -> Non
 def test_empty_trend_fixture_parses_and_shapes(payload) -> None:
     response = TrendResponse.model_validate(payload("trend_empty"))
     assert trend_frame(response.data, 7).empty
+
+
+# --- charts -------------------------------------------------------------------------------
+
+
+def test_sparkline_needs_at_least_two_points() -> None:
+    from stewards.monitors.trend import sparkline_chart
+
+    assert sparkline_chart([], "#0E8F8A") is None
+    assert sparkline_chart([5], "#0E8F8A") is None
+    assert sparkline_chart([5, 6], "#0E8F8A") is not None
+
+
+def test_sparkline_has_no_axes_and_no_background() -> None:
+    from stewards.monitors.trend import sparkline_chart
+
+    spec = sparkline_chart([1, 2, 3], "#C6413B").to_dict()
+    assert spec["encoding"]["x"]["axis"] is None
+    assert spec["encoding"]["y"]["axis"] is None
+    assert spec["config"]["background"] == "transparent"
+    assert spec["mark"]["color"] == "#C6413B"
+
+
+def test_trend_chart_is_none_without_points() -> None:
+    from stewards.monitors.trend import trend_chart
+
+    assert trend_chart([], 7, "#0E8F8A", "#C6413B", "#5C6B76", "#EDF0F2") is None
+
+
+def test_trend_chart_dashes_the_past_threshold_series() -> None:
+    """The brief specifies a solid open series and a dashed past-threshold series."""
+    from stewards.monitors.trend import trend_chart
+
+    chart = trend_chart(
+        [point(20, 22, 6), point(21, 23, 7)], 7, "#0E8F8A", "#C6413B", "#5C6B76", "#EDF0F2"
+    )
+    assert chart is not None
+    spec = chart.to_dict()
+    dash = spec["encoding"]["strokeDash"]["scale"]
+    assert dash["domain"] == [OPEN_SERIES, "Past 7-day threshold"]
+    assert dash["range"] == [[1, 0], [4, 3]]  # solid, then dashed
+    colour = spec["encoding"]["color"]["scale"]
+    assert colour["range"] == ["#0E8F8A", "#C6413B"]
+    assert spec["config"]["background"] == "transparent"
+
+
+def test_trend_chart_plots_both_series_for_every_point(stall_trend: TrendResponse) -> None:
+    from stewards.monitors.trend import trend_chart
+
+    chart = trend_chart(stall_trend.data, 7, "#0E8F8A", "#C6413B", "#5C6B76", "#EDF0F2")
+    assert chart is not None
+    frame = chart.data
+    assert len(frame) == 60  # 30 snapshots x 2 series
+    assert set(frame["series"]) == {OPEN_SERIES, "Past 7-day threshold"}

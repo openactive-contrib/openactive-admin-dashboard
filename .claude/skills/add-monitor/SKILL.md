@@ -39,7 +39,7 @@ Monitor(
 
 `ColKind` drives the `st.column_config` mapping — never write column_config in a page.
 
-## 2. Page stub — `src/stewards/pages/20_zero_future.py`
+## 2. Page stub — `src/stewards/views/20_zero_future.py`
 
 Three lines. No logic:
 
@@ -63,7 +63,7 @@ optional field. These are both the sample-data payloads the app serves before th
 and the happy-path fixtures the tests assert on. Test-only variants (empty, malformed,
 paginated) go in `tests/fixtures/`.
 
-## 4. Tests — `tests/unit/monitors/test_zero_future.py`
+## 4. Tests — `tests/unit/test_zero_future.py`
 
 - `tests/unit/test_registry.py` already covers the registry entry for free (unique id,
   page module exists, sample payloads exist, every `Col.field` and `FilterSpec.field`
