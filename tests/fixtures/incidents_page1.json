@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_a",
+      "publisher_name": "Publisher A",
+      "feed_id": "feed_a",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://a.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-09",
+      "days_open": 12,
+      "consecutive_days": 12,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [6, 7, 8, 9, 10, 11, 12],
+      "detail": { "last_modified": "2026-08-09" },
+      "quality_score": 82
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 2,
+    "page": 1,
+    "page_size": 1
+  }
+}

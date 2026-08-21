@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_name": "Freedom Leisure",
+      "first_detected": "2026-07-30",
+      "days_open": 22,
+      "past_threshold": true,
+      "status": "contact_due"
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 1,
+    "page": 1,
+    "page_size": 500
+  }
+}

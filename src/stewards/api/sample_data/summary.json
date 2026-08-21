@@ -1,0 +1,31 @@
+{
+  "data": {
+    "publishers_monitored": 170,
+    "publishers_with_issues": 47,
+    "open_incidents": 32,
+    "past_threshold": 10,
+    "feeds": 412,
+    "datasets": 178,
+    "monitors": [
+      {
+        "monitor_id": "single_feed_stall",
+        "count": 23,
+        "past_threshold_count": 7,
+        "sparkline": [12, 14, 15, 18, 20, 22, 23]
+      },
+      {
+        "monitor_id": "http_failure",
+        "count": 9,
+        "past_threshold_count": 3,
+        "sparkline": [11, 10, 10, 9, 9, 8, 9]
+      }
+    ]
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 2,
+    "page": 1,
+    "page_size": 100
+  }
+}

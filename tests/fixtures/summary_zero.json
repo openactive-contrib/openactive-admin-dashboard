@@ -1,0 +1,21 @@
+{
+  "data": {
+    "publishers_monitored": 170,
+    "publishers_with_issues": 0,
+    "open_incidents": 0,
+    "past_threshold": 0,
+    "feeds": 412,
+    "datasets": 178,
+    "monitors": [
+      { "monitor_id": "single_feed_stall", "count": 0, "past_threshold_count": 0, "sparkline": [] },
+      { "monitor_id": "http_failure", "count": 0, "past_threshold_count": 0, "sparkline": [] }
+    ]
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 2,
+    "page": 1,
+    "page_size": 100
+  }
+}

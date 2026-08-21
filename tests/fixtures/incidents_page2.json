@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_b",
+      "publisher_name": "Publisher B",
+      "feed_id": "feed_b",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://b.example.org/openactive/slots",
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [0, 0, 1, 2, 3],
+      "detail": { "last_modified": null },
+      "quality_score": null
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 2,
+    "page": 2,
+    "page_size": 1
+  }
+}
