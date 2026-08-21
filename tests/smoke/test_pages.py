@@ -30,6 +30,19 @@ def run(name: str) -> AppTest:
     return app
 
 
+def text_of(app: AppTest) -> str:
+    """All rendered text, whichever element carries it.
+
+    Backticks are markdown syntax rather than content, and the injected stylesheet is not
+    text at all, so both are stripped before matching.
+    """
+    parts = [
+        *(m.value for m in app.markdown if not m.value.lstrip().startswith("<style>")),
+        *(c.value for c in app.caption),
+    ]
+    return " ".join(parts).replace("`", "")
+
+
 @pytest.mark.parametrize("name", PAGES)
 def test_page_renders_without_exception(name: str) -> None:
     app = run(name)
@@ -38,12 +51,13 @@ def test_page_renders_without_exception(name: str) -> None:
 
 @pytest.mark.parametrize("name", PAGES)
 def test_every_page_states_the_snapshot(name: str) -> None:
-    captions = " ".join(c.value for c in run(name).caption)
+    """Hard rule: no data page may read as live."""
+    text = text_of(run(name))
     if name == "90_docs.py":
-        assert "theodi.org" in captions  # docs carry the access statement, not a snapshot
+        assert "theodi.org" in text  # docs carry the access statement, not a snapshot
     else:
-        assert "Snapshot 2026-08-21" in captions
-        assert "daily batch" in captions
+        assert "Snapshot 2026-08-21" in text
+        assert "daily batch" in text
 
 
 @pytest.mark.parametrize("name", MONITOR_PAGES)
@@ -99,10 +113,10 @@ def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
 
     app = run("00_overview.py")
     assert len(app.button) == 1  # only the contact-queue call to action; tiles use page links
-    markdown = " ".join(m.value for m in app.markdown)
+    text = text_of(app)
     for monitor in MONITOR_REGISTRY:
-        assert monitor.name in markdown
-        assert monitor.unit in " ".join(c.value for c in app.caption)
+        assert monitor.name in text
+        assert monitor.unit in text
 
 
 def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
@@ -157,8 +171,7 @@ def test_the_app_boots_and_lands_on_the_overview() -> None:
     app = AppTest.from_file(str(APP_FILE), default_timeout=60)
     app.run()
     assert not app.exception, [e.value for e in app.exception]
-    captions = " ".join(c.value for c in app.caption)
-    assert "Snapshot 2026-08-21" in captions
+    assert "Snapshot 2026-08-21" in text_of(app)
     assert any("Authentication is disabled" in w.value for w in app.warning)
 
 
@@ -196,3 +209,15 @@ def test_every_registered_monitor_page_lives_under_views() -> None:
     for monitor in MONITOR_REGISTRY:
         assert monitor.page.startswith("views/")
         assert (APP_FILE.parent / monitor.page).is_file()
+
+
+def test_the_header_shows_a_delta_when_the_api_supplies_one() -> None:
+    text = text_of(run("00_overview.py"))
+    assert "+3" in text  # publishers with issues
+    assert "+5" in text  # open incidents
+    assert "+2" in text  # past threshold
+
+
+def test_the_overview_header_exports_the_monitor_table() -> None:
+    app = run("00_overview.py")
+    assert app.get("download_button")

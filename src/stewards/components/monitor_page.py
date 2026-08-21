@@ -31,7 +31,7 @@ def render_kpis(monitor: Monitor, incidents: Sequence[Incident]) -> None:
     kpis = transforms.monitor_kpis(monitor, incidents)
     for index, (column, kpi) in enumerate(zip(st.columns(3), kpis, strict=True)):
         with column, card(f"kpi_{monitor.id}_{index}"):
-            layout.tone_metric(kpi.label, kpi.value, kpi.tone)
+            layout.tone_metric(kpi.label, kpi.value, kpi.tone, slug=f"{monitor.id}{index}")
 
 
 def render_monitor_page(monitor: Monitor) -> None:

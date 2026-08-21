@@ -61,7 +61,7 @@ def render_contact_queue_page() -> None:
         zip(st.columns(3), contact_queue.queue_kpis(incidents), strict=True)
     ):
         with column, card(f"kpi_queue_{index}"):
-            layout.tone_metric(label, value, tone)
+            layout.tone_metric(label, value, tone, slug=f"queue{index}")
 
     skipped = contact_queue.unknown_monitor_ids(incidents)
     if skipped:

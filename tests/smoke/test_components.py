@@ -123,7 +123,7 @@ def test_a_monitor_page_reports_the_failure_instead_of_an_empty_table() -> None:
     app = run(_monitor_page_error_script)
     assert any("unavailable" in error.value for error in app.error)
     assert not app.dataframe
-    assert app.title[0].value == "Single-feed stalls"
+    assert any("Single-feed stalls" in m.value for m in app.markdown)
 
 
 def _contact_queue_error_script() -> None:
@@ -204,7 +204,7 @@ def _unknown_fleet_size_script() -> None:
 
 def test_a_summary_with_no_fleet_size_does_not_divide_by_zero() -> None:
     app = run(_unknown_fleet_size_script)
-    assert any("fleet size unknown" in c.value for c in app.caption)
+    assert any("fleet size unknown" in m.value for m in app.markdown)
 
 
 # --- the contact queue with an unrenderable monitor -------------------------------------
@@ -258,7 +258,9 @@ def _header_script() -> None:
 def test_a_header_without_an_export_renders_no_download_button() -> None:
     app = run(_header_script)
     assert not app.get("download_button")
-    assert any("Snapshot 2026-08-21 06:00" in c.value for c in app.caption)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Snapshot `2026-08-21 06:00`" in markdown
+    assert "BigQuery · daily batch" in markdown
 
 
 def _export_script() -> None:

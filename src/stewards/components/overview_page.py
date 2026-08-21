@@ -11,7 +11,7 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
-from stewards.monitors.overview import Tile, build_tiles
+from stewards.monitors.overview import Tile, build_tiles, format_delta, overview_frame
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.trend import sparkline_chart
 
@@ -28,34 +28,44 @@ def render_fleet_kpis(summary: Summary) -> None:
         (
             "Publishers monitored",
             f"{summary.publishers_monitored:,}",
+            None,
             f"{summary.feeds:,} feeds across {summary.datasets:,} datasets",
-            Tone.GREY,
+            None,
         ),
         (
             "Publishers with issues",
             f"{summary.publishers_with_issues:,}",
+            format_delta(summary.publishers_with_issues_delta),
             issue_share,
             Tone.AMBER,
         ),
         (
             "Open incidents",
             f"{summary.open_incidents:,}",
+            format_delta(summary.open_incidents_delta),
             f"across {len(summary.monitors)} monitors",
             Tone.RED,
         ),
         (
             "Past contact threshold",
             f"{summary.past_threshold:,}",
-            "in the publisher contact queue",
+            format_delta(summary.past_threshold_delta),
+            f"open longer than {get_settings().contact_threshold_days} days",
             Tone.RED,
         ),
     )
-    for index, (column, (label, value, sub, tone)) in enumerate(
+    for index, (column, (label, value, delta, sub, tone)) in enumerate(
         zip(st.columns(4), cells, strict=True)
     ):
         with column, card(f"kpi_{index}"):
-            layout.tone_metric(label, value, tone if value != "0" else Tone.GREEN)
-            st.caption(sub)
+            layout.tone_metric(
+                label,
+                value,
+                tone if value != "0" else Tone.GREEN,
+                slug=f"fleet{index}",
+                delta=delta,
+                sub=sub,
+            )
 
 
 def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
@@ -91,8 +101,9 @@ def render_tile(tile: Tile) -> None:
 
         count_col, spark_col = st.columns([1, 1], vertical_alignment="center")
         with count_col:
-            st.markdown(f"## :{colour}[{tile.value}]")
-            st.caption(tile.monitor.unit)
+            layout.tone_metric(
+                "", tile.value, tile.state, slug=f"tile{tile.monitor.id}", sub=tile.monitor.unit
+            )
         with spark_col:
             chart = sparkline_chart(tile.sparkline, theme.FOREGROUND[tile.state])
             if chart is not None:
@@ -117,12 +128,19 @@ def render_overview_page() -> None:
         return
 
     summary = response.data
+    tiles = build_tiles(summary)
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"
         if summary.publishers_monitored
         else "Health of the publisher fleet"
     )
-    layout.render_header("Overview", title, response.meta)
+    layout.render_header(
+        "Overview",
+        title,
+        response.meta,
+        export=overview_frame(tiles),
+        export_name="monitor_overview",
+    )
     if get_settings().use_sample_data:
         layout.render_sample_data_notice()
 
@@ -130,7 +148,6 @@ def render_overview_page() -> None:
     threshold_days = get_settings().contact_threshold_days
     render_threshold_banner(summary, threshold_days)
 
-    tiles = build_tiles(summary)
     with st.container(horizontal=True, vertical_alignment="bottom"):
         st.markdown("**Monitors**")
         st.caption(

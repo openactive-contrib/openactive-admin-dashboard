@@ -91,8 +91,9 @@ tests/
 5. **Read-only.** No mute, assign, re-crawl, or send-email actions. Export CSV and a
    copyable email draft are the only outputs.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
-   `components.layout.render_header`. A page that failed to load renders
-   `render_error_header` instead — no snapshot caption, because there is no snapshot.
+   `components.layout.render_header`, which is the whole header bar (crumb, title,
+   snapshot, Export CSV). A page that failed to load renders `render_error_header`
+   instead — no snapshot line, because there is no snapshot.
 7. Secrets only via `.streamlit/secrets.toml` / env. Never commit tokens, never log the API
    token, never log or display a full user email (`auth.google.mask_email`).
 8. **The page modules live in `views/`, never `pages/`.** A folder named `pages` beside the
@@ -114,6 +115,14 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_ALLOWED_DOMAIN` | Google workspace allowlist, default `theodi.org` |
 | `STEWARDS_USE_SAMPLE_DATA` | Serve the bundled payloads instead of calling the API |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
+
+## The `/summary` contract
+
+Beyond the counts in `BUILD_BRIEF.md` §3, `/summary` may send optional
+`publishers_with_issues_delta`, `open_incidents_delta` and `past_threshold_delta`
+(change against the previous snapshot). They are `int | None`: absent means the KPI
+renders with no delta, never a fabricated zero. `monitors.overview.format_delta` owns the
+sign convention.
 
 ## Testing bar
 
@@ -161,8 +170,14 @@ uv run mypy src
   `tests/unit/test_theme.py` fails if the two drift apart, so change both or neither, and
   it also fails on any hex inlined outside `theme.py`.
 - The page background is the canvas tint; cards are white. Streamlit has no theme token for
-  a container's fill, so `components/surface.py` holds the app's **only** stylesheet and
-  cards opt in with `card("name")` — never a bare `st.container(border=True)`.
+  a container's fill, nor a per-element type scale, so `components/surface.py` holds the
+  app's **only** stylesheet: card fill plus the header-bar and KPI type scale. Cards opt in
+  with `card("name")` — never a bare `st.container(border=True)`. Elements hook the type
+  scale through container **keys** (`st-key-*`), never a generated emotion class, and no
+  data is ever interpolated into markup.
+- `layout.tone_metric(label, value, tone, slug=…, delta=…, sub=…)` renders every KPI. Its
+  `slug` must be unique on the page — it becomes the container key. `tone=None` leaves the
+  value in body ink, for a figure that is context rather than a state.
 - Streamlit's built-in sidebar nav takes a plain-text label, so it is hidden
   (`st.navigation(..., position="hidden")`) and `components/nav.render_sidebar` draws the
   grouped sidebar with `st.page_link` plus an `st.badge` count pill per item.

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+
+import pandas as pd
 
 from stewards.api.models import Summary
 from stewards.monitors.registry import MONITOR_REGISTRY, Monitor, Severity
@@ -36,6 +39,22 @@ def tile_note(monitor: Monitor, count: int, past_threshold_count: int) -> str:
     if past_threshold_count > 0:
         return f"{past_threshold_count} past the {monitor.threshold_days}-day threshold"
     return f"none past the {monitor.threshold_days}-day threshold yet"
+
+
+#: A true minus sign (U+2212), not a hyphen: it aligns with the digits at this size.
+MINUS = "\u2212"
+
+
+def format_delta(change: int | None) -> str | None:
+    """Signed change against the previous snapshot, or None when unknown.
+
+    Zero is rendered explicitly: "no change" is information, whereas a missing field is not.
+    """
+    if change is None:
+        return None
+    if change == 0:
+        return "0"
+    return f"+{change:,}" if change > 0 else f"{MINUS}{abs(change):,}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,3 +128,24 @@ def build_tiles(summary: Summary) -> tuple[Tile, ...]:
 def sidebar_counts(summary: Summary) -> dict[str, int]:
     """Monitor id -> open incident count, for the navigation labels."""
     return {m.monitor_id: m.count for m in summary.monitors}
+
+
+OVERVIEW_COLUMNS = ("Monitor", "Group", "State", "Open", "Past threshold", "Note")
+
+
+def overview_frame(tiles: Sequence[Tile]) -> pd.DataFrame:
+    """The tile grid as a table, for the header's Export CSV."""
+    return pd.DataFrame(
+        [
+            {
+                "Monitor": tile.monitor.name,
+                "Group": tile.monitor.group.value,
+                "State": tile.state_label,
+                "Open": tile.count,
+                "Past threshold": tile.past_threshold_count,
+                "Note": tile.note,
+            }
+            for tile in tiles
+        ],
+        columns=list(OVERVIEW_COLUMNS),
+    )

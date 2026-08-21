@@ -6,10 +6,14 @@ import pytest
 
 from stewards.api.models import MonitorCount, Summary, SummaryResponse
 from stewards.monitors.overview import (
+    MINUS,
+    OVERVIEW_COLUMNS,
     STATE_LABELS,
     NavBadge,
     build_tiles,
+    format_delta,
     nav_badges,
+    overview_frame,
     sidebar_counts,
     tile_note,
     tile_state,
@@ -139,3 +143,66 @@ def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) ->
 
 def test_sidebar_counts_of_an_empty_summary_is_empty() -> None:
     assert sidebar_counts(Summary()) == {}
+
+
+# --- deltas -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (None, None),  # the API has not sent it: render nothing, never a made-up zero
+        (0, "0"),
+        (3, "+3"),
+        (-2, f"{MINUS}2"),
+        (1500, "+1,500"),
+        (-1500, f"{MINUS}1,500"),
+        (1, "+1"),
+        (-1, f"{MINUS}1"),
+    ],
+)
+def test_format_delta(change: int | None, expected: str | None) -> None:
+    assert format_delta(change) == expected
+
+
+def test_a_negative_delta_uses_a_true_minus_not_a_hyphen() -> None:
+    rendered = format_delta(-4)
+    assert rendered is not None
+    assert "-" not in rendered
+    assert rendered.startswith(MINUS)
+
+
+def test_deltas_default_to_absent_on_the_contract() -> None:
+    summary = Summary()
+    assert summary.publishers_with_issues_delta is None
+    assert summary.open_incidents_delta is None
+    assert summary.past_threshold_delta is None
+
+
+def test_the_sample_summary_supplies_deltas(summary: SummaryResponse) -> None:
+    assert format_delta(summary.data.publishers_with_issues_delta) == "+3"
+    assert format_delta(summary.data.open_incidents_delta) == "+5"
+    assert format_delta(summary.data.past_threshold_delta) == "+2"
+
+
+# --- the export frame ---------------------------------------------------------------------
+
+
+def test_overview_frame_has_a_row_per_tile(summary: SummaryResponse) -> None:
+    frame = overview_frame(build_tiles(summary.data))
+    assert list(frame.columns) == list(OVERVIEW_COLUMNS)
+    assert len(frame) == len(MONITOR_REGISTRY)
+    assert set(frame["Monitor"]) == {m.name for m in MONITOR_REGISTRY}
+
+
+def test_overview_frame_carries_the_counts(summary: SummaryResponse) -> None:
+    frame = overview_frame(build_tiles(summary.data)).set_index("Monitor")
+    assert frame.loc["Single-feed stalls", "Open"] == 23
+    assert frame.loc["Single-feed stalls", "Past threshold"] == 7
+    assert frame.loc["Single-feed stalls", "State"] == "Critical"
+
+
+def test_overview_frame_of_no_tiles_keeps_its_columns() -> None:
+    frame = overview_frame([])
+    assert frame.empty
+    assert list(frame.columns) == list(OVERVIEW_COLUMNS)

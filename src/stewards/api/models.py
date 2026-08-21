@@ -80,6 +80,12 @@ class Summary(ApiModel):
     datasets: int = 0
     monitors: tuple[MonitorCount, ...] = ()
 
+    #: Change against the previous snapshot. Optional: the KPI renders without a delta
+    #: until the API supplies these, rather than showing a made-up zero.
+    publishers_with_issues_delta: int | None = None
+    open_incidents_delta: int | None = None
+    past_threshold_delta: int | None = None
+
     def count_for(self, monitor_id: str) -> MonitorCount | None:
         return next((m for m in self.monitors if m.monitor_id == monitor_id), None)
 
