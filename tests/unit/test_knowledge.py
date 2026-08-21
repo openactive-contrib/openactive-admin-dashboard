@@ -9,14 +9,20 @@ import pytest
 
 from stewards.knowledge.loader import (
     DOCS_DIR,
+    EXCERPT_CHARS,
+    INDEX_COLUMNS,
     Doc,
     DocError,
     all_docs,
     all_tags,
     excerpt_of,
     get_doc,
+    human_date,
+    index_frame,
     load_docs,
+    newest_update,
     parse_doc,
+    remember,
     search_docs,
 )
 
@@ -187,3 +193,110 @@ def test_quoted_front_matter_values_are_unwrapped() -> None:
 
 def test_all_docs_is_cached_and_returns_the_same_tuple() -> None:
     assert all_docs() is all_docs()
+
+
+# --- editorial dates ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (date(2026, 8, 14), "14 Aug 2026"),
+        (date(2026, 8, 9), "09 Aug 2026"),  # zero-padded, as the approved design shows
+        (date(2026, 7, 28), "28 Jul 2026"),
+        (date(2026, 1, 1), "01 Jan 2026"),
+        (date(2026, 12, 31), "31 Dec 2026"),
+        (None, "undated"),
+    ],
+)
+def test_human_date(value: date | None, expected: str) -> None:
+    assert human_date(value) == expected
+
+
+def test_the_document_label_is_editorial_not_iso() -> None:
+    doc = parse_doc("x", "---\ntitle: X\nupdated: 2026-08-09\n---\n\nBody.\n")
+    assert doc.updated_label == "09 Aug 2026"
+    assert doc.updated == date(2026, 8, 9)  # the ISO value is still there for sorting
+
+
+def test_newest_update_picks_the_latest() -> None:
+    docs = (
+        parse_doc("a", "---\ntitle: A\nupdated: 2026-01-01\n---\n\nBody.\n"),
+        parse_doc("b", "---\ntitle: B\nupdated: 2026-06-01\n---\n\nBody.\n"),
+        parse_doc("c", "---\ntitle: C\n---\n\nBody.\n"),
+    )
+    assert newest_update(docs) == date(2026, 6, 1)
+
+
+def test_newest_update_of_undated_or_no_documents_is_none() -> None:
+    assert newest_update(()) is None
+    assert newest_update((parse_doc("c", "---\ntitle: C\n---\n\nBody.\n"),)) is None
+
+
+# --- excerpts as plain text ---------------------------------------------------------------
+
+
+def test_excerpt_strips_inline_emphasis() -> None:
+    body = "A feed is **stalled** when `max(modified)` stops _advancing_.\n"
+    assert excerpt_of(body) == "A feed is stalled when max(modified) stops advancing."
+
+
+def test_excerpt_still_skips_a_fenced_block_after_the_strip() -> None:
+    """Regression: stripping emphasis first would hide the ``` marker."""
+    body = "```sql\nSELECT 1\n```\n\nReal prose here.\n"
+    assert excerpt_of(body) == "Real prose here."
+
+
+def test_the_shipped_runbook_excerpt_is_plain_and_short() -> None:
+    excerpt = get_doc("single-feed-stalls-runbook").excerpt
+    assert "**" not in excerpt
+    assert len(excerpt) <= EXCERPT_CHARS
+
+
+# --- the export index ---------------------------------------------------------------------
+
+
+def test_index_frame_has_a_row_per_document() -> None:
+    docs = all_docs()
+    frame = index_frame(docs)
+    assert list(frame.columns) == list(INDEX_COLUMNS)
+    assert len(frame) == len(docs)
+    assert frame.iloc[0]["Title"] == docs[0].title
+    assert frame.iloc[0]["Updated"] == "2026-08-14"  # ISO in the export, not the byline
+    assert frame.iloc[0]["Tags"] == "runbook, stalls, availability"
+
+
+def test_index_frame_of_no_documents_keeps_its_columns() -> None:
+    frame = index_frame([])
+    assert frame.empty
+    assert list(frame.columns) == list(INDEX_COLUMNS)
+
+
+def test_index_frame_leaves_an_undated_document_blank() -> None:
+    docs = (parse_doc("c", "---\ntitle: C\n---\n\nBody.\n"),)
+    assert index_frame(docs).iloc[0]["Updated"] == ""
+
+
+# --- recently viewed ----------------------------------------------------------------------
+
+
+def test_remember_puts_the_newest_first() -> None:
+    assert remember(("a", "b"), "c") == ("c", "a", "b")
+
+
+def test_remember_moves_a_repeat_to_the_front_without_duplicating() -> None:
+    assert remember(("a", "b", "c"), "b") == ("b", "a", "c")
+
+
+def test_remember_caps_the_history() -> None:
+    assert remember(("a", "b", "c"), "d", limit=3) == ("d", "a", "b")
+    assert remember(("a", "b", "c"), "d", limit=1) == ("d",)
+
+
+def test_remember_ignores_an_empty_slug() -> None:
+    """Returning to the index must not push a blank entry into the history."""
+    assert remember(("a", "b"), "") == ("a", "b")
+
+
+def test_remember_from_an_empty_history() -> None:
+    assert remember((), "a") == ("a",)

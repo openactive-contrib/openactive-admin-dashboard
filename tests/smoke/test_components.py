@@ -444,7 +444,7 @@ def _stale_doc_script() -> None:
 def test_a_stale_document_selection_falls_back_to_the_index() -> None:
     app = run(_stale_doc_script)
     assert any("no longer exists" in w.value for w in app.warning)
-    assert any("Internal documentation" in t.value for t in app.title)
+    assert any("Internal documentation" in m.value for m in app.markdown)
 
 
 def _internal_only_doc_script() -> None:

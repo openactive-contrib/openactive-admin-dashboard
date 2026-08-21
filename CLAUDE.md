@@ -159,7 +159,10 @@ uv run mypy src
 - Semantic colours are fixed: red `#C6413B`, amber `#C77F1A`, green `#1F7A4C`,
   grey `#5C6B76`, teal `#0E8F8A` (primary). Defined once in `components/theme.py`; use
   `theme.markdown_colour(tone)` for coloured text rather than inline HTML.
-- Copy tone: factual, no exclamation marks, no emoji in UI text.
+- Copy tone: factual, no exclamation marks, no emoji in UI text. Dates are ISO
+  everywhere they describe data (snapshots, incidents, exports). Knowledge-base document
+  dates are the one exception — `09 Aug 2026` via `knowledge.loader.human_date`, because a
+  document date is an editorial byline rather than a measurement.
 - Cache API reads with `@st.cache_data(ttl=3600)` at the repository layer only; the wrapped
   `_fetch_*` function stays cache-free so tests call it directly.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
@@ -187,6 +190,9 @@ uv run mypy src
 - Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
 - Route URLs drop the filename's numeric prefix: `views/12_http_failures.py` serves
   `/http_failures`.
+- `layout.render_header` takes either a `Meta` (renders the snapshot lines) or `meta_lines`
+  for a page not backed by the daily batch. The knowledge base uses the latter: it is
+  markdown files, so labelling it "BigQuery · daily batch" would be untrue.
 
 ## Before you finish a task
 

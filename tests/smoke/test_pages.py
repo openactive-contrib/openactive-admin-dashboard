@@ -39,6 +39,7 @@ def text_of(app: AppTest) -> str:
     parts = [
         *(m.value for m in app.markdown if not m.value.lstrip().startswith("<style>")),
         *(c.value for c in app.caption),
+        *(b.label for b in app.button),
     ]
     return " ".join(parts).replace("`", "")
 
@@ -144,10 +145,56 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
 
 def test_docs_index_lists_the_runbook_and_opens_it() -> None:
     app = run("90_docs.py")
-    assert any("Runbook" in m.value for m in app.markdown)
-    app.button[0].click().run()
-    assert not app.exception
+    text = text_of(app)
+    assert "Runbook — single-feed stalls" in text
+    assert "Data Infrastructure" in text  # owner, right-aligned on the card
+    assert "14 Aug 2026" in text  # editorial date, not ISO
+
+    app.button(key="open_doc_single-feed-stalls-runbook").click().run()
+    assert not app.exception, [e.value for e in app.exception]
     assert any("internal only" in m.value for m in app.markdown)
+
+
+def test_the_docs_header_states_its_own_provenance_not_the_snapshot() -> None:
+    """The knowledge base is files, so it must not claim to come from the daily batch."""
+    text = text_of(run("90_docs.py"))
+    assert "Updated 14 Aug 2026" in text
+    assert "1 document · internal only" in text
+    assert "BigQuery" not in text
+
+
+def test_opening_a_doc_records_it_as_recently_viewed() -> None:
+    app = run("90_docs.py")
+    assert "Documents you open appear here." in text_of(app)
+
+    app.button(key="open_doc_single-feed-stalls-runbook").click().run()
+    app.button(key="docs_back").click().run()
+    assert not app.exception, [e.value for e in app.exception]
+    assert app.button(key="recent_single-feed-stalls-runbook")
+
+
+def test_the_tag_chips_offer_every_tag_in_the_index() -> None:
+    from stewards.components.docs_page import ALL_TAGS
+    from stewards.knowledge.loader import all_docs, all_tags
+
+    app = run("90_docs.py")
+    chips = app.get("button_group")
+    assert chips
+    assert list(chips[0].options) == [ALL_TAGS, *all_tags(all_docs())]
+
+
+def test_selecting_a_tag_keeps_the_documents_carrying_it() -> None:
+    app = run("90_docs.py")
+    app.get("button_group")[0].set_value("runbook").run()
+    assert not app.exception, [e.value for e in app.exception]
+    assert "Runbook — single-feed stalls" in text_of(app)
+
+
+def test_a_tag_plus_a_non_matching_search_reaches_the_empty_state() -> None:
+    app = run("90_docs.py")
+    app.get("button_group")[0].set_value("runbook").run()
+    app.text_input[0].set_value("no-such-topic").run()
+    assert any("No document matches" in info.value for info in app.info)
 
 
 def test_docs_search_with_no_match_says_so() -> None:

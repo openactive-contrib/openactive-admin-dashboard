@@ -1,4 +1,4 @@
-"""The knowledge base: searchable index, tag filter, and a full markdown view."""
+"""The knowledge base: searchable index, tag chips, doc view, and the access panel."""
 
 from __future__ import annotations
 
@@ -6,79 +6,148 @@ import streamlit as st
 
 from stewards.components import layout
 from stewards.components.surface import card
-from stewards.knowledge.loader import Doc, all_docs, all_tags, get_doc, search_docs
+from stewards.knowledge.loader import (
+    Doc,
+    all_docs,
+    all_tags,
+    get_doc,
+    human_date,
+    index_frame,
+    newest_update,
+    remember,
+    search_docs,
+)
+
+CRUMB = "Knowledge base"
+TITLE = "Internal documentation"
 
 SELECTED_KEY = "docs_selected_slug"
-TITLE = "Internal documentation"
-CRUMB = "Knowledge base"
+RECENT_KEY = "docs_recent_slugs"
+TAG_KEY = "docs_tag"
+
+ALL_TAGS = "All"
+SEARCH_PLACEHOLDER = 'Search titles, body text and tags — e.g. "orphan", "runbook", "stalls"'
+ACCESS_BODY = (
+    "Every page here sits behind Google SSO and is restricted to the `theodi.org` "
+    "workspace. Nothing in this space is publishable."
+)
 
 
 def _select(slug: str) -> None:
     st.session_state[SELECTED_KEY] = slug
+    st.session_state[RECENT_KEY] = remember(st.session_state.get(RECENT_KEY, ()), slug)
+
+
+def count_label(total: int) -> str:
+    """`1 document` / `6 documents`."""
+    return f"{total} document" if total == 1 else f"{total} documents"
+
+
+def _eyebrow(text: str, key: str) -> None:
+    with st.container(key=key):
+        st.markdown(text.upper())
+
+
+def render_tags(tags: tuple[str, ...], key: str) -> None:
+    if not tags:
+        return
+    with st.container(horizontal=True, key=key):
+        for tag in tags:
+            st.badge(tag, color="primary")
+
+
+def render_result(doc: Doc) -> None:
+    """One result card: title, excerpt, tags; date and owner on the right."""
+    with card(f"doc_{doc.slug}"):
+        body, meta = st.columns([5, 1], vertical_alignment="top")
+        with body:
+            with st.container(key=f"oadoctitle_{doc.slug}"):
+                st.button(
+                    doc.title,
+                    key=f"open_doc_{doc.slug}",
+                    type="tertiary",
+                    on_click=_select,
+                    args=(doc.slug,),
+                )
+            with st.container(key=f"oadocexcerpt_{doc.slug}"):
+                st.markdown(doc.excerpt)
+            render_tags(doc.tags, key=f"oadoctags_{doc.slug}")
+        with meta, st.container(key=f"oadocmeta_{doc.slug}"):
+            st.markdown(human_date(doc.updated))
+            st.markdown(doc.owner)
 
 
 def render_index(docs: tuple[Doc, ...]) -> None:
     with card("docs_search"):
         term = st.text_input(
             "Search",
-            key="docs_search",
-            placeholder="Search titles, body text and tags — e.g. “stall”, “runbook”",
+            key="docs_search_term",
+            placeholder=SEARCH_PLACEHOLDER,
             label_visibility="collapsed",
         )
-        tags = st.multiselect(
-            "Tags",
-            all_tags(docs),
-            key="docs_tags",
+        chosen = st.pills(
+            "Tag",
+            [ALL_TAGS, *all_tags(docs)],
+            default=ALL_TAGS,
+            key=TAG_KEY,
             label_visibility="collapsed",
-            placeholder="Filter by tag",
         )
 
+    tags = () if chosen in (None, ALL_TAGS) else (chosen,)
     results = search_docs(docs, term, tags)
-    st.caption(f"{len(results)} of {len(docs)} documents")
     if not results:
-        st.info("No document matches that search. Clear the search box or the tag filter.")
+        st.info("No document matches that search. Clear the search box or pick All.")
         return
-
     for doc in results:
-        with card(f"doc_{doc.slug}"):
-            body, side = st.columns([4, 1], vertical_alignment="top")
-            with body:
-                st.markdown(f"**{doc.title}**")
-                st.caption(doc.excerpt)
-                st.markdown(" ".join(f"`{tag}`" for tag in doc.tags))
-            with side:
-                st.caption(f"updated {doc.updated_label}")
-                st.caption(doc.owner)
-                st.button(
-                    "Open",
-                    key=f"open_doc_{doc.slug}",
-                    on_click=_select,
-                    args=(doc.slug,),
-                    width="stretch",
-                )
+        render_result(doc)
+
+
+def render_access_panel(docs: tuple[Doc, ...]) -> None:
+    with card("docs_access"):
+        _eyebrow("Access", "oaeyebrow_access")
+        with st.container(key="oapanelbody"):
+            st.markdown(ACCESS_BODY)
+        with st.container(key="oapanelrule"):
+            st.divider()
+        _eyebrow("Recently viewed", "oaeyebrow_recent")
+        recent = st.session_state.get(RECENT_KEY, ())
+        if not recent:
+            st.caption("Documents you open appear here.")
+            return
+        for slug in recent:
+            try:
+                doc = get_doc(slug, docs)
+            except KeyError:
+                continue
+            st.button(
+                doc.title,
+                key=f"recent_{slug}",
+                type="tertiary",
+                on_click=_select,
+                args=(slug,),
+            )
 
 
 def render_doc(doc: Doc) -> None:
     body, side = st.columns([3, 1], vertical_alignment="top")
     with body:
-        st.button("← All documents", key="docs_back", on_click=_select, args=("",))
-        tags = " ".join(f"`{tag}`" for tag in doc.tags)
+        st.button(
+            "← All documents", key="docs_back", type="tertiary", on_click=_select, args=("",)
+        )
+        render_tags(doc.tags, key=f"oadocviewtags_{doc.slug}")
         if doc.is_restricted:
-            st.markdown(f"{tags} :red[**internal only**]")
-        else:
-            st.markdown(tags)
+            st.markdown(":red-badge[internal only]")
         st.title(doc.title, anchor=False)
         st.caption(f"Owner: {doc.owner} · updated {doc.updated_label}")
         st.markdown(doc.body)
     with side:
-        st.caption("ON THIS PAGE")
+        _eyebrow("On this page", "oaeyebrow_onthispage")
         for heading in doc.headings:
             st.markdown(f"- {heading}")
 
 
 def render_docs_page() -> None:
     docs = all_docs()
-    st.caption(CRUMB.upper())
     slug = st.session_state.get(SELECTED_KEY, "")
 
     if slug:
@@ -88,15 +157,26 @@ def render_docs_page() -> None:
             st.session_state[SELECTED_KEY] = ""
             st.warning("That document no longer exists. Showing the index instead.")
         else:
+            layout.render_header(CRUMB, doc.title)
             render_doc(doc)
             layout.render_footer("", note="Documentation is internal to the ODI workspace.")
             return
 
-    st.title(TITLE, anchor=False)
-    st.caption(
-        "Every page here sits behind Google SSO and is restricted to the theodi.org "
-        "workspace. Nothing in this space is publishable."
+    latest = newest_update(docs)
+    layout.render_header(
+        CRUMB,
+        TITLE,
+        export=index_frame(docs),
+        export_name="documentation",
+        export_stamp=latest.isoformat() if latest else "",
+        meta_lines=(
+            f"Updated `{human_date(latest)}`",
+            f"{count_label(len(docs))} · internal only",
+        ),
     )
-    st.divider()
-    render_index(docs)
+    index, panel = st.columns([3.3, 1], vertical_alignment="top")
+    with index:
+        render_index(docs)
+    with panel:
+        render_access_panel(docs)
     layout.render_footer("", note="Documentation is internal to the ODI workspace.")

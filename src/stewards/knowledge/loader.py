@@ -14,13 +14,17 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+import pandas as pd
+
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 RESTRICTED = "restricted"
-EXCERPT_CHARS = 220
+EXCERPT_CHARS = 120
 
 _FRONT_MATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _H2 = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+#: Inline emphasis and code spans, stripped so an excerpt reads as plain prose.
+_EMPHASIS = re.compile(r"[*_`]{1,2}")
 
 
 class DocError(ValueError):
@@ -51,7 +55,8 @@ class Doc:
 
     @property
     def updated_label(self) -> str:
-        return self.updated.isoformat() if self.updated else "undated"
+        """Editorial date, in the reader's format rather than ISO — this is a byline."""
+        return human_date(self.updated)
 
 
 def _split_front_matter(text: str) -> tuple[dict[str, str], str]:
@@ -96,11 +101,17 @@ def parse_doc(slug: str, text: str) -> Doc:
 
 
 def excerpt_of(body: str, limit: int = EXCERPT_CHARS) -> str:
-    """First prose paragraph, trimmed — headings and code fences skipped."""
+    """First prose paragraph as plain text, trimmed.
+
+    Headings and code fences are skipped, and inline emphasis is stripped: a card excerpt is
+    a summary line, so it should not inherit bold or code styling from the source.
+    """
     for block in body.split("\n\n"):
-        text = " ".join(block.split())
-        if not text or text.startswith(("#", "```", "|", "-", ">")):
+        raw = " ".join(block.split())
+        # Skip on the raw text: stripping emphasis first would hide a ``` fence marker.
+        if not raw or raw.startswith(("#", "```", "|", "-", ">")):
             continue
+        text = _EMPHASIS.sub("", raw)
         return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
     return ""
 
@@ -145,3 +156,42 @@ def search_docs(docs: Iterable[Doc], term: str = "", tags: Sequence[str] = ()) -
             continue
         results.append(doc)
     return results
+
+
+INDEX_COLUMNS = ("Title", "Tags", "Owner", "Updated", "Sensitivity")
+RECENT_LIMIT = 3
+
+
+def human_date(value: date | None) -> str:
+    """`09 Aug 2026`. Document dates are a byline, not a measurement, so they are not ISO."""
+    return value.strftime("%d %b %Y") if value else "undated"
+
+
+def index_frame(docs: Sequence[Doc]) -> pd.DataFrame:
+    """The document index as a table, for the header's Export CSV."""
+    return pd.DataFrame(
+        [
+            {
+                "Title": doc.title,
+                "Tags": ", ".join(doc.tags),
+                "Owner": doc.owner,
+                "Updated": doc.updated.isoformat() if doc.updated else "",
+                "Sensitivity": doc.sensitivity,
+            }
+            for doc in docs
+        ],
+        columns=list(INDEX_COLUMNS),
+    )
+
+
+def remember(history: Sequence[str], slug: str, limit: int = RECENT_LIMIT) -> tuple[str, ...]:
+    """Most-recently-opened first, de-duplicated, capped. An empty slug changes nothing."""
+    if not slug:
+        return tuple(history)[:limit]
+    return (slug, *(s for s in history if s != slug))[:limit]
+
+
+def newest_update(docs: Sequence[Doc]) -> date | None:
+    """The most recent update across the index, for the header line."""
+    dates = [doc.updated for doc in docs if doc.updated is not None]
+    return max(dates) if dates else None
