@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "OpenActive Data Stewards Dashboard — internal data health monitoring for the ODI tech team"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "streamlit>=1.40",
+    "streamlit[auth]>=1.40",
     "httpx>=0.27",
     "pydantic>=2.7",
     "pandas>=2.2",

@@ -83,3 +83,15 @@ def test_the_allowed_domain_is_configurable() -> None:
     settings = settings_for(allowed_email_domain="example.org")
     assert decide(settings, is_logged_in=True, email="a@example.org") is Decision.ALLOWED
     assert decide(settings, is_logged_in=True, email="a@theodi.org") is Decision.DENIED
+
+
+def test_current_email_is_none_when_the_session_carries_no_email() -> None:
+    """Regression: reading `st.user.email` raises for a key the session does not carry.
+
+    Once an `[auth]` section exists in secrets.toml, Streamlit populates `st.user` with
+    nothing but `is_logged_in` until the user signs in — so the gate crashed on the way to
+    rendering the login screen. Outside a script run `st.user` is empty, the same shape.
+    """
+    from stewards.auth.google import _current_email
+
+    assert _current_email() is None

@@ -92,8 +92,13 @@ def render_dev_bypass_warning() -> None:
 
 
 def _current_email() -> str | None:
-    """`st.user.email` is loosely typed; only a string is a usable identity."""
-    email = st.user.email
+    """The signed-in address, or None if the session does not carry one.
+
+    `st.user` raises for a key the session has no value for, and until the user signs in
+    it carries no `email` at all — so it is read through the mapping interface, which
+    defaults instead. The proxy is loosely typed; only a string is a usable identity.
+    """
+    email = st.user.get("email")
     return email if isinstance(email, str) else None
 
 
@@ -103,7 +108,7 @@ def require_login(settings: Settings) -> str | None:
     In a dev environment the gate can be skipped explicitly with `STEWARDS_DISABLE_AUTH`;
     the banner says so on every page so it can never pass unnoticed in a real deployment.
     """
-    is_logged_in = bool(settings.disable_auth) or bool(st.user.is_logged_in)
+    is_logged_in = bool(settings.disable_auth) or bool(st.user.get("is_logged_in"))
     email = None if settings.disable_auth else _current_email()
     decision = decide(settings, is_logged_in=is_logged_in, email=email)
 

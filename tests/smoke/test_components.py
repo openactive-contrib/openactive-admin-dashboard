@@ -460,3 +460,17 @@ def test_a_restricted_document_is_flagged_and_lists_its_headings() -> None:
     assert "internal only" in markdown
     assert "Detection" in markdown
     assert "Triage sequence" in markdown
+
+
+def _gate_before_login_script() -> None:
+    from stewards.auth.google import require_login
+    from stewards.config import Settings
+
+    require_login(Settings(api_base_url="https://api.test"))
+    raise AssertionError("the gate must stop the script before this line")
+
+
+def test_the_gate_renders_the_login_screen_when_nobody_is_signed_in() -> None:
+    """Regression: with the gate on, `st.user` carries no usable identity keys yet."""
+    app = run(_gate_before_login_script)
+    assert any("Continue with Google" in b.label for b in app.button)
