@@ -3,7 +3,9 @@
 # so they are deliberately not set here.
 title: OpenActive Data Stewards
 description: Runbooks and reference material for the data health dashboard.
-theme: just-the-docs
+remote_theme: just-the-docs/just-the-docs
+plugins:
+  - jekyll-remote-theme
 
 # Every document gets the theme's page layout, so no file needs its own `layout:` key.
 defaults:
