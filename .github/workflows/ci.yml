@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same PR supersedes the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # --locked fails the build if uv.lock is out of date with pyproject.toml,
+      # so CI never resolves a dependency set the committed lock does not describe.
+      - name: Install dependencies
+        run: uv sync --extra dev --locked
+
+      # --output-format=github turns findings into inline PR annotations.
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+
+      - name: ruff format
+        run: uv run ruff format --check .
+
+      - name: mypy --strict
+        run: uv run mypy src
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --extra dev --locked
+
+      # The project-wide bar from CLAUDE.md ("Testing bar"): >= 80%.
+      - name: pytest
+        run: uv run pytest --cov=src/stewards --cov-report=term-missing --cov-fail-under=80
+
+      # The higher bar on the modules that hold the logic: >= 90%.
+      # Reads the .coverage written above — the suite is not re-run.
+      - name: coverage bar on monitors, components and api
+        run: >
+          uv run coverage report
+          --include="src/stewards/monitors/*,src/stewards/components/*,src/stewards/api/*"
+          --fail-under=90

@@ -35,6 +35,18 @@ uv run ruff check --fix . && uv run ruff format .
 uv run mypy src
 ```
 
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request to `main`, and on pushes to `main`:
+
+- **Lint** — `ruff check`, `ruff format --check`, `mypy --strict`
+- **Tests** — `pytest`, with the coverage bars enforced rather than aspirational:
+  >= 80% project-wide, and >= 90% across `monitors/`, `components/` and `api/`
+
+Dependencies install with `uv sync --extra dev --locked`, so a `pyproject.toml` change
+committed without a refreshed `uv.lock` fails the build instead of silently resolving to
+something the lockfile does not describe.
+
 ## Where things are
 
 - `BUILD_BRIEF.md` — settled product decisions, page map, API contract, visual language
