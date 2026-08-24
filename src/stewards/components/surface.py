@@ -38,8 +38,11 @@ _STYLES = f"""
   }}
 
   /* --- header bar -------------------------------------------------------------------- */
+  /* The header bar holds only two short text blocks, so its height is whatever the padding
+     gives it — it used to be propped open by the export button that sat on the right. This
+     is set to sit in the same family as the KPI cards below rather than read as a strip. */
   div[class*="st-key-{CARD_PREFIX}_header"] {{
-      padding: 0.6rem 1.15rem;
+      padding: 1.55rem 1.35rem;
       border-radius: 8px;
   }}
   div[class*="st-key-oacrumb"] p {{
@@ -50,7 +53,7 @@ _STYLES = f"""
       color: {theme.LABEL};
   }}
   div[class*="st-key-oatitle"] p {{
-      margin: 0.1rem 0 0;
+      margin: 0.15rem 0 0;
       font-size: 1.22rem;
       font-weight: 600;
       letter-spacing: -0.012em;
