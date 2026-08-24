@@ -8,6 +8,7 @@ from functools import lru_cache
 
 DEFAULT_ALLOWED_DOMAIN = "theodi.org"
 DEFAULT_THRESHOLD_DAYS = 7
+DEFAULT_DOCS_URL = "https://openactive-contrib.github.io/openactive-admin-dashboard/"
 
 
 class ConfigError(RuntimeError):
@@ -23,6 +24,7 @@ class Settings:
     contact_threshold_days: int = DEFAULT_THRESHOLD_DAYS
     use_sample_data: bool = False
     disable_auth: bool = False
+    docs_url: str = DEFAULT_DOCS_URL
 
     @property
     def is_dev(self) -> bool:
@@ -74,6 +76,7 @@ def load_settings(source: Mapping[str, str]) -> Settings:
         contact_threshold_days=threshold_days,
         use_sample_data=use_sample_data,
         disable_auth=env == "dev" and _flag(source, "STEWARDS_DISABLE_AUTH"),
+        docs_url=source.get("STEWARDS_DOCS_URL", "").strip() or DEFAULT_DOCS_URL,
     )
 
 

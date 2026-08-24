@@ -27,20 +27,10 @@ def _render_titles(crumb: str, title: str) -> None:
 def render_header(
     crumb: str,
     title: str,
-    meta: Meta | None = None,
-    *,
-    meta_lines: tuple[str, str] | None = None,
+    meta: Meta,
 ) -> None:
-    """The header bar: breadcrumb and title left, provenance right.
-
-    `meta` renders the snapshot lines. Pages not backed by the daily batch pass `meta_lines`
-    instead — the knowledge base is files, not a snapshot, and labelling it
-    "BigQuery · daily batch" would be untrue.
-    """
-    if meta is not None:
-        lines = (f"Snapshot `{meta.snapshot_date.isoformat()} {SNAPSHOT_TIME}`", SOURCE_LINE)
-    else:
-        lines = meta_lines or ("", "")
+    """The header bar: breadcrumb and title left, snapshot provenance right."""
+    lines = (f"Snapshot `{meta.snapshot_date.isoformat()} {SNAPSHOT_TIME}`", SOURCE_LINE)
 
     with card("header"):
         titles, provenance = st.columns([5, 3], vertical_alignment="center")

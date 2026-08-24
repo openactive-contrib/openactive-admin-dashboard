@@ -110,58 +110,6 @@ _STYLES = f"""
       color: {theme.LABEL};
   }}
 
-  /* --- knowledge base ---------------------------------------------------------------- */
-  /* Panel headings: ACCESS, RECENTLY VIEWED, ON THIS PAGE. */
-  div[class*="st-key-oaeyebrow"] p {{
-      margin: 0;
-      font-size: 0.69rem;
-      font-weight: 700;
-      letter-spacing: 0.075em;
-      color: {theme.LABEL};
-  }}
-  /* A result title is a link, not a button. */
-  div[class*="st-key-oadoctitle"] button {{
-      padding: 0;
-      min-height: 0;
-  }}
-  div[class*="st-key-oadoctitle"] button p {{
-      margin: 0;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: -0.005em;
-      color: {theme.INK};
-  }}
-  div[class*="st-key-oadoctitle"] button:hover p {{
-      color: {theme.TEAL_HOVER};
-  }}
-  div[class*="st-key-oadocexcerpt"] p {{
-      margin: 0.25rem 0 0;
-      font-size: 0.84rem;
-      line-height: 1.5;
-      color: {theme.MUTED};
-  }}
-  div[class*="st-key-oadocmeta"] p {{
-      margin: 0;
-      text-align: right;
-      font-size: 0.74rem;
-      line-height: 1.5;
-      color: {theme.LABEL};
-  }}
-  div[class*="st-key-oadoctags"], div[class*="st-key-oadocviewtags"] {{
-      gap: 0.3rem;
-      margin-top: 0.5rem;
-  }}
-
-  div[class*="st-key-oapanelbody"] p {{
-      margin: 0.4rem 0 0;
-      font-size: 0.8rem;
-      line-height: 1.6;
-      color: {theme.INK_SOFTER};
-  }}
-  div[class*="st-key-oapanelrule"] hr {{
-      margin: 0.85rem 0;
-  }}
-
   /* --- sidebar logo ------------------------------------------------------------------ */
   /* The OpenActive wordmark is a dark navy on transparency: 9.4:1 against the canvas,
      but only 1.56:1 against the dark sidebar, well under the 3:1 minimum for a graphical

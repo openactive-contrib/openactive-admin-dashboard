@@ -327,7 +327,6 @@ def _navigation_script() -> None:
     nav.build_navigation()
     assert nav.page_for("overview") is not None
     assert nav.page_for("contact_queue") is not None
-    assert nav.page_for("docs") is not None
     assert nav.page_for("no_such_monitor") is None
     for monitor in MONITOR_REGISTRY:
         page = nav.page_for(monitor.id)
@@ -346,7 +345,6 @@ def _url_path_script() -> None:
         "contact_queue": "contact_queue",
         "single_feed_stall": "single_feed_stalls",
         "http_failure": "http_failures",
-        "docs": "docs",
     }
     actual = {key: nav.page_for(key).url_path for key in expected}
     assert actual == expected, actual
@@ -379,12 +377,27 @@ def _sidebar_script() -> None:
 def test_the_sidebar_renders_a_link_per_page_and_a_pill_per_count() -> None:
     app = run(_sidebar_script)
     captions = [c.value for c in app.caption]
-    for section in ("OVERVIEW", "AVAILABILITY", "KNOWLEDGE BASE"):
+    for section in ("OVERVIEW", "AVAILABILITY", "REFERENCE"):
         assert section in captions
     markdown = " ".join(m.value for m in app.markdown)
     # Badges render as markdown colour directives carrying the count.
     for count, colour in (("10", "red"), ("23", "red"), ("9", "orange")):
         assert f":{colour}-badge[{count}]" in markdown
+
+
+def test_documentation_links_out_to_the_pages_site() -> None:
+    """`external` is the flag Streamlit renders as target="_blank", so the docs open in a
+    new tab instead of navigating away from the dashboard."""
+    from stewards.config import get_settings
+
+    app = run(_sidebar_script)
+    links = {link.label: link for link in app.get("page_link")}
+    assert links["Documentation"].proto.external
+    assert links["Documentation"].proto.page == get_settings().docs_url
+    # Every other row is an in-app page, which must not open a new tab.
+    assert not any(
+        link.proto.external for label, link in links.items() if label != "Documentation"
+    )
 
 
 def _sidebar_without_badges_script() -> None:
@@ -414,39 +427,6 @@ def test_meta_and_summary_models_are_importable_here() -> None:
     )
     assert Summary().monitors == ()
     assert load_sample("summary")["data"]["publishers_monitored"] == 170
-
-
-# --- the docs page ----------------------------------------------------------------------
-
-
-def _stale_doc_script() -> None:
-    import streamlit as st
-
-    from stewards.components.docs_page import SELECTED_KEY, render_docs_page
-
-    st.session_state[SELECTED_KEY] = "a-document-that-was-deleted"
-    render_docs_page()
-
-
-def test_a_stale_document_selection_falls_back_to_the_index() -> None:
-    app = run(_stale_doc_script)
-    assert any("no longer exists" in w.value for w in app.warning)
-    assert any("Internal documentation" in m.value for m in app.markdown)
-
-
-def _internal_only_doc_script() -> None:
-    from stewards.components.docs_page import render_doc
-    from stewards.knowledge.loader import get_doc
-
-    render_doc(get_doc("single-feed-stalls-runbook"))
-
-
-def test_a_restricted_document_is_flagged_and_lists_its_headings() -> None:
-    app = run(_internal_only_doc_script)
-    markdown = " ".join(m.value for m in app.markdown)
-    assert "internal only" in markdown
-    assert "Detection" in markdown
-    assert "Triage sequence" in markdown
 
 
 def _gate_before_login_script() -> None:

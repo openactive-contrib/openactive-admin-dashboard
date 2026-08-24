@@ -28,8 +28,10 @@ and are also the happy-path contract fixtures for the tests — one copy of each
 the real API lands, point `STEWARDS_API_BASE_URL` at it and drop the flags; nothing else
 changes. Any page in sample-data mode renders a banner saying so.
 
-Also built out: the overview, the cross-monitor contact queue, and the knowledge base (one
-seed document — the single-feed stalls runbook).
+Also built out: the overview and the cross-monitor contact queue. Runbooks are **not** in
+the app: they live in `docs/` and are published to GitHub Pages by
+`.github/workflows/pages.yml`. The sidebar's Documentation row is an external
+`st.page_link` to `STEWARDS_DOCS_URL`, which opens in a new tab.
 
 ## Stack
 
@@ -58,15 +60,13 @@ src/stewards/
   monitors/contact_queue.py  the cross-monitor union, shaped
   monitors/trend.py          30-snapshot series
   monitors/email_draft.py    the publisher email draft
-  knowledge/loader.py        markdown front matter, search, tags, headings
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, monitor_page,
-                             overview_page, contact_queue_page, docs_page
+                             overview_page, contact_queue_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
-  docs/*.md                  knowledge base content, with front matter
 tests/
-  unit/                      pure logic: thresholds, registry, transforms, email, docs
+  unit/                      pure logic: thresholds, registry, transforms, email
   contract/                  respx-backed client + repository tests
   smoke/                     AppTest renders of every page and every error state
   fixtures/                  test-only payload variants (empty, malformed, paginated)
@@ -76,9 +76,9 @@ tests/
 
 1. **Pages contain no logic.** A page module calls one `render_*_page` component and nothing
    else. All shaping, filtering, derivation and formatting lives in pure functions under
-   `monitors/` or `knowledge/` — that is what the unit tests exercise.
+   `monitors/` — that is what the unit tests exercise.
 2. **No Streamlit imports in testable logic.** Anything that computes a value must be
-   importable and callable without a Streamlit runtime. `monitors/`, `knowledge/` and
+   importable and callable without a Streamlit runtime. `monitors/` and
    `config.py` hold that line; `api/repository.py` is the boundary where `st.cache_data`
    starts. If a function needs `st`, it belongs in a component and must be a thin renderer.
 3. **No raw dicts past the client boundary.** `api/client.py` returns parsed JSON;
@@ -114,6 +114,7 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_ENV` | `prod` (default) or `dev` |
 | `STEWARDS_CONTACT_THRESHOLD_DAYS` | Contact threshold, default 7 |
 | `STEWARDS_ALLOWED_DOMAIN` | Google workspace allowlist, default `theodi.org` |
+| `STEWARDS_DOCS_URL` | Runbooks site the sidebar links out to, default the project's GitHub Pages URL |
 | `STEWARDS_USE_SAMPLE_DATA` | Serve the bundled payloads instead of calling the API |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
 
@@ -161,9 +162,8 @@ uv run mypy src
   grey `#5C6B76`, teal `#0E8F8A` (primary). Defined once in `components/theme.py`; use
   `theme.markdown_colour(tone)` for coloured text rather than inline HTML.
 - Copy tone: factual, no exclamation marks, no emoji in UI text. Dates are ISO
-  everywhere they describe data (snapshots, incidents, exports). Knowledge-base document
-  dates are the one exception — `09 Aug 2026` via `knowledge.loader.human_date`, because a
-  document date is an editorial byline rather than a measurement.
+  everywhere they describe data (snapshots, incidents). The runbooks on GitHub Pages are
+  outside the app and set their own conventions.
 - Cache API reads with `@st.cache_data(ttl=3600)` at the repository layer only; the wrapped
   `_fetch_*` function stays cache-free so tests call it directly.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
@@ -191,9 +191,8 @@ uv run mypy src
 - Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
 - Route URLs drop the filename's numeric prefix: `views/12_http_failures.py` serves
   `/http_failures`.
-- `layout.render_header` takes either a `Meta` (renders the snapshot lines) or `meta_lines`
-  for a page not backed by the daily batch. The knowledge base uses the latter: it is
-  markdown files, so labelling it "BigQuery · daily batch" would be untrue.
+- `layout.render_header` requires a `Meta`: every page it serves is backed by the daily
+  batch, so the snapshot line is never optional.
 
 ## Before you finish a task
 

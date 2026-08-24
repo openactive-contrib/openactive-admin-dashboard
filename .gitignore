@@ -11,3 +11,5 @@ build/
 *.egg-info/
 .streamlit/secrets.toml
 .idea/
+_site/
+.jekyll-cache/

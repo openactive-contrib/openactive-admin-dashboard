@@ -1,0 +1,13 @@
+# Jekyll config for the GitHub Pages site built from this directory.
+# `url` and `baseurl` are injected at build time by actions/configure-pages,
+# so they are deliberately not set here.
+title: OpenActive Data Stewards
+description: Runbooks and reference material for the data health dashboard.
+theme: minima
+
+# Every document gets the theme's page layout, so no file needs its own `layout:` key.
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: page

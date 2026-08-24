@@ -79,5 +79,5 @@ paginated) go in `tests/fixtures/`.
 - [ ] monitor tile appears on the overview with correct count and state colour
 - [ ] sidebar label carries the open-incident count
 - [ ] draft-email popover names the monitor and the days open
-- [ ] a runbook markdown page exists in `src/stewards/docs/` tagged `runbook`
+- [ ] a runbook page exists in `docs/`, linked from `docs/index.md`
 - [ ] `uv run ruff check . && uv run mypy src` clean

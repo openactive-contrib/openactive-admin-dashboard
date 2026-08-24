@@ -18,7 +18,6 @@ PAGES = [
     "01_contact_queue.py",
     "10_single_feed_stalls.py",
     "12_http_failures.py",
-    "90_docs.py",
 ]
 
 MONITOR_PAGES = ["10_single_feed_stalls.py", "12_http_failures.py"]
@@ -54,11 +53,8 @@ def test_page_renders_without_exception(name: str) -> None:
 def test_every_page_states_the_snapshot(name: str) -> None:
     """Hard rule: no data page may read as live."""
     text = text_of(run(name))
-    if name == "90_docs.py":
-        assert "theodi.org" in text  # docs carry the access statement, not a snapshot
-    else:
-        assert "Snapshot 2026-08-21" in text
-        assert "daily batch" in text
+    assert "Snapshot 2026-08-21" in text
+    assert "daily batch" in text
 
 
 @pytest.mark.parametrize("name", MONITOR_PAGES)
@@ -141,66 +137,6 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
     frame = app.dataframe[0].value
     assert len(frame) == 10
     assert set(frame["Monitor"]) == {"Single-feed stalls", "HTTP endpoint failures"}
-
-
-def test_docs_index_lists_the_runbook_and_opens_it() -> None:
-    app = run("90_docs.py")
-    text = text_of(app)
-    assert "Runbook — single-feed stalls" in text
-    assert "Data Infrastructure" in text  # owner, right-aligned on the card
-    assert "14 Aug 2026" in text  # editorial date, not ISO
-
-    app.button(key="open_doc_single-feed-stalls-runbook").click().run()
-    assert not app.exception, [e.value for e in app.exception]
-    assert any("internal only" in m.value for m in app.markdown)
-
-
-def test_the_docs_header_states_its_own_provenance_not_the_snapshot() -> None:
-    """The knowledge base is files, so it must not claim to come from the daily batch."""
-    text = text_of(run("90_docs.py"))
-    assert "Updated 14 Aug 2026" in text
-    assert "1 document · internal only" in text
-    assert "BigQuery" not in text
-
-
-def test_opening_a_doc_records_it_as_recently_viewed() -> None:
-    app = run("90_docs.py")
-    assert "Documents you open appear here." in text_of(app)
-
-    app.button(key="open_doc_single-feed-stalls-runbook").click().run()
-    app.button(key="docs_back").click().run()
-    assert not app.exception, [e.value for e in app.exception]
-    assert app.button(key="recent_single-feed-stalls-runbook")
-
-
-def test_the_tag_chips_offer_every_tag_in_the_index() -> None:
-    from stewards.components.docs_page import ALL_TAGS
-    from stewards.knowledge.loader import all_docs, all_tags
-
-    app = run("90_docs.py")
-    chips = app.get("button_group")
-    assert chips
-    assert list(chips[0].options) == [ALL_TAGS, *all_tags(all_docs())]
-
-
-def test_selecting_a_tag_keeps_the_documents_carrying_it() -> None:
-    app = run("90_docs.py")
-    app.get("button_group")[0].set_value("runbook").run()
-    assert not app.exception, [e.value for e in app.exception]
-    assert "Runbook — single-feed stalls" in text_of(app)
-
-
-def test_a_tag_plus_a_non_matching_search_reaches_the_empty_state() -> None:
-    app = run("90_docs.py")
-    app.get("button_group")[0].set_value("runbook").run()
-    app.text_input[0].set_value("no-such-topic").run()
-    assert any("No document matches" in info.value for info in app.info)
-
-
-def test_docs_search_with_no_match_says_so() -> None:
-    app = run("90_docs.py")
-    app.text_input[0].set_value("no-such-topic").run()
-    assert any("No document matches" in info.value for info in app.info)
 
 
 def test_sample_data_mode_is_announced_on_every_data_page() -> None:

@@ -55,4 +55,5 @@ something the lockfile does not describe.
 - `Data Stewards Dashboard.dc.html` — the approved UI mockup
 
 Two of the eight monitors are built (`single_feed_stall`, `http_failure`), plus the overview,
-the cross-monitor contact queue and the knowledge base. The rest follow their API endpoints.
+and the cross-monitor contact queue. The rest follow their API endpoints. Runbooks are
+published separately from `docs/` to GitHub Pages.

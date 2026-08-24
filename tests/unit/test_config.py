@@ -6,6 +6,7 @@ import pytest
 
 from stewards.config import (
     DEFAULT_ALLOWED_DOMAIN,
+    DEFAULT_DOCS_URL,
     DEFAULT_THRESHOLD_DAYS,
     ConfigError,
     Settings,
@@ -138,3 +139,25 @@ def test_a_missing_secrets_file_is_not_an_error(monkeypatch: pytest.MonkeyPatch)
         assert config.get_settings().api_base_url == "https://from-env"
     finally:
         config.get_settings.cache_clear()
+
+
+def test_the_docs_url_defaults_to_the_projects_github_pages_site() -> None:
+    settings = load_settings({"STEWARDS_API_BASE_URL": "https://api.test"})
+    assert settings.docs_url == DEFAULT_DOCS_URL
+
+
+def test_the_docs_url_is_configurable() -> None:
+    settings = load_settings(
+        {
+            "STEWARDS_API_BASE_URL": "https://api.test",
+            "STEWARDS_DOCS_URL": "https://docs.theodi.org/stewards/ ",
+        }
+    )
+    assert settings.docs_url == "https://docs.theodi.org/stewards/"
+
+
+def test_a_blank_docs_url_falls_back_to_the_default() -> None:
+    settings = load_settings(
+        {"STEWARDS_API_BASE_URL": "https://api.test", "STEWARDS_DOCS_URL": "   "}
+    )
+    assert settings.docs_url == DEFAULT_DOCS_URL

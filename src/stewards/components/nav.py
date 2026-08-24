@@ -18,6 +18,7 @@ import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 
 from stewards.components import theme
+from stewards.config import get_settings
 from stewards.monitors.overview import NavBadge
 from stewards.monitors.registry import MONITOR_REGISTRY, groups
 
@@ -33,10 +34,13 @@ LOGO = ASSET_DIR / "openactive-logo.png"
 
 OVERVIEW_PAGE = "views/00_overview.py"
 CONTACT_QUEUE_PAGE = "views/01_contact_queue.py"
-DOCS_PAGE = "views/90_docs.py"
 
 OVERVIEW_SECTION = "Overview"
-DOCS_SECTION = "Knowledge base"
+
+#: The runbooks live on GitHub Pages, outside the app. `st.page_link` renders a URL as an
+#: external link, which opens in a new tab; the URL comes from `STEWARDS_DOCS_URL`.
+REFERENCE_SECTION = "Reference"
+DOCS_LABEL = "Documentation"
 
 _pages: dict[str, StreamlitPage] = {}
 _sections: dict[str, list[tuple[str, StreamlitPage]]] = {}
@@ -69,9 +73,6 @@ def build_navigation() -> StreamlitPage:
             _pages[monitor.id] = page
             section.append((monitor.id, page))
         _sections[group.value] = section
-
-    _pages["docs"] = st.Page(APP_DIR / DOCS_PAGE, title="Documentation")
-    _sections[DOCS_SECTION] = [("docs", _pages["docs"])]
 
     return st.navigation(
         {name: [page for _, page in items] for name, items in _sections.items()},
@@ -107,6 +108,12 @@ def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
                     st.page_link(page, label=page.title)
                     if badge is not None:
                         st.badge(badge.text, color=theme.markdown_colour(badge.tone))
+        st.caption(REFERENCE_SECTION.upper())
+        st.page_link(
+            get_settings().docs_url,
+            label=DOCS_LABEL,
+            icon=":material/open_in_new:",
+        )
 
 
 def page_for(key: str) -> StreamlitPage | None:
