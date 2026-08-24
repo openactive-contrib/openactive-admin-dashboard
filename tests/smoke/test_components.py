@@ -255,32 +255,13 @@ def _header_script() -> None:
     layout.render_footer("view_monitor_overview", note="Nothing is sent from here.")
 
 
-def test_a_header_without_an_export_renders_no_download_button() -> None:
+def test_the_header_renders_no_download_button() -> None:
+    """CSV export was removed from the header; provenance is all that sits on the right."""
     app = run(_header_script)
     assert not app.get("download_button")
     markdown = " ".join(m.value for m in app.markdown)
     assert "Snapshot `2026-08-21 06:00`" in markdown
     assert "BigQuery · daily batch" in markdown
-
-
-def _export_script() -> None:
-    from stewards.api.models import IncidentPage
-    from stewards.api.sample_transport import load_sample
-    from stewards.components import layout
-    from stewards.monitors.registry import get_monitor
-    from stewards.monitors.transforms import to_dataframe
-
-    monitor = get_monitor("http_failure")
-    page = IncidentPage.model_validate(load_sample("http_failure_incidents"))
-    frame = to_dataframe(monitor, page.data)
-    layout.render_header(
-        monitor.crumb, monitor.name, page.meta, export=frame, export_name=monitor.id
-    )
-
-
-def test_the_export_button_is_named_after_the_snapshot() -> None:
-    app = run(_export_script)
-    assert app.get("download_button")
 
 
 # --- the empty trend chart --------------------------------------------------------------
@@ -302,11 +283,16 @@ def test_an_empty_trend_says_so_instead_of_charting_nothing() -> None:
 
 
 def _login_screen_script() -> None:
-    from stewards.auth.google import render_denied, render_identity, render_login_screen
+    from stewards.auth.google import (
+        render_denied,
+        render_identity_footer,
+        render_login_screen,
+    )
 
     render_login_screen("theodi.org")
     render_denied("theodi.org")
-    render_identity("huseyin.kir@theodi.org")
+    render_identity_footer(None)  # a dev-bypass session has no identity block at all
+    render_identity_footer("huseyin.kir@theodi.org")
 
 
 def test_the_login_screen_names_the_workspace_and_never_shows_a_full_address() -> None:
@@ -396,7 +382,6 @@ def test_the_sidebar_renders_a_link_per_page_and_a_pill_per_count() -> None:
     for section in ("OVERVIEW", "AVAILABILITY", "KNOWLEDGE BASE"):
         assert section in captions
     markdown = " ".join(m.value for m in app.markdown)
-    assert "Data Stewards" in markdown
     # Badges render as markdown colour directives carrying the count.
     for count, colour in (("10", "red"), ("23", "red"), ("9", "orange")):
         assert f":{colour}-badge[{count}]" in markdown
@@ -413,8 +398,10 @@ def _sidebar_without_badges_script() -> None:
 def test_the_sidebar_still_renders_when_the_summary_is_unavailable() -> None:
     app = run(_sidebar_without_badges_script)
     markdown = " ".join(m.value for m in app.markdown)
-    assert "Data Stewards" in markdown
-    # The brand mark is a badge; no *count* pill should appear.
+    # AppTest exposes no page_link accessor, so the section headings stand in for "the
+    # sidebar still rendered" — the point of the test is the absent pills.
+    assert "OVERVIEW" in [c.value for c in app.caption]
+    # No count pill should appear when the summary supplied none.
     for colour in ("red", "orange", "green", "gray"):
         assert f":{colour}-badge[" not in markdown
 

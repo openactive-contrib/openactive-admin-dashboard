@@ -6,14 +6,12 @@ the container keys this module sets. Nothing here interpolates data into HTML.
 
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
 
 from stewards.api.models import Meta
 from stewards.components import theme
 from stewards.components.surface import card
 from stewards.monitors.thresholds import Tone
-from stewards.monitors.transforms import csv_bytes
 
 SNAPSHOT_TIME = "06:00"
 SOURCE_LINE = "BigQuery · daily batch"
@@ -31,26 +29,21 @@ def render_header(
     title: str,
     meta: Meta | None = None,
     *,
-    export: pd.DataFrame | None = None,
-    export_name: str = "export",
     meta_lines: tuple[str, str] | None = None,
-    export_stamp: str = "",
 ) -> None:
-    """The header bar: breadcrumb and title left, provenance and Export CSV right.
+    """The header bar: breadcrumb and title left, provenance right.
 
-    `meta` renders the snapshot lines and stamps the export filename. Pages not backed by the
-    daily batch pass `meta_lines` instead — the knowledge base is files, not a snapshot, and
-    labelling it "BigQuery · daily batch" would be untrue.
+    `meta` renders the snapshot lines. Pages not backed by the daily batch pass `meta_lines`
+    instead — the knowledge base is files, not a snapshot, and labelling it
+    "BigQuery · daily batch" would be untrue.
     """
     if meta is not None:
         lines = (f"Snapshot `{meta.snapshot_date.isoformat()} {SNAPSHOT_TIME}`", SOURCE_LINE)
-        stamp = meta.snapshot_date.isoformat()
     else:
         lines = meta_lines or ("", "")
-        stamp = export_stamp
 
     with card("header"):
-        titles, provenance, action = st.columns([5, 2, 1], vertical_alignment="center")
+        titles, provenance = st.columns([5, 3], vertical_alignment="center")
         with titles:
             _render_titles(crumb, title)
         with provenance, st.container(key="oasnapshot"):
@@ -59,17 +52,6 @@ def render_header(
             if lines[1]:
                 with st.container(key="oasnapshotsource"):
                     st.markdown(lines[1])
-        with action:
-            if export is not None:
-                st.download_button(
-                    "Export CSV",
-                    data=csv_bytes(export),
-                    file_name=f"{export_name}_{stamp}.csv" if stamp else f"{export_name}.csv",
-                    mime="text/csv",
-                    icon=":material/download:",
-                    width="stretch",
-                    help="Exports the rows currently shown, after filters.",
-                )
 
 
 def render_error_header(crumb: str, title: str) -> None:
@@ -79,9 +61,7 @@ def render_error_header(crumb: str, title: str) -> None:
 
 
 def render_footer(query: str, *, note: str = "") -> None:
-    st.caption(
-        f"Read-only view. Actions available: export, draft publisher email. {note}".strip()
-    )
+    st.caption(f"Read-only view. Actions available: draft publisher email. {note}".strip())
     if query:
         st.caption(f"`{query}`")
 

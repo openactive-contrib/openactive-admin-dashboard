@@ -46,10 +46,10 @@ def render_monitor_page(monitor: Monitor) -> None:
 
     incidents = list(page.data)
 
-    # Everything above the filters is rendered into reserved slots, because the header's
-    # Export CSV button and the KPIs both need the *filtered* frame, which only exists once
-    # the filter widgets have been read. The slots keep the on-screen order the brief
-    # specifies: header, blurb, KPIs, trend, filters, table.
+    # Everything above the filters is rendered into reserved slots, because the KPIs need
+    # the *filtered* frame, which only exists once the filter widgets have been read. The
+    # slots keep the on-screen order the brief specifies: header, blurb, KPIs, trend,
+    # filters, table.
     header_slot = st.container()
     blurb_slot = st.container()
     kpi_slot = st.container()
@@ -72,9 +72,7 @@ def render_monitor_page(monitor: Monitor) -> None:
     tones = transforms.tone_frame(monitor, shown)
 
     with header_slot:
-        layout.render_header(
-            monitor.crumb, monitor.name, page.meta, export=frame, export_name=monitor.id
-        )
+        layout.render_header(monitor.crumb, monitor.name, page.meta)
         if get_settings().use_sample_data:
             layout.render_sample_data_notice()
     with blurb_slot:

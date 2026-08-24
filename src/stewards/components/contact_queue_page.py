@@ -34,9 +34,7 @@ def render_contact_queue_page() -> None:
     frame = contact_queue.to_dataframe(incidents)
     tones = contact_queue.tone_frame(incidents)
 
-    layout.render_header(
-        "Cross-monitor", TITLE, page.meta, export=frame, export_name="contact_queue"
-    )
+    layout.render_header("Cross-monitor", TITLE, page.meta)
     if get_settings().use_sample_data:
         layout.render_sample_data_notice()
 

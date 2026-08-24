@@ -14,8 +14,6 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
-import pandas as pd
-
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 RESTRICTED = "restricted"
@@ -158,30 +156,12 @@ def search_docs(docs: Iterable[Doc], term: str = "", tags: Sequence[str] = ()) -
     return results
 
 
-INDEX_COLUMNS = ("Title", "Tags", "Owner", "Updated", "Sensitivity")
 RECENT_LIMIT = 3
 
 
 def human_date(value: date | None) -> str:
     """`09 Aug 2026`. Document dates are a byline, not a measurement, so they are not ISO."""
     return value.strftime("%d %b %Y") if value else "undated"
-
-
-def index_frame(docs: Sequence[Doc]) -> pd.DataFrame:
-    """The document index as a table, for the header's Export CSV."""
-    return pd.DataFrame(
-        [
-            {
-                "Title": doc.title,
-                "Tags": ", ".join(doc.tags),
-                "Owner": doc.owner,
-                "Updated": doc.updated.isoformat() if doc.updated else "",
-                "Sensitivity": doc.sensitivity,
-            }
-            for doc in docs
-        ],
-        columns=list(INDEX_COLUMNS),
-    )
 
 
 def remember(history: Sequence[str], slug: str, limit: int = RECENT_LIMIT) -> tuple[str, ...]:

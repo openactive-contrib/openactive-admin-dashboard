@@ -7,13 +7,11 @@ import pytest
 from stewards.api.models import MonitorCount, Summary, SummaryResponse
 from stewards.monitors.overview import (
     MINUS,
-    OVERVIEW_COLUMNS,
     STATE_LABELS,
     NavBadge,
     build_tiles,
     format_delta,
     nav_badges,
-    overview_frame,
     sidebar_counts,
     tile_note,
     tile_state,
@@ -183,26 +181,3 @@ def test_the_sample_summary_supplies_deltas(summary: SummaryResponse) -> None:
     assert format_delta(summary.data.publishers_with_issues_delta) == "+3"
     assert format_delta(summary.data.open_incidents_delta) == "+5"
     assert format_delta(summary.data.past_threshold_delta) == "+2"
-
-
-# --- the export frame ---------------------------------------------------------------------
-
-
-def test_overview_frame_has_a_row_per_tile(summary: SummaryResponse) -> None:
-    frame = overview_frame(build_tiles(summary.data))
-    assert list(frame.columns) == list(OVERVIEW_COLUMNS)
-    assert len(frame) == len(MONITOR_REGISTRY)
-    assert set(frame["Monitor"]) == {m.name for m in MONITOR_REGISTRY}
-
-
-def test_overview_frame_carries_the_counts(summary: SummaryResponse) -> None:
-    frame = overview_frame(build_tiles(summary.data)).set_index("Monitor")
-    assert frame.loc["Single-feed stalls", "Open"] == 23
-    assert frame.loc["Single-feed stalls", "Past threshold"] == 7
-    assert frame.loc["Single-feed stalls", "State"] == "Critical"
-
-
-def test_overview_frame_of_no_tiles_keeps_its_columns() -> None:
-    frame = overview_frame([])
-    assert frame.empty
-    assert list(frame.columns) == list(OVERVIEW_COLUMNS)

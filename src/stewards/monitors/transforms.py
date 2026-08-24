@@ -199,13 +199,3 @@ def apply_filters(
 def sort_by_age(incidents: Iterable[Incident]) -> list[Incident]:
     """Oldest incident first — the order a steward works through."""
     return sorted(incidents, key=lambda i: (-i.days_open, i.publisher_name))
-
-
-def csv_bytes(frame: pd.DataFrame) -> bytes:
-    """Export the frame exactly as displayed. Sparkline lists are dropped."""
-    exportable = frame.drop(columns=_list_columns(frame), errors="ignore")
-    return exportable.to_csv(index=False).encode("utf-8")
-
-
-def _list_columns(frame: pd.DataFrame) -> list[str]:
-    return [c for c in frame.columns if frame[c].apply(lambda v: isinstance(v, list)).any()]

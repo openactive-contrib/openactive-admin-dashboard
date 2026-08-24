@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-
-import pandas as pd
 
 from stewards.api.models import Summary
 from stewards.monitors.registry import MONITOR_REGISTRY, Monitor, Severity
@@ -128,24 +125,3 @@ def build_tiles(summary: Summary) -> tuple[Tile, ...]:
 def sidebar_counts(summary: Summary) -> dict[str, int]:
     """Monitor id -> open incident count, for the navigation labels."""
     return {m.monitor_id: m.count for m in summary.monitors}
-
-
-OVERVIEW_COLUMNS = ("Monitor", "Group", "State", "Open", "Past threshold", "Note")
-
-
-def overview_frame(tiles: Sequence[Tile]) -> pd.DataFrame:
-    """The tile grid as a table, for the header's Export CSV."""
-    return pd.DataFrame(
-        [
-            {
-                "Monitor": tile.monitor.name,
-                "Group": tile.monitor.group.value,
-                "State": tile.state_label,
-                "Open": tile.count,
-                "Past threshold": tile.past_threshold_count,
-                "Note": tile.note,
-            }
-            for tile in tiles
-        ],
-        columns=list(OVERVIEW_COLUMNS),
-    )

@@ -13,7 +13,7 @@ from enum import StrEnum
 
 import streamlit as st
 
-from stewards.components.surface import card
+from stewards.components.surface import SIDEBAR_FOOT_KEY, card
 from stewards.config import Settings
 
 
@@ -75,12 +75,31 @@ def render_denied(domain: str) -> None:
 
 
 def render_identity(email: str | None) -> None:
-    """Sidebar identity block. Shows the masked address, never the full one."""
-    with st.sidebar:
+    """Sidebar identity block. Shows the masked address, never the full one.
+
+    The container key is what `components/surface.py` targets to hold the block at the foot
+    of the sidebar.
+    """
+    with st.sidebar, st.container(key=SIDEBAR_FOOT_KEY):
         st.divider()
         st.caption(mask_email(email))
         st.caption("Google SSO · steward")
         st.button("Sign out", key="auth_signout", on_click=st.logout, width="stretch")
+
+
+def render_identity_footer(email: str | None) -> None:
+    """The identity block, drawn once the navigation is already on the page.
+
+    Order alone only puts it *below* the nav, not at the bottom of the sidebar; holding it
+    there takes a rule in `components/surface.py`, because Streamlit offers no native way
+    to pin a sidebar element to the bottom.
+
+    A dev-bypass session has no identity to show, so it renders nothing at all rather than
+    an "unknown" address.
+    """
+    if email is None:
+        return
+    render_identity(email)
 
 
 def render_dev_bypass_warning() -> None:
@@ -107,6 +126,9 @@ def require_login(settings: Settings) -> str | None:
 
     In a dev environment the gate can be skipped explicitly with `STEWARDS_DISABLE_AUTH`;
     the banner says so on every page so it can never pass unnoticed in a real deployment.
+
+    The returned address is what `render_identity_footer` renders once the navigation has
+    been drawn, which is what puts sign-out at the bottom of the sidebar.
     """
     is_logged_in = bool(settings.disable_auth) or bool(st.user.get("is_logged_in"))
     email = None if settings.disable_auth else _current_email()
@@ -123,5 +145,4 @@ def require_login(settings: Settings) -> str | None:
             render_denied(settings.allowed_email_domain)
             st.stop()
         case _:
-            render_identity(email)
             return email

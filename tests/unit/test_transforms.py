@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pandas as pd
 import pytest
 
 from stewards.api.models import HttpFailureDetail, Incident, StallDetail
@@ -15,7 +14,6 @@ from stewards.monitors.transforms import (
     Kpi,
     apply_filters,
     cell_tone,
-    csv_bytes,
     filter_options,
     format_cell,
     monitor_kpis,
@@ -307,30 +305,3 @@ def test_sort_by_age_is_oldest_first_then_alphabetical() -> None:
 
 def test_sort_by_age_of_nothing_is_nothing() -> None:
     assert sort_by_age([]) == []
-
-
-# --- export ---------------------------------------------------------------------------
-
-
-def test_csv_export_drops_sparkline_columns(stall_monitor: Monitor) -> None:
-    frame = to_dataframe(stall_monitor, [make_incident()])
-    header = csv_bytes(frame).decode().splitlines()[0]
-    assert "Publisher" in header
-    assert "30d trend" not in header
-
-
-def test_csv_export_of_an_empty_frame_is_just_a_header(stall_monitor: Monitor) -> None:
-    lines = csv_bytes(to_dataframe(stall_monitor, [])).decode().strip().splitlines()
-    assert len(lines) == 1
-
-
-def test_csv_export_keeps_every_filtered_row(stall_monitor: Monitor, stall_page) -> None:
-    shown = apply_filters(stall_monitor, stall_page.data, past_threshold_only=True)
-    frame = to_dataframe(stall_monitor, shown)
-    body = csv_bytes(frame).decode().strip().splitlines()[1:]
-    assert len(body) == len(shown) == 7
-
-
-def test_csv_export_of_a_frame_without_lists_is_unchanged() -> None:
-    frame = pd.DataFrame([{"a": 1, "b": 2}])
-    assert csv_bytes(frame).decode().splitlines()[0] == "a,b"

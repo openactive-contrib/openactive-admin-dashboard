@@ -88,11 +88,12 @@ tests/
 4. **Adding a monitor must not touch shared code.** One registry entry + one page stub +
    sample payloads + one test module. If a new monitor forces an edit to `transforms.py` or
    `incident_table.py`, generalise the component instead of special-casing.
-5. **Read-only.** No mute, assign, re-crawl, or send-email actions. Export CSV and a
-   copyable email draft are the only outputs.
+5. **Read-only.** No mute, assign, re-crawl, or send-email actions. A copyable email
+   draft is the only output. CSV export was removed from the header on request — do not
+   reintroduce a download button without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
-   snapshot, Export CSV). A page that failed to load renders `render_error_header`
+   snapshot). A page that failed to load renders `render_error_header`
    instead — no snapshot line, because there is no snapshot.
 7. Secrets only via `.streamlit/secrets.toml` / env. Never commit tokens, never log the API
    token, never log or display a full user email (`auth.google.mask_email`).

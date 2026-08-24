@@ -263,8 +263,3 @@ def test_the_header_shows_a_delta_when_the_api_supplies_one() -> None:
     assert "+3" in text  # publishers with issues
     assert "+5" in text  # open incidents
     assert "+2" in text  # past threshold
-
-
-def test_the_overview_header_exports_the_monitor_table() -> None:
-    app = run("00_overview.py")
-    assert app.get("download_button")

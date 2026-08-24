@@ -11,7 +11,7 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
-from stewards.monitors.overview import Tile, build_tiles, format_delta, overview_frame
+from stewards.monitors.overview import Tile, build_tiles, format_delta
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.trend import sparkline_chart
 
@@ -138,8 +138,6 @@ def render_overview_page() -> None:
         "Overview",
         title,
         response.meta,
-        export=overview_frame(tiles),
-        export_name="monitor_overview",
     )
     if get_settings().use_sample_data:
         layout.render_sample_data_notice()

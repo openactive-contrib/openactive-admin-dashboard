@@ -11,7 +11,8 @@ Everything below is achievable with native widgets — do not write custom compo
 ## Page composition (every monitor page, in this order)
 
 1. **Header** — breadcrumb (group name), page title, right-aligned snapshot caption
-   (`Snapshot 2026-08-21 06:00 · daily batch`) and an Export CSV `st.download_button`.
+   (`Snapshot 2026-08-21 06:00 · daily batch`). No export button: the header is
+   breadcrumb and title left, provenance right.
 2. **Blurb card** — 2–3 sentences from the registry, plus monospace meta chips
    (monitor id, severity, contact threshold, schedule) via `st.caption`/`st.code` inline.
 3. **KPIs** — exactly three `st.metric` in `st.columns(3)`, right-aligned block.

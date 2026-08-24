@@ -12,7 +12,6 @@ from stewards.knowledge.loader import (
     all_tags,
     get_doc,
     human_date,
-    index_frame,
     newest_update,
     remember,
     search_docs,
@@ -166,9 +165,6 @@ def render_docs_page() -> None:
     layout.render_header(
         CRUMB,
         TITLE,
-        export=index_frame(docs),
-        export_name="documentation",
-        export_stamp=latest.isoformat() if latest else "",
         meta_lines=(
             f"Updated `{human_date(latest)}`",
             f"{count_label(len(docs))} · internal only",

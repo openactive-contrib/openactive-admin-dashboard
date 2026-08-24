@@ -10,7 +10,6 @@ import pytest
 from stewards.knowledge.loader import (
     DOCS_DIR,
     EXCERPT_CHARS,
-    INDEX_COLUMNS,
     Doc,
     DocError,
     all_docs,
@@ -18,7 +17,6 @@ from stewards.knowledge.loader import (
     excerpt_of,
     get_doc,
     human_date,
-    index_frame,
     load_docs,
     newest_update,
     parse_doc,
@@ -251,30 +249,6 @@ def test_the_shipped_runbook_excerpt_is_plain_and_short() -> None:
     excerpt = get_doc("single-feed-stalls-runbook").excerpt
     assert "**" not in excerpt
     assert len(excerpt) <= EXCERPT_CHARS
-
-
-# --- the export index ---------------------------------------------------------------------
-
-
-def test_index_frame_has_a_row_per_document() -> None:
-    docs = all_docs()
-    frame = index_frame(docs)
-    assert list(frame.columns) == list(INDEX_COLUMNS)
-    assert len(frame) == len(docs)
-    assert frame.iloc[0]["Title"] == docs[0].title
-    assert frame.iloc[0]["Updated"] == "2026-08-14"  # ISO in the export, not the byline
-    assert frame.iloc[0]["Tags"] == "runbook, stalls, availability"
-
-
-def test_index_frame_of_no_documents_keeps_its_columns() -> None:
-    frame = index_frame([])
-    assert frame.empty
-    assert list(frame.columns) == list(INDEX_COLUMNS)
-
-
-def test_index_frame_leaves_an_undated_document_blank() -> None:
-    docs = (parse_doc("c", "---\ntitle: C\n---\n\nBody.\n"),)
-    assert index_frame(docs).iloc[0]["Updated"] == ""
 
 
 # --- recently viewed ----------------------------------------------------------------------

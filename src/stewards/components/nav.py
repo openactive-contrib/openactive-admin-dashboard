@@ -25,6 +25,12 @@ from stewards.monitors.registry import MONITOR_REGISTRY, groups
 #: navigation builds identically however the app was launched.
 APP_DIR = Path(__file__).resolve().parent.parent
 
+#: The OpenActive lockup. Its wordmark is navy on transparency, which reads on the light
+#: canvas but not on the dark sidebar — `surface.py` puts a light plaque behind the sidebar
+#: copy rather than altering the artwork.
+ASSET_DIR = APP_DIR / "assets"
+LOGO = ASSET_DIR / "openactive-logo.png"
+
 OVERVIEW_PAGE = "views/00_overview.py"
 CONTACT_QUEUE_PAGE = "views/01_contact_queue.py"
 DOCS_PAGE = "views/90_docs.py"
@@ -73,15 +79,21 @@ def build_navigation() -> StreamlitPage:
     )
 
 
-def render_brand() -> None:
-    st.markdown(":primary-badge[OA] **Data Stewards**")
-    st.caption("OpenActive · internal")
+def render_logo() -> None:
+    """Pin the OpenActive mark above everything else in the sidebar.
+
+    `st.logo` is app chrome rather than a flow element, so it lands at the top of the
+    sidebar whatever order it is called in. No `icon_image`: the same lockup is what
+    Streamlit shows in the app's top-left while the sidebar is collapsed, and the navy
+    wordmark has 9.4:1 against the canvas there.
+    """
+    st.logo(str(LOGO), size="medium")
 
 
 def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
-    """The grouped sidebar: section heading, page link, count pill."""
+    """The grouped sidebar: logo, section heading, page link, count pill."""
+    render_logo()
     with st.sidebar:
-        render_brand()
         for section, items in _sections.items():
             st.caption(section.upper())
             for key, page in items:

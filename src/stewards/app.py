@@ -11,14 +11,14 @@ import streamlit as st
 
 from stewards.api import repository
 from stewards.api.errors import ApiError
-from stewards.auth.google import require_login
+from stewards.auth.google import render_identity_footer, require_login
 from stewards.components import nav
 from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
 from stewards.monitors.overview import NavBadge, nav_badges
 
 st.set_page_config(
-    page_title="Data Stewards · OpenActive",
+    page_title="OpenActive Admin Dashboard",
     page_icon=":material/monitor_heart:",
     layout="wide",
 )
@@ -39,10 +39,11 @@ def main() -> None:
         st.error(f"**The dashboard is not configured.**\n\n{exc}")
         st.stop()
 
-    require_login(settings)
+    email = require_login(settings)
     inject_card_styles()
     page = nav.build_navigation()
     nav.render_sidebar(_nav_badges())
+    render_identity_footer(email)
     page.run()
 
 

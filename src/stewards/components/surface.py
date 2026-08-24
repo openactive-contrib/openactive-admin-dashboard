@@ -3,8 +3,9 @@
 Streamlit exposes no theme token for the background of `st.container(border=True)` — it
 renders transparent — so on the brand canvas tint every card would flatten into an outline.
 Nor can theme config set a per-element type scale. This module is the one place the app
-writes CSS, and it writes only what the theme cannot: card fill, and the sizes and weights
-of the header bar and the KPI blocks.
+writes CSS, and it writes only what the theme cannot: card fill, the sizes and weights of
+the header bar and the KPI blocks, and the plaque that keeps the OpenActive lockup legible
+on the dark sidebar.
 
 Elements opt in through container keys, which Streamlit turns into stable `st-key-<key>`
 classes — so nothing here depends on Streamlit's generated emotion class names, and no data
@@ -19,6 +20,10 @@ from streamlit.delta_generator import DeltaGenerator
 from stewards.components import theme
 
 CARD_PREFIX = "oacard"
+
+#: Container key on the sidebar identity block. Shared with `auth.google.render_identity`
+#: so the selector below and the widget that needs it cannot drift apart.
+SIDEBAR_FOOT_KEY = "oasidebarfoot"
 
 _STYLES = f"""
 <style>
@@ -152,6 +157,38 @@ _STYLES = f"""
   }}
   div[class*="st-key-oapanelrule"] hr {{
       margin: 0.85rem 0;
+  }}
+
+  /* --- sidebar logo ------------------------------------------------------------------ */
+  /* The OpenActive wordmark is a dark navy on transparency: 9.4:1 against the canvas,
+     but only 1.56:1 against the dark sidebar, well under the 3:1 minimum for a graphical
+     object. A light plaque restores the artwork's intended ground instead of recolouring
+     it. Scoped to stSidebarLogo, so the copy Streamlit shows in the app's top-left while
+     the sidebar is collapsed — already on the light canvas — is left alone. */
+  [data-testid="stSidebarLogo"] {{
+      background-color: {theme.SURFACE};
+      padding: 0.35rem 0.5rem;
+      border-radius: 7px;
+      box-sizing: content-box;
+  }}
+
+  /* --- sidebar footer ----------------------------------------------------------------- */
+  /* Streamlit has no native way to pin a sidebar element to the bottom, and
+     `height="stretch"` is not it: in a vertical parent that resolves to height:100%, which
+     would make a spacer swallow the whole column. So the column is made to fill the scroll
+     area and the identity block takes the leftover margin. stSidebarUserContent is a plain
+     block sized to its content, hence all three rules. */
+  [data-testid="stSidebarUserContent"] {{
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      box-sizing: border-box;
+  }}
+  [data-testid="stSidebarUserContent"] > div[data-testid="stVerticalBlock"] {{
+      flex: 1;
+  }}
+  div[class*="st-key-{SIDEBAR_FOOT_KEY}"] {{
+      margin-top: auto;
   }}
 
   /* Bring the header bar close to the top of the canvas. */
