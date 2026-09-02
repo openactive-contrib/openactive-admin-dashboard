@@ -16,6 +16,11 @@ import streamlit as st
 from stewards.components.surface import SIDEBAR_FOOT_KEY, card
 from stewards.config import Settings
 
+LOGIN_EYEBROW = "Sign in"
+LOGIN_TITLE = "Continue with your work account"
+LOGIN_NOTE = "Single sign-on via Google. Platform never sees or stores your password."
+LOGIN_FOOTER = "OpenActive admin dashboard reports the health and quality of the ecosystem."
+
 
 class Decision(StrEnum):
     DEV_BYPASS = "dev_bypass"
@@ -52,21 +57,37 @@ def mask_email(email: str | None) -> str:
 
 
 def render_login_screen(domain: str) -> None:
+    """The sign-in card: eyebrow, promise, the single SSO action, then the reassurance.
+
+    Structure only — the card's type scale lives in `components/surface.py`, keyed off the
+    container keys set here. The button carries a Material icon rather than the Google
+    wordmark: the mark is multicoloured artwork whose colours are not in the brand palette,
+    and `tests/unit/test_theme.py` holds the line that no other colour enters the app.
+    """
     _, middle, _ = st.columns([1, 2, 1])
     with middle, card("login"):
-        st.title("Data Stewards", anchor=False)
-        st.caption("OpenActive · internal")
-        st.markdown(
-            "This dashboard reports the health of the OpenActive publisher feeds. "
-            f"Access is limited to the {domain} Google workspace."
-        )
-        st.button(
-            "Continue with Google",
-            key="auth_login",
-            type="primary",
-            on_click=st.login,
-            width="stretch",
-        )
+        with st.container(key="oalogineyebrow"):
+            st.markdown(LOGIN_EYEBROW.upper())
+        with st.container(key="oalogintitle"):
+            st.markdown(LOGIN_TITLE)
+        with st.container(key="oaloginbody"):
+            st.markdown(
+                f"Access is limited to the **{domain}** Google Workspace. "
+                "No password to remember."
+            )
+        with st.container(key="oaloginaction"):
+            st.button(
+                "Continue with Google",
+                key="auth_login",
+                type="primary",
+                icon=":material/login:",
+                on_click=st.login,
+                width="stretch",
+            )
+        with st.container(key="oaloginnote"):
+            st.markdown(f":material/verified_user: {LOGIN_NOTE}")
+        st.divider()
+        st.caption(LOGIN_FOOTER)
 
 
 def render_denied(domain: str) -> None:

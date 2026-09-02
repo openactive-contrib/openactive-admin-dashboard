@@ -158,6 +158,30 @@ def test_the_app_boots_and_lands_on_the_overview() -> None:
     assert any("Authentication is disabled" in w.value for w in app.warning)
 
 
+def test_the_login_screen_is_reached_with_the_card_stylesheet_already_on_the_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: the gate stops the script, so the styles must be emitted above it.
+
+    Injected below `require_login`, the sign-in and denied screens got no CSS at all — the
+    white card fill and the card's type scale both silently vanished.
+    """
+    from stewards import config
+    from stewards.components import theme
+
+    monkeypatch.setenv("STEWARDS_DISABLE_AUTH", "false")
+    config.get_settings.cache_clear()
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=60)
+    app.run()
+    assert any("Continue with Google" in button.label for button in app.button)
+    styles = [m.value for m in app.markdown if m.value.lstrip().startswith("<style>")]
+    assert styles, "the login screen rendered with no stylesheet"
+    assert f"background-color: {theme.SURFACE}" in styles[0]
+
+    config.get_settings.cache_clear()
+
+
 def test_the_app_reports_a_missing_configuration_instead_of_crashing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

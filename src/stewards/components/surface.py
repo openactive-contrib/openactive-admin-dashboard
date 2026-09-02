@@ -77,6 +77,57 @@ _STYLES = f"""
       color: {theme.LABEL};
   }}
 
+  /* --- login card -------------------------------------------------------------------- */
+  /* The sign-in card is the one screen with no data on it, so it carries the app's largest
+     type: an eyebrow, a single promise, one action. The note beneath the button is the
+     sunken tint rather than `st.info`, which the config points at teal — reassurance is
+     not a state. */
+  div[class*="st-key-{CARD_PREFIX}_login"] {{
+      padding: 2.15rem 2.1rem 1.5rem;
+      margin-top: 2.5rem;
+  }}
+  div[class*="st-key-oalogineyebrow"] p {{
+      margin: 0;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.085em;
+      color: {theme.LABEL};
+  }}
+  div[class*="st-key-oalogintitle"] p {{
+      margin: 0.5rem 0 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.022em;
+      line-height: 1.2;
+      color: {theme.INK};
+  }}
+  div[class*="st-key-oaloginbody"] p {{
+      margin: 0.6rem 0 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: {theme.INK_SOFTER};
+  }}
+  div[class*="st-key-oaloginaction"] {{
+      margin: 1.35rem 0 0.6rem;
+  }}
+  div[class*="st-key-oaloginaction"] button {{
+      padding: 0.62rem 1rem;
+      border-radius: 8px;
+      font-size: 0.98rem;
+      font-weight: 600;
+  }}
+  div[class*="st-key-oaloginnote"] {{
+      # background-color: {theme.SURFACE_SUNKEN};
+      border-radius: 8px;
+      # padding: 0.85rem 0.95rem;
+  }}
+  div[class*="st-key-oaloginnote"] p {{
+      margin: 0;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: {theme.MUTED};
+  }}
+
   /* --- KPI blocks -------------------------------------------------------------------- */
   div[class*="st-key-oakpilabel"] p {{
       margin: 0;

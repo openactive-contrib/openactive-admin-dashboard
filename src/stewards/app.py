@@ -39,8 +39,11 @@ def main() -> None:
         st.error(f"**The dashboard is not configured.**\n\n{exc}")
         st.stop()
 
-    email = require_login(settings)
+    # Before the gate, not after: `require_login` stops the script on the sign-in and
+    # denied screens, so a stylesheet emitted below it would never reach them and the
+    # login card would render as a transparent outline on the canvas tint.
     inject_card_styles()
+    email = require_login(settings)
     page = nav.build_navigation()
     nav.render_sidebar(_nav_badges())
     render_identity_footer(email)

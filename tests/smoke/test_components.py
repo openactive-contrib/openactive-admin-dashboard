@@ -299,6 +299,11 @@ def test_the_login_screen_names_the_workspace_and_never_shows_a_full_address() -
     app = run(_login_screen_script)
     assert any("Continue with Google" in b.label for b in app.button)
     assert any("theodi.org" in e.value for e in app.error)
+    body = " ".join(m.value for m in app.markdown)
+    assert "SIGN IN" in body
+    assert "Continue with your work account" in body
+    assert "**theodi.org** Google Workspace" in body
+    assert "never sees or stores your password" in body
     captions = " ".join(c.value for c in app.caption)
     assert "h…@theodi.org" in captions
     assert "huseyin.kir@theodi.org" not in captions
