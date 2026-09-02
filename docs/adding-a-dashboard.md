@@ -91,18 +91,43 @@ within a monitor (asserted).
 ## 2. The API contract
 
 The app is a **client only** — no BigQuery SDK, no SQL, no direct database access. All four
-endpoints are already implemented generically in `api/repository.py`, so a new monitor
-normally needs **no new client code**: it reuses `/monitors/{id}/incidents` and
-`/monitors/{id}/trend` with its own id.
+reads are already implemented generically in `api/repository.py`, so a new monitor normally
+needs **no new client code**: it reuses the per-monitor incidents and trend reads with its
+own id.
 
-Base URL is `${STEWARDS_API_BASE_URL}/api/v1`.
+### Two URL shapes
 
-| Endpoint | Used by | Repository function |
+`api/endpoints.py` maps each logical read onto a path and query. Which shape a deployment
+speaks is `STEWARDS_API_STYLE`; no page or component ever builds a URL.
+
+| Logical read | `contract` (default) | `admin` (the interim API) |
 |---|---|---|
-| `GET /summary` | overview KPIs, home-page cards, sidebar badges | `fetch_summary()` |
-| `GET /monitors/{id}/incidents?page=1&page_size=500` | the monitor page table | `fetch_incidents(id)` |
-| `GET /monitors/{id}/trend?days=30` | the monitor page chart | `fetch_trend(id)` |
-| `GET /contact-queue` | the cross-monitor queue | `fetch_contact_queue()` |
+| fleet summary | `GET /api/v1/summary` | `GET /admin/summary?as_of=<date>` |
+| incidents | `GET /api/v1/monitors/<id>/incidents?page=1&page_size=500` | `GET /admin/<id-with-hyphens>-incidents?as_of=<date>&page=1&page_size=500` |
+| trend | `GET /api/v1/monitors/<id>/trend?days=30` | `GET /admin/<id-with-hyphens>-trend?as_of=<date>` (singular, and it picks its own window) |
+| contact queue | `GET /api/v1/contact-queue` | `GET /admin/contact-queue?as_of=<date>` |
+
+So under `admin`, `single_feed_stall` reads `/admin/single-feed-stall-incidents`: the path
+is derived from the monitor id, and a new monitor needs no routing change. `as_of` is the
+snapshot to answer for and defaults to today, which is the snapshot the daily batch has
+just written.
+
+**An endpoint a deployment has not built yet answers 404**, which becomes `ApiNotFound` and
+renders as "registered in the dashboard but its endpoint is not live in this deployment" on
+the page that needs it. The rest of the app is unaffected: the sidebar simply shows no count
+pills, and every other page still loads. Both shapes route all four reads, so shipping an
+endpoint is the only step — there is no app change to make afterwards.
+
+The token rides in an `Authorization: Bearer` header unless `STEWARDS_API_TOKEN_PARAM`
+names a query parameter to carry it instead (the admin API takes `?token=`). It is never
+logged: every error message names the path, which carries no query string.
+
+| Logical read | Used by | Repository function |
+|---|---|---|
+| fleet summary | overview KPIs, home-page cards, sidebar badges | `fetch_summary()` |
+| incidents | the monitor page table | `fetch_incidents(id)` |
+| trend | the monitor page chart | `fetch_trend(id)` |
+| contact queue | the cross-monitor queue | `fetch_contact_queue()` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
 
@@ -136,8 +161,8 @@ was built from, because the data is a daily batch and must never read as live.
 | `feed_id`, `feed_name`, `feed_type`, `feed_url` | string | no | Feed-level monitors set these; publisher-level ones leave them null. |
 | `consecutive_days` | int | no | For checks with a suppression window. |
 | `last_contacted` | date | no | Drives the queue's "already contacted" KPI. |
-| `quality_score` | int | no | For `SCORE` columns. |
-| `trend` | array of numbers | no | The row sparkline. |
+| `quality_score` | number | no | For `SCORE` columns. Fractional values are expected (`72.1`). |
+| `trend` | array of numbers | no | The row sparkline. Individual points may be `null`; a null is dropped from the drawn line rather than plotted as a zero, because `st.column_config.LineChartColumn` renders the whole cell as text if the list is not all numbers. |
 | `detail` | object | no | Monitor-specific. The only untyped field — see step 4. |
 
 Paging: `_fetch_incidents` follows `meta.total` at `page_size=500` up to 20 pages and
@@ -149,6 +174,7 @@ Status vocabulary the app already colours and labels:
 | Tone | Tokens |
 |---|---|
 | red | `contact_due`, `not_contacted`, `overdue` |
+| grey | `open` — the admin API's only status; it tracks detection, not the contact conversation |
 | amber | `awaiting_reply`, `contacted`, `monitoring` |
 | green | `resolved`, `on_target` |
 | grey | `new` |
@@ -179,6 +205,11 @@ The home-page card and the sidebar badge come from this entry matched to the reg
 `monitor_id`. A registered monitor the API does not report yet shows as a zero/green card
 rather than disappearing — that is deliberate, so a registry entry landing before its
 endpoint is visible instead of silently missing.
+
+`count` and `past_threshold_count` may be `null`, meaning the batch did not compute that
+figure for this snapshot. That is not the same as zero: the card reads em dash and grey
+with a "not reported" note, and gets no sidebar badge. Send zero only when the figure is
+genuinely zero. Null points in `sparkline` are dropped from the line, as on a row trend.
 
 ### Contact queue
 
@@ -363,23 +394,31 @@ shape. Test-only variants (empty, malformed, paginated) belong in `tests/fixture
 ## 9. Switching to the real API
 
 Nothing in the app changes. Point `STEWARDS_API_BASE_URL` at the API, set
-`STEWARDS_API_TOKEN`, and drop `STEWARDS_USE_SAMPLE_DATA`. Any page in sample-data mode
-renders a banner saying so, so there is no ambiguity about which mode is on screen.
+`STEWARDS_API_TOKEN`, name the shape it speaks, and drop `STEWARDS_USE_SAMPLE_DATA`. Any
+page in sample-data mode renders a banner saying so, so there is no ambiguity about which
+mode is on screen.
 
 | Variable | Meaning |
 |---|---|
 | `STEWARDS_API_BASE_URL` | Required unless sample-data mode is on |
-| `STEWARDS_API_TOKEN` | Bearer token for the API; not the user's identity |
+| `STEWARDS_API_TOKEN` | Token for the API; not the user's identity |
+| `STEWARDS_API_STYLE` | `contract` (default) or `admin` — see the two shapes above |
+| `STEWARDS_API_TOKEN_PARAM` | Query parameter the token rides in; empty means a bearer header |
 | `STEWARDS_USE_SAMPLE_DATA` | Serve the bundled payloads instead of calling the API |
 | `STEWARDS_CONTACT_THRESHOLD_DAYS` | Fleet contact threshold, default 7 |
+
+Sample-data mode ignores `STEWARDS_API_STYLE` and always speaks `contract`, because that is
+the shape the bundled payload files are named for — so a local run pointed at the admin API
+keeps every page working when the sample flag goes back on.
 
 Secrets come from the environment or `.streamlit/secrets.toml` only. Never commit a token,
 never log one.
 
-A monitor whose data does not fit `/monitors/{id}/incidents` needs a new repository function,
-and that is a change to shared code: add the endpoint to `api/repository.py` (a cache-free
-`_fetch_*` plus a cached wrapper), a model in `api/models.py`, and a `respx`-backed test in
-`tests/contract/`. Do not call `httpx` from anywhere but `api/client.py`.
+A monitor whose data does not fit the per-monitor incidents read needs a new logical read,
+and that is a change to shared code: add it to `api/endpoints.py` for **every** shape, add a
+cache-free `_fetch_*` plus a cached wrapper in `api/repository.py`, a model in
+`api/models.py`, and a `respx`-backed test in `tests/contract/`. Do not call `httpx` from
+anywhere but `api/client.py`, and do not build a path anywhere but `api/endpoints.py`.
 
 ## 10. Tests
 

@@ -77,6 +77,7 @@ def test_days_label() -> None:
         ("awaiting_reply", Tone.AMBER, "Awaiting reply"),
         ("monitoring", Tone.AMBER, "Monitoring"),
         ("new", Tone.GREY, "New"),
+        ("open", Tone.GREY, "Open"),
         ("resolved", Tone.GREEN, "Resolved"),
     ],
 )
@@ -88,6 +89,12 @@ def test_known_statuses(status: str, tone: Tone, label: str) -> None:
 def test_unknown_status_degrades_to_grey_and_a_readable_label() -> None:
     assert status_tone("something_new_from_the_api") is Tone.GREY
     assert status_label("something_new_from_the_api") == "Something new from the api"
+
+
+def test_the_admin_apis_open_token_is_labelled_rather_than_de_slugged() -> None:
+    """Every incident from the admin API carries it, so it is declared, not a fallback."""
+    assert status_label("open") == "Open"
+    assert status_tone("open") is Tone.GREY
 
 
 def test_empty_status_is_not_blank() -> None:

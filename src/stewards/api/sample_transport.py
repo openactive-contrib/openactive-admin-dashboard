@@ -21,6 +21,11 @@ def load_sample(name: str) -> Any:
 
 
 def _resolve(path: str) -> str | None:
+    """Payload stem for a request path, or None if unroutable.
+
+    Only the contract shape is routed, which is the shape the payload files are named for;
+    `Settings.effective_api_style` is what guarantees sample-data mode asks for it.
+    """
     parts = [p for p in path.split("/") if p]
     match parts:
         case [*_, "summary"]:

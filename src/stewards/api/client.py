@@ -11,12 +11,12 @@ from typing import Any
 
 import httpx
 
+from stewards.api import endpoints
 from stewards.api.errors import ApiContractError, ApiNotFound, ApiUnauthorized, ApiUnavailable
 from stewards.config import Settings, get_settings
 
 log = logging.getLogger(__name__)
 
-API_PREFIX = "/api/v1"
 TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 RETRIES = 2
 
@@ -24,7 +24,11 @@ RETRIES = 2
 def build_client(
     settings: Settings, transport: httpx.BaseTransport | None = None
 ) -> httpx.Client:
-    """Construct the httpx client. The bearer token is never logged."""
+    """Construct the httpx client. The token is never logged.
+
+    The path prefix follows the configured API shape, and the token travels in the header
+    unless `api_token_param` names a query parameter to carry it instead.
+    """
     if transport is None:
         if settings.use_sample_data:
             from stewards.api.sample_transport import sample_transport
@@ -33,10 +37,10 @@ def build_client(
         else:
             transport = httpx.HTTPTransport(retries=RETRIES)
     headers = {"Accept": "application/json"}
-    if settings.api_token:
+    if settings.api_token and not settings.api_token_param:
         headers["Authorization"] = f"Bearer {settings.api_token}"
     return httpx.Client(
-        base_url=f"{settings.api_base_url}{API_PREFIX}",
+        base_url=f"{settings.api_base_url}{endpoints.prefix(settings.effective_api_style)}",
         headers=headers,
         timeout=TIMEOUT,
         transport=transport,
@@ -56,9 +60,25 @@ class StewardsClient:
     def settings(self) -> Settings:
         return self._settings
 
+    @property
+    def style(self) -> endpoints.Style:
+        """Which URL shape requests are built for."""
+        return self._settings.effective_api_style
+
+    def _query(self, params: dict[str, Any] | None) -> dict[str, Any] | None:
+        """The caller's query, plus the token when this API takes it as a parameter.
+
+        Only ever passed to httpx as `params`, never formatted into a log line or an error
+        message: every message below names the path, which carries no query string.
+        """
+        token_param = self._settings.api_token_param
+        if not (token_param and self._settings.api_token):
+            return params
+        return {**(params or {}), token_param: self._settings.api_token}
+
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
-            response = self._client.get(path, params=params)
+            response = self._client.get(path, params=self._query(params))
         except httpx.TimeoutException as exc:
             raise ApiUnavailable(f"The monitoring API timed out on {path}") from exc
         except httpx.TransportError as exc:

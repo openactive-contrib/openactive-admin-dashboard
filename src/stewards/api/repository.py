@@ -8,10 +8,12 @@ once a day, so the cache is deliberately generous and there is no refresh button
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import streamlit as st
 from pydantic import BaseModel, ValidationError
 
+from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
 from stewards.api.errors import ApiContractError
 from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
@@ -33,28 +35,43 @@ def _parse[T: BaseModel](model: type[T], payload: object, endpoint: str) -> T:
         ) from exc
 
 
-def _fetch_summary(client: StewardsClient | None = None) -> SummaryResponse:
+def _fetch_summary(
+    client: StewardsClient | None = None, as_of: date | None = None
+) -> SummaryResponse:
     client = client or get_client()
-    return _parse(SummaryResponse, client.get("/summary"), "/summary")
+    endpoint = endpoints.summary(client.style, as_of=as_of or date.today())
+    return _parse(SummaryResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
-def _fetch_incidents(monitor_id: str, client: StewardsClient | None = None) -> IncidentPage:
+def _fetch_incidents(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> IncidentPage:
     """Fetch every open incident for a monitor, paging inside this function.
 
     Callers never loop: filtering and searching happen locally over the returned snapshot.
+    `as_of` names the snapshot to answer for; it defaults to today, which is the snapshot
+    the daily batch has just written.
     """
     client = client or get_client()
-    endpoint = f"/monitors/{monitor_id}/incidents"
-    first = _parse(
-        IncidentPage, client.get(endpoint, {"page": 1, "page_size": PAGE_SIZE}), endpoint
-    )
+    as_of = as_of or date.today()
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.incidents(
+            client.style, monitor_id, as_of=as_of, page=page, page_size=PAGE_SIZE
+        )
+
+    endpoint = request(1)
+    first = _parse(IncidentPage, client.get(endpoint.path, endpoint.params), endpoint.path)
 
     incidents = list(first.data)
     page = 1
     while len(incidents) < first.meta.total and incidents and page < MAX_PAGES:
         page += 1
+        nxt_endpoint = request(page)
         nxt = _parse(
-            IncidentPage, client.get(endpoint, {"page": page, "page_size": PAGE_SIZE}), endpoint
+            IncidentPage,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
         )
         if not nxt.data:
             break
@@ -67,16 +84,22 @@ def _fetch_incidents(monitor_id: str, client: StewardsClient | None = None) -> I
 
 
 def _fetch_trend(
-    monitor_id: str, days: int = 30, client: StewardsClient | None = None
+    monitor_id: str,
+    days: int = 30,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
 ) -> TrendResponse:
     client = client or get_client()
-    endpoint = f"/monitors/{monitor_id}/trend"
-    return _parse(TrendResponse, client.get(endpoint, {"days": days}), endpoint)
+    endpoint = endpoints.trend(client.style, monitor_id, as_of=as_of or date.today(), days=days)
+    return _parse(TrendResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
-def _fetch_contact_queue(client: StewardsClient | None = None) -> IncidentPage:
+def _fetch_contact_queue(
+    client: StewardsClient | None = None, as_of: date | None = None
+) -> IncidentPage:
     client = client or get_client()
-    return _parse(IncidentPage, client.get("/contact-queue"), "/contact-queue")
+    endpoint = endpoints.contact_queue(client.style, as_of=as_of or date.today())
+    return _parse(IncidentPage, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading snapshot…")

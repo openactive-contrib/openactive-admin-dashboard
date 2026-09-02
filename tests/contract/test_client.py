@@ -9,7 +9,8 @@ import httpx
 import pytest
 import respx
 
-from stewards.api.client import API_PREFIX, StewardsClient, get_client, reset_client
+from stewards.api.client import StewardsClient, get_client, reset_client
+from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
     ApiContractError,
     ApiNotFound,
@@ -18,6 +19,7 @@ from stewards.api.errors import (
 )
 from stewards.config import Settings
 
+API_PREFIX = prefix(Style.CONTRACT)
 BASE = "https://api.test"
 URL = f"{BASE}{API_PREFIX}/summary"
 

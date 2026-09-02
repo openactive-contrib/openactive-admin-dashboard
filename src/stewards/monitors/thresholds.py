@@ -46,6 +46,9 @@ _STATUS_TONES = {
     "resolved": Tone.GREEN,
     "on_target": Tone.GREEN,
     "new": Tone.GREY,
+    # The admin API reports every incident as simply `open`: it tracks detection, not the
+    # contact conversation, so the token carries no workflow state and stays grey.
+    "open": Tone.GREY,
 }
 
 _STATUS_LABELS = {
@@ -58,6 +61,7 @@ _STATUS_LABELS = {
     "resolved": "Resolved",
     "on_target": "On target",
     "new": "New",
+    "open": "Open",
 }
 
 

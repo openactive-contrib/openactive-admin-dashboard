@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from stewards.api.endpoints import Style
 from stewards.config import (
     DEFAULT_ALLOWED_DOMAIN,
     DEFAULT_DOCS_URL,
@@ -161,3 +162,43 @@ def test_a_blank_docs_url_falls_back_to_the_default() -> None:
         {"STEWARDS_API_BASE_URL": "https://api.test", "STEWARDS_DOCS_URL": "   "}
     )
     assert settings.docs_url == DEFAULT_DOCS_URL
+
+
+# --- the API shape ------------------------------------------------------------------------
+
+
+def test_the_api_shape_defaults_to_the_versioned_contract() -> None:
+    settings = load_settings(BASE)
+    assert settings.api_style is Style.CONTRACT
+    assert settings.api_token_param == ""  # so the token goes in the header
+
+
+def test_the_admin_shape_is_selectable_with_a_query_parameter_token() -> None:
+    settings = load_settings(
+        BASE | {"STEWARDS_API_STYLE": "ADMIN", "STEWARDS_API_TOKEN_PARAM": " token "}
+    )
+    assert settings.api_style is Style.ADMIN
+    assert settings.api_token_param == "token"
+
+
+def test_an_unknown_api_shape_is_a_config_error_naming_the_options() -> None:
+    with pytest.raises(ConfigError, match="contract, admin"):
+        load_settings(BASE | {"STEWARDS_API_STYLE": "graphql"})
+
+
+def test_a_blank_api_shape_falls_back_to_the_contract() -> None:
+    assert load_settings(BASE | {"STEWARDS_API_STYLE": "  "}).api_style is Style.CONTRACT
+
+
+def test_sample_data_mode_speaks_the_contract_shape_whatever_the_style_says() -> None:
+    """The bundled payloads are named for the contract, and cover endpoints admin lacks."""
+    settings = load_settings(
+        {"STEWARDS_USE_SAMPLE_DATA": "true", "STEWARDS_API_STYLE": "admin"}
+    )
+    assert settings.api_style is Style.ADMIN  # what the deployment is configured for
+    assert settings.effective_api_style is Style.CONTRACT  # what requests are built for
+
+
+def test_a_live_deployment_uses_the_style_it_declares() -> None:
+    settings = load_settings(BASE | {"STEWARDS_API_STYLE": "admin"})
+    assert settings.effective_api_style is Style.ADMIN

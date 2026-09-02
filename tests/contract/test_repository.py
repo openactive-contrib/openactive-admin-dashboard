@@ -11,7 +11,8 @@ import httpx
 import pytest
 import respx
 
-from stewards.api.client import API_PREFIX, StewardsClient
+from stewards.api.client import StewardsClient
+from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
     ApiContractError,
     ApiNotFound,
@@ -29,6 +30,7 @@ from stewards.api.repository import (
 from stewards.api.sample_transport import load_sample
 from stewards.config import Settings
 
+API_PREFIX = prefix(Style.CONTRACT)
 BASE = f"https://api.test{API_PREFIX}"
 INCIDENTS = f"{BASE}/monitors/single_feed_stall/incidents"
 

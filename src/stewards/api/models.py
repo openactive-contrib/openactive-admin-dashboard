@@ -54,8 +54,14 @@ class Incident(ApiModel):
     feed_url: str | None = None
     consecutive_days: int | None = None
     last_contacted: date | None = None
-    quality_score: int | None = None
-    trend: tuple[float, ...] = ()
+
+    #: Percentage-style figures arrive fractional (`72.1`), so this is a float, not an int.
+    quality_score: float | None = None
+
+    #: The row sparkline. A snapshot the batch has no figure for arrives as null, so the
+    #: series is optional per point: dropping the gaps would silently reshape the line.
+    trend: tuple[float | None, ...] = ()
+
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -66,18 +72,26 @@ class IncidentPage(ApiModel):
 
 class MonitorCount(ApiModel):
     monitor_id: str
-    count: int = 0
-    past_threshold_count: int = 0
-    sparkline: tuple[float, ...] = ()
+
+    #: Counts a deployment does not compute for this snapshot arrive as null, so the tile
+    #: reads "not reported" rather than the zero that means "all clear".
+    count: int | None = None
+    past_threshold_count: int | None = None
+
+    #: A snapshot the batch has no figure for arrives as null, as on `Incident.trend`.
+    sparkline: tuple[float | None, ...] = ()
 
 
 class Summary(ApiModel):
-    publishers_monitored: int = 0
-    publishers_with_issues: int = 0
-    open_incidents: int = 0
-    past_threshold: int = 0
-    feeds: int = 0
-    datasets: int = 0
+    #: Every fleet count is optional for the same reason as the deltas below: a figure the
+    #: batch has not computed yet arrives as null, and the KPI says so instead of showing a
+    #: zero that would read as "nothing is wrong".
+    publishers_monitored: int | None = None
+    publishers_with_issues: int | None = None
+    open_incidents: int | None = None
+    past_threshold: int | None = None
+    feeds: int | None = None
+    datasets: int | None = None
     monitors: tuple[MonitorCount, ...] = ()
 
     #: Change against the previous snapshot. Optional: the KPI renders without a delta

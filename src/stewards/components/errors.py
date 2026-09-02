@@ -28,8 +28,9 @@ _MESSAGES: tuple[tuple[type[ApiError], str, str], ...] = (
     ),
     (
         ApiNotFound,
-        "The monitoring API has no data for this monitor yet.",
-        "This monitor is registered in the dashboard but its endpoint is not live.",
+        "The monitoring API has no data for this view yet.",
+        "This view is registered in the dashboard but its endpoint is not live in this "
+        "deployment.",
     ),
     (
         ApiContractError,

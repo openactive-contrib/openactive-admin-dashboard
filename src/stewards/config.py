@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 
+from stewards.api.endpoints import Style
+
 DEFAULT_ALLOWED_DOMAIN = "theodi.org"
 DEFAULT_THRESHOLD_DAYS = 7
 DEFAULT_DOCS_URL = "https://openactive-contrib.github.io/openactive-admin-dashboard/"
@@ -19,6 +21,11 @@ class ConfigError(RuntimeError):
 class Settings:
     api_base_url: str
     api_token: str = ""
+    api_style: Style = Style.CONTRACT
+    api_token_param: str = ""
+    """Query parameter the token is sent as. Empty means an `Authorization: Bearer` header,
+    which is what the versioned contract expects; the interim admin API takes `?token=`."""
+
     env: str = "prod"
     allowed_email_domain: str = DEFAULT_ALLOWED_DOMAIN
     contact_threshold_days: int = DEFAULT_THRESHOLD_DAYS
@@ -29,6 +36,17 @@ class Settings:
     @property
     def is_dev(self) -> bool:
         return self.env == "dev"
+
+    @property
+    def effective_api_style(self) -> Style:
+        """The shape requests are actually built for.
+
+        Sample-data mode always speaks the contract shape whatever `api_style` says: the
+        bundled payloads are named for it, and they cover the summary and contact queue
+        that the interim admin API has not implemented. Without this, pointing a local run
+        at the admin API would silently disable those pages in sample mode too.
+        """
+        return Style.CONTRACT if self.use_sample_data else self.api_style
 
 
 _TRUE = frozenset({"1", "true", "yes", "on"})
@@ -43,11 +61,21 @@ def load_settings(source: Mapping[str, str]) -> Settings:
 
     `use_sample_data` serves bundled payloads instead of calling the API, so the app is
     runnable before the API exists. `disable_auth` is honoured only when `env` is `dev`.
+    `api_style` picks which URL shape the deployment's API speaks — see `api/endpoints.py`.
     """
     env = source.get("STEWARDS_ENV", "prod").strip().lower() or "prod"
     use_sample_data = _flag(source, "STEWARDS_USE_SAMPLE_DATA")
     base_url = source.get("STEWARDS_API_BASE_URL", "").strip()
     token = source.get("STEWARDS_API_TOKEN", "").strip()
+
+    style_name = source.get("STEWARDS_API_STYLE", "").strip().lower() or Style.CONTRACT.value
+    try:
+        style = Style(style_name)
+    except ValueError as exc:
+        known = ", ".join(s.value for s in Style)
+        raise ConfigError(
+            f"STEWARDS_API_STYLE must be one of {known}, got {style_name!r}"
+        ) from exc
 
     if not base_url:
         if not use_sample_data:
@@ -70,6 +98,8 @@ def load_settings(source: Mapping[str, str]) -> Settings:
     return Settings(
         api_base_url=base_url.rstrip("/"),
         api_token=token,
+        api_style=style,
+        api_token_param=source.get("STEWARDS_API_TOKEN_PARAM", "").strip(),
         env=env,
         allowed_email_domain=source.get("STEWARDS_ALLOWED_DOMAIN", "").strip()
         or DEFAULT_ALLOWED_DOMAIN,

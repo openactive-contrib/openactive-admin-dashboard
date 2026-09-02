@@ -78,7 +78,7 @@ def _error_script(exc: object) -> None:
     [
         (ApiUnauthorized("token expired"), "rejected this deployment's credentials"),
         (ApiUnavailable("timed out"), "unavailable"),
-        (ApiNotFound("no endpoint"), "no data for this monitor yet"),
+        (ApiNotFound("no endpoint"), "no data for this view yet"),
         (ApiContractError("bad shape"), "unexpected shape"),
         (ApiError("something else"), "could not be read"),
     ],
@@ -205,6 +205,28 @@ def _unknown_fleet_size_script() -> None:
 def test_a_summary_with_no_fleet_size_does_not_divide_by_zero() -> None:
     app = run(_unknown_fleet_size_script)
     assert any("fleet size unknown" in m.value for m in app.markdown)
+
+
+def _partial_summary_script(response: object) -> None:
+    from stewards.api.models import SummaryResponse
+    from stewards.components.overview_page import render_fleet_kpis, render_threshold_banner
+
+    assert isinstance(response, SummaryResponse)
+    render_fleet_kpis(response.data)
+    render_threshold_banner(response.data, 7)
+
+
+def test_counts_the_api_does_not_report_render_as_unknown(payload) -> None:
+    """A null count must not read as an all-clear zero, or as a contract error."""
+    response = SummaryResponse.model_validate(payload("admin_summary_partial"))
+    app = run(_partial_summary_script, response)
+    markdown = " ".join(m.value for m in app.markdown)
+
+    assert "179" in markdown
+    assert "—" in markdown
+    assert not app.success  # nothing is known to be clear
+    assert not app.warning
+    assert any("does not report" in info.value for info in app.info)
 
 
 # --- the contact queue with an unrenderable monitor -------------------------------------

@@ -47,7 +47,11 @@ def format_cell(col: Col, value: Any) -> Any:
     """Render one value for its column kind. Sparklines and numbers stay native."""
     match col.kind:
         case ColKind.SPARKLINE:
-            return list(value) if value else []
+            # `st.column_config.LineChartColumn` needs a list of numbers: one null in the
+            # series and the cell gives up and renders the raw list as text. A snapshot the
+            # batch has no figure for is dropped from the line rather than drawn as a zero,
+            # and a series with nothing left in it draws nothing at all.
+            return [float(point) for point in value if point is not None] if value else []
         case ColKind.NUMBER:
             return None if value is None else int(value)
         case ColKind.PERCENT | ColKind.SCORE:

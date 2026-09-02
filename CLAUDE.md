@@ -17,8 +17,16 @@ for adding one — registry entry, page, home-page card, API contract, sample pa
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
-**The backing API does not exist yet.** The app is a finished client against the contract in
-`BUILD_BRIEF.md` §3, and it ships sample payloads so it can be run and reviewed today:
+**Only part of the backing API exists.** `single_feed_stall` reads the live interim admin
+API (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`, `?as_of=`
+plus `?token=`), and `/admin/summary` is live too — it sends `null` for the counts its batch
+does not compute yet, which the overview shows as "not reported" (see the `/summary`
+contract below). The app also requests `/admin/contact-queue` and the other monitors'
+`/admin/<slug>-incidents`; those are not deployed yet, so they 404 and those pages render
+the typed "endpoint is not live" state rather than failing. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
+`/api/v1/monitors/<id>/...` design) and `admin` — selected by `STEWARDS_API_STYLE`.
+
+The app also ships sample payloads so every page can be run and reviewed today:
 
 ```bash
 STEWARDS_USE_SAMPLE_DATA=true STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
@@ -49,7 +57,8 @@ src/stewards/
   app.py                     settings, auth gate, st.navigation
   config.py                  Settings + load_settings(mapping); Streamlit-free
   auth/google.py             OIDC gate; `decide()` is the pure allowlist decision
-  api/client.py              httpx transport: base URL, auth header, timeout, retries
+  api/client.py              httpx transport: base URL, auth, timeout, retries
+  api/endpoints.py           logical read -> path + query, per API shape; Streamlit-free
   api/errors.py              ApiUnavailable | ApiUnauthorized | ApiNotFound | ApiContractError
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
@@ -112,7 +121,9 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | Variable | Meaning |
 |---|---|
 | `STEWARDS_API_BASE_URL` | Required unless sample-data mode is on |
-| `STEWARDS_API_TOKEN` | Bearer token for the API; not the user's identity |
+| `STEWARDS_API_TOKEN` | Token for the API; not the user's identity |
+| `STEWARDS_API_STYLE` | `contract` (default) or `admin` — which URL shape the deployment speaks |
+| `STEWARDS_API_TOKEN_PARAM` | Query parameter the token rides in; empty (default) means a bearer header |
 | `STEWARDS_ENV` | `prod` (default) or `dev` |
 | `STEWARDS_CONTACT_THRESHOLD_DAYS` | Contact threshold, default 7 |
 | `STEWARDS_ALLOWED_DOMAIN` | Google workspace allowlist, default `theodi.org` |
@@ -122,16 +133,22 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 
 ## The `/summary` contract
 
-Beyond the counts in `BUILD_BRIEF.md` §3, `/summary` may send optional
-`publishers_with_issues_delta`, `open_incidents_delta` and `past_threshold_delta`
-(change against the previous snapshot). They are `int | None`: absent means the KPI
-renders with no delta, never a fabricated zero. `monitors.overview.format_delta` owns the
-sign convention.
+Every count in `BUILD_BRIEF.md` §3 is `int | None`. A deployment sends `null` for a figure
+its batch does not compute for that snapshot — the live admin API does exactly this for
+`open_incidents` and `past_threshold` — and null is not zero: the KPI reads em dash with no
+tone, the tile says "not reported", and the sidebar badge is omitted.
+`monitors.overview.format_count` owns that rendering. The same applies per monitor inside
+`data.monitors` (`count`, `past_threshold_count`, and null points in `sparkline`).
+
+Beyond those counts, `/summary` may send optional `publishers_with_issues_delta`,
+`open_incidents_delta` and `past_threshold_delta` (change against the previous snapshot).
+They are `int | None` too: absent means the KPI renders with no delta, never a fabricated
+zero. `monitors.overview.format_delta` owns the sign convention.
 
 ## Testing bar
 
 - `pytest` must pass. Coverage on `src/stewards/{monitors,components,api}` ≥ 90%, project
-  ≥ 80%. Currently 100% / 98% / 99% and 98% overall.
+  ≥ 80%. Currently 100% / 99% / 100% and 99% overall.
 - Every pure function gets: a happy path, an empty-input case, and one boundary case
   (`days_open == threshold`, zero rows, null score, missing optional field).
 - API client tested with `respx` against fixtures — including 401, 500, a timeout, a
@@ -168,6 +185,11 @@ uv run mypy src
   outside the app and set their own conventions.
 - Cache API reads with `@st.cache_data(ttl=3600)` at the repository layer only; the wrapped
   `_fetch_*` function stays cache-free so tests call it directly.
+- No page or component builds a URL. `api/endpoints.py` maps each of the four logical reads
+  onto a path and query per shape; both shapes route all four, and an endpoint a deployment
+  has not built yet answers 404, which becomes `ApiNotFound` on the page that needs it.
+  Sample-data mode always speaks `contract` (`Settings.effective_api_style`), because that
+  is what the payload files are named for.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
   params, so the controls respond without a refetch and stay unit-testable.
 - The full brand palette lives in `components/theme.py`; `.streamlit/config.toml` mirrors it

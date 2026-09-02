@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from stewards.api.models import Summary
 from stewards.monitors.registry import MONITOR_REGISTRY, Monitor, Severity
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.transforms import EMPTY
 
 STATE_LABELS = {
     Tone.RED: "Critical",
@@ -16,23 +17,35 @@ STATE_LABELS = {
 }
 
 
-def tile_state(monitor: Monitor, count: int, past_threshold_count: int) -> Tone:
+def format_count(count: int | None) -> str:
+    """A count for display. None is a figure the API did not report, never a zero."""
+    return EMPTY if count is None else f"{count:,}"
+
+
+def tile_state(monitor: Monitor, count: int | None, past_threshold_count: int | None) -> Tone:
     """Green with nothing open, red once anything is past the threshold, else amber.
 
-    Informational monitors stay grey while they are merely non-zero.
+    Informational monitors stay grey while they are merely non-zero, and so does a monitor
+    whose count the API did not report: an unknown figure is not an all-clear.
     """
+    if count is None:
+        return Tone.GREY
     if count <= 0:
         return Tone.GREEN
-    if past_threshold_count > 0:
+    if past_threshold_count is not None and past_threshold_count > 0:
         return Tone.RED
     if monitor.severity is Severity.INFORMATIONAL:
         return Tone.GREY
     return Tone.AMBER
 
 
-def tile_note(monitor: Monitor, count: int, past_threshold_count: int) -> str:
+def tile_note(monitor: Monitor, count: int | None, past_threshold_count: int | None) -> str:
+    if count is None:
+        return "count not reported in this snapshot"
     if count <= 0:
         return "no open incidents in this snapshot"
+    if past_threshold_count is None:
+        return f"{monitor.threshold_days}-day threshold count not reported"
     if past_threshold_count > 0:
         return f"{past_threshold_count} past the {monitor.threshold_days}-day threshold"
     return f"none past the {monitor.threshold_days}-day threshold yet"
@@ -69,11 +82,11 @@ def nav_badges(summary: Summary) -> dict[str, NavBadge]:
     attention. Tone matches the monitor tile, so the sidebar and the overview never disagree.
     """
     badges: dict[str, NavBadge] = {}
-    if summary.past_threshold > 0:
+    if summary.past_threshold is not None and summary.past_threshold > 0:
         badges["contact_queue"] = NavBadge(str(summary.past_threshold), Tone.RED)
     for monitor in MONITOR_REGISTRY:
         counts = summary.count_for(monitor.id)
-        if counts is None or counts.count <= 0:
+        if counts is None or counts.count is None or counts.count <= 0:
             continue
         badges[monitor.id] = NavBadge(
             str(counts.count), tile_state(monitor, counts.count, counts.past_threshold_count)
@@ -84,8 +97,8 @@ def nav_badges(summary: Summary) -> dict[str, NavBadge]:
 @dataclass(frozen=True, slots=True)
 class Tile:
     monitor: Monitor
-    count: int
-    past_threshold_count: int
+    count: int | None
+    past_threshold_count: int | None
     state: Tone
     state_label: str
     note: str
@@ -93,7 +106,7 @@ class Tile:
 
     @property
     def value(self) -> str:
-        return f"{self.count:,}"
+        return format_count(self.count)
 
 
 def build_tiles(summary: Summary) -> tuple[Tile, ...]:
@@ -107,6 +120,8 @@ def build_tiles(summary: Summary) -> tuple[Tile, ...]:
         counts = summary.count_for(monitor.id)
         count = counts.count if counts else 0
         past = counts.past_threshold_count if counts else 0
+        # Nulls are dropped rather than drawn as zeros, as on an incident's row sparkline.
+        sparkline = tuple(p for p in counts.sparkline if p is not None) if counts else ()
         state = tile_state(monitor, count, past)
         tiles.append(
             Tile(
@@ -116,12 +131,15 @@ def build_tiles(summary: Summary) -> tuple[Tile, ...]:
                 state=state,
                 state_label=STATE_LABELS[state],
                 note=tile_note(monitor, count, past),
-                sparkline=counts.sparkline if counts else (),
+                sparkline=sparkline,
             )
         )
     return tuple(tiles)
 
 
 def sidebar_counts(summary: Summary) -> dict[str, int]:
-    """Monitor id -> open incident count, for the navigation labels."""
-    return {m.monitor_id: m.count for m in summary.monitors}
+    """Monitor id -> open incident count, for the navigation labels.
+
+    A monitor whose count the API did not report is left out: there is no number to show.
+    """
+    return {m.monitor_id: m.count for m in summary.monitors if m.count is not None}

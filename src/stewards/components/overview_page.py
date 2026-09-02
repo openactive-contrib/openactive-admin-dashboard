@@ -11,44 +11,53 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
-from stewards.monitors.overview import Tile, build_tiles, format_delta
+from stewards.monitors.overview import Tile, build_tiles, format_count, format_delta
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.transforms import EMPTY
 from stewards.monitors.trend import sparkline_chart
 
 TILES_PER_ROW = 3
 
 
+def value_tone(value: str, tone: Tone) -> Tone | None:
+    """A figure the API did not report carries no state; a reported zero is an all-clear."""
+    if value == EMPTY:
+        return None
+    return Tone.GREEN if value == "0" else tone
+
+
 def render_fleet_kpis(summary: Summary) -> None:
     issue_share = (
         f"{summary.publishers_with_issues / summary.publishers_monitored:.1%} of the fleet"
-        if summary.publishers_monitored
+        if summary.publishers_monitored and summary.publishers_with_issues is not None
         else "fleet size unknown"
     )
     cells = (
         (
             "Publishers monitored",
-            f"{summary.publishers_monitored:,}",
+            format_count(summary.publishers_monitored),
             None,
-            f"{summary.feeds:,} feeds across {summary.datasets:,} datasets",
+            f"{format_count(summary.feeds)} feeds across "
+            f"{format_count(summary.datasets)} datasets",
             None,
         ),
         (
             "Publishers with issues",
-            f"{summary.publishers_with_issues:,}",
+            format_count(summary.publishers_with_issues),
             format_delta(summary.publishers_with_issues_delta),
             issue_share,
             Tone.AMBER,
         ),
         (
             "Open incidents",
-            f"{summary.open_incidents:,}",
+            format_count(summary.open_incidents),
             format_delta(summary.open_incidents_delta),
             f"across {len(summary.monitors)} monitors",
             Tone.RED,
         ),
         (
             "Past contact threshold",
-            f"{summary.past_threshold:,}",
+            format_count(summary.past_threshold),
             format_delta(summary.past_threshold_delta),
             f"open longer than {get_settings().contact_threshold_days} days",
             Tone.RED,
@@ -61,7 +70,7 @@ def render_fleet_kpis(summary: Summary) -> None:
             layout.tone_metric(
                 label,
                 value,
-                tone if value != "0" else Tone.GREEN,
+                value_tone(value, tone) if tone is not None else None,
                 slug=f"fleet{index}",
                 delta=delta,
                 sub=sub,
@@ -69,6 +78,14 @@ def render_fleet_kpis(summary: Summary) -> None:
 
 
 def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
+    if summary.past_threshold is None:
+        st.info(
+            f"This snapshot does not report how many incidents have passed the "
+            f"{threshold_days}-day contact threshold. Open the contact queue to see the "
+            "incidents themselves.",
+            icon=":material/info:",
+        )
+        return
     if summary.past_threshold <= 0:
         st.success(
             f"No incident has been open longer than {threshold_days} days in this snapshot.",

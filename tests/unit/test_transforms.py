@@ -305,3 +305,22 @@ def test_sort_by_age_is_oldest_first_then_alphabetical() -> None:
 
 def test_sort_by_age_of_nothing_is_nothing() -> None:
     assert sort_by_age([]) == []
+
+
+# --- sparkline cells ----------------------------------------------------------------------
+
+
+def test_a_sparkline_cell_drops_the_snapshots_with_no_figure() -> None:
+    """The live API sends a null per missing snapshot; LineChartColumn needs numbers only.
+
+    One null and the whole cell falls back to rendering the raw list as text, which is what
+    the table showed before this rule.
+    """
+    col = Col("trend", "30d trend", ColKind.SPARKLINE)
+    assert format_cell(col, (1, 2, None, 4)) == [1.0, 2.0, 4.0]
+
+
+def test_a_sparkline_cell_with_no_usable_points_is_empty() -> None:
+    col = Col("trend", "30d trend", ColKind.SPARKLINE)
+    assert format_cell(col, ()) == []
+    assert format_cell(col, (None, None)) == []
