@@ -12,8 +12,10 @@ custom JS components).
 ## Current state
 
 Two of the eight monitors in the brief are built: `single_feed_stall` and `http_failure`.
-The remaining six land one at a time as their API endpoints go live — see
-`.claude/skills/add-monitor/SKILL.md`, which is the whole procedure.
+The remaining six land one at a time as their API endpoints go live. **The whole procedure
+for adding one — registry entry, page, home-page card, API contract, sample payloads,
+tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
+agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
 **The backing API does not exist yet.** The app is a finished client against the contract in
 `BUILD_BRIEF.md` §3, and it ships sample payloads so it can be run and reviewed today:

@@ -2,82 +2,54 @@
 name: add-monitor
 description: Add a new monitor dashboard to the stewards app. Use whenever the user asks for a new health/quality check, a new dashboard page, or a new incident type.
 ---
+---
+title: Adding a dashboard
+description: How to add a new monitor dashboard to the app. Use whenever the user asks for a new health/quality check, a new dashboard page, or a new incident type.
+---
 
 # Adding a monitor
 
-A monitor is a named check that produces **incidents** (a publisher/feed failing the check,
-with an age in days). Adding one must touch exactly four things. If it touches more, the
-shared code is not general enough — fix that instead of special-casing.
+**`docs/adding-a-dashboard.md` is the procedure. Read it in full before editing anything.**
+It carries what this file deliberately does not duplicate: the API contract field by field,
+the sample-payload rules, the home-page card mechanics, the required test cases, and the
+list of existing tests whose fleet-wide totals a new monitor breaks.
 
-## 1. Registry entry — `src/stewards/monitors/registry.py`
+This file exists so the procedure is found; that file exists so it is correct in one place.
+Do not restate it here — if the procedure changes, change the doc.
 
-```python
-Monitor(
-    id="zero_future",
-    name="Zero future opportunities",
-    group=Group.CONTENT,  # OVERVIEW | AVAILABILITY | CONTENT | COVERAGE
-    severity=Severity.HIGH,  # CRITICAL | HIGH | MEDIUM | INFORMATIONAL
-    blurb="The feed parses cleanly but contains no opportunity starting after the "
-    "snapshot date. Invisible to consumers even though availability checks pass.",
-    # The id is the API path segment: GET /api/v1/monitors/zero_future/incidents
-    unit="feeds at zero",  # the noun under the count, on the tile and the first KPI
-    key_cols=("publisher_id", "feed_id"),
-    columns=[
-        Col("publisher_name", "Publisher", kind=ColKind.TEXT, primary=True),
-        Col("feed_name", "Feed", kind=ColKind.MONO),
-        Col("future_count", "Future count", kind=ColKind.NUMBER),
-        Col("last_nonzero", "Last non-zero day", kind=ColKind.DATE),
-        Col("days_open", "Days at zero", kind=ColKind.DAYS),  # auto RAG vs threshold
-        Col("trend", "30d trend", kind=ColKind.SPARKLINE),
-        Col("status", "Status", kind=ColKind.STATUS),
-    ],
-    threshold_days=7,
-    has_threshold_filter=True,  # False for informational monitors
-    extras=(),  # "schema_diff" | "coverage_histogram"
-)
-```
+## What you are adding
 
-`ColKind` drives the `st.column_config` mapping — never write column_config in a page.
+A monitor is a named check producing **incidents** (one publisher/feed failing it, with an
+age in days and a status). Shared components render the whole page from one registry entry,
+so adding a dashboard is a declaration plus data, not a page build.
 
-## 2. Page stub — `src/stewards/views/20_zero_future.py`
+| File | Change |
+|---|---|
+| `src/stewards/monitors/registry.py` | one `Monitor(...)`, appended to `MONITOR_REGISTRY` |
+| `src/stewards/api/models.py` | a `DetailModel` subclass — only if the monitor has `detail` fields |
+| `src/stewards/views/NN_<name>.py` | three-line page stub, no logic |
+| `src/stewards/api/sample_data/<id>_incidents.json` | happy-path payload, also the test fixture |
+| `src/stewards/api/sample_data/<id>_trend.json` | ~30 snapshot points |
+| `src/stewards/api/sample_data/summary.json` | append a `MonitorCount` for the new id (this is what makes the home-page card and sidebar badge real) |
+| `tests/unit/test_<id>.py` | happy path, empty input, `days_open == threshold_days` boundary |
 
-Three lines. No logic:
+Nothing to register in `app.py`, and no `column_config`, tile or sidebar code to write: the
+sidebar iterates `MONITOR_REGISTRY`, the cards come from the registry crossed with
+`/summary`, and `ColKind` drives the table widgets.
 
-```python
-from stewards.components.monitor_page import render_monitor_page
-from stewards.monitors.registry import get_monitor
+## Non-negotiables
 
-render_monitor_page(get_monitor("zero_future"))
-```
+- Adding a monitor must not touch shared code beyond the additive detail model. If it does,
+  generalise the component instead of special-casing the monitor.
+- Pages contain no logic; anything that computes a value stays importable without Streamlit.
+- The page module goes in `views/`, never `pages/` — a `pages/` folder beside `app.py`
+  bypasses the auth gate.
+- Read-only: no mute, assign, re-crawl or send actions, and no download button.
+- Copy is factual, no exclamation marks, no emoji, ISO dates.
 
-Nothing to register in `app.py`: `components/nav.py` builds the sidebar by iterating
-`MONITOR_REGISTRY` and grouping on `Monitor.group`.
+## Done means
 
-Register it in the `st.navigation` section dict in `app.py` under its group.
-
-## 3. Payloads — `src/stewards/api/sample_data/`
-
-`zero_future_incidents.json` and `zero_future_trend.json`, in the envelope shape. Include
-one row past threshold, one below, one at exactly `threshold_days`, and one with a null
-optional field. These are both the sample-data payloads the app serves before the API exists
-and the happy-path fixtures the tests assert on. Test-only variants (empty, malformed,
-paginated) go in `tests/fixtures/`.
-
-## 4. Tests — `tests/unit/test_zero_future.py`
-
-- `tests/unit/test_registry.py` already covers the registry entry for free (unique id,
-  page module exists, sample payloads exist, every `Col.field` and `FilterSpec.field`
-  resolves, detail model validates) — just add the payloads and it runs
-- `to_dataframe(fixture)` produces the declared columns in declared order
-- `days_open == threshold` is classified past-threshold (boundary)
-- empty payload renders an empty table, not an exception
-- the monitor appears in the overview tile list and in the contact queue union
-
-## Checklist before declaring done
-
-- [ ] `uv run pytest -q` green, new code ≥ 90% covered
-- [ ] monitor tile appears on the overview with correct count and state colour
-- [ ] sidebar label carries the open-incident count
-- [ ] draft-email popover names the monitor and the days open
-- [ ] a runbook page exists in `docs/`, linked from `docs/index.md`
-- [ ] `uv run ruff check . && uv run mypy src` clean
+`uv run pytest -q` green at the coverage bar, `uv run ruff check . && uv run mypy src`
+clean, the card and sidebar badge correct on the overview, and a runbook page added to
+`docs/` and linked from `docs/index.md`. The full checklist is at the end of
+`docs/adding-a-dashboard.md`.
