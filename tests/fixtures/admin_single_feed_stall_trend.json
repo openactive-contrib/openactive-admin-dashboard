@@ -1,0 +1,17 @@
+{
+  "data": [
+    {"date": "2026-08-22", "open_count": 0, "past_threshold_count": 0},
+    {"date": "2026-08-23", "open_count": 0, "past_threshold_count": 0},
+    {"date": "2026-08-24", "open_count": 0, "past_threshold_count": 0},
+    {"date": "2026-08-25", "open_count": 131, "past_threshold_count": 0},
+    {"date": "2026-09-01", "open_count": 126, "past_threshold_count": 0},
+    {"date": "2026-09-02", "open_count": 129, "past_threshold_count": 0}
+  ],
+  "meta": {
+    "snapshot_date": "2026-09-02",
+    "generated_at": "2026-09-02T12:57:19Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 6
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "data": {
+    "publishers_monitored": 179,
+    "publishers_with_issues": 0,
+    "open_incidents": null,
+    "past_threshold": null,
+    "feeds": 463,
+    "datasets": 179,
+    "monitors": [
+      {
+        "monitor_id": "single_feed_stall",
+        "count": 126,
+        "past_threshold_count": 119,
+        "sparkline": [126, 127, 125, 122, 123, 124, 126]
+      }
+    ],
+    "publishers_with_issues_delta": 2,
+    "open_incidents_delta": null,
+    "past_threshold_delta": 2
+  },
+  "meta": {
+    "snapshot_date": "2026-09-01",
+    "generated_at": "2026-09-01T00:00:27Z",
+    "page": 1,
+    "page_size": 1,
+    "total": 1
+  }
+}

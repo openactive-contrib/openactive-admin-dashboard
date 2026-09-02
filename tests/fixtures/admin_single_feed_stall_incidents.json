@@ -1,0 +1,111 @@
+{
+  "data": [
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_actihire",
+      "publisher_name": "Actihire",
+      "feed_id": "actihire-bookteq-com-api-open-active-facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://actihire.bookteq.com/api/open-active/facility-uses",
+      "first_detected": "2026-08-20",
+      "days_open": 13,
+      "consecutive_days": 13,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "detail": {
+        "last_modified": "2026-08-20"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_boundary",
+      "publisher_name": "Boundary Leisure",
+      "feed_id": "boundary-leisure-scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://boundary-leisure.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-26",
+      "days_open": 7,
+      "consecutive_days": 7,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": {
+        "last_modified": "2026-08-26"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_sparse",
+      "publisher_name": "Sparse Data Trust",
+      "feed_id": "sparse-data-trust-sessions",
+      "feed_name": null,
+      "feed_type": null,
+      "feed_url": null,
+      "first_detected": "2026-09-01",
+      "days_open": 1,
+      "consecutive_days": null,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [],
+      "detail": {},
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_gappy",
+      "publisher_name": "Gappy Sports Trust",
+      "feed_id": "gappy-sports-trust-sessions",
+      "feed_name": "sessions",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://gappy-sports.example.org/openactive/sessions",
+      "first_detected": "2026-08-28",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        1,
+        2,
+        null,
+        4,
+        5
+      ],
+      "detail": {
+        "last_modified": "2026-08-28"
+      },
+      "quality_score": 72.1
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-09-02",
+    "generated_at": "2026-09-02T12:22:39.999999Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 4
+  }
+}
