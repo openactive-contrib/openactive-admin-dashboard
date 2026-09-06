@@ -10,6 +10,8 @@ say what to do about it.
 
 - [Adding a dashboard]({% link adding-a-dashboard.md %}) — the end-to-end procedure for a
   new monitor: registry entry, page, home-page card, API contract, sample data and tests.
+- [Deployment]({% link deployment.md %}) — the container image, the GHCR-to-Azure
+  pipeline, and the manual set-up behind it.
 
 ## Runbooks
 

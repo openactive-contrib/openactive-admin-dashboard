@@ -1,0 +1,24 @@
+# Everything the image does not need. `.streamlit/secrets.toml` above all: the entrypoint
+# writes it from the environment, and a real one must never reach a layer.
+.streamlit/secrets.toml
+.git
+.github
+.venv
+.idea
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+tests
+docs
+_site
+.jekyll-cache
+*.md
+*.dc.html

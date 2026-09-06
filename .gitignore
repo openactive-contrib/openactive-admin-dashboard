@@ -10,6 +10,7 @@ dist/
 build/
 *.egg-info/
 .streamlit/secrets.toml
+.env.local
 .idea/
 _site/
 .jekyll-cache/

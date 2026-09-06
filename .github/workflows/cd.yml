@@ -1,0 +1,187 @@
+name: CD
+
+# Deploys a published release to Azure App Service as a container. The image is built
+# once, pushed to GHCR, and the web app is pointed at the release's tag — the registry is
+# the record of what is running, and a rollback is a redeploy of an earlier release.
+#
+# Cutting a release is the deploy:
+#
+#   gh release create v1.2.3 --generate-notes
+#
+# Draft releases do not fire this workflow; publishing one does. A prerelease is built and
+# pushed but not deployed, so a release candidate can sit in GHCR until someone deploys it
+# deliberately with the manual trigger below.
+#
+# `workflow_dispatch` takes a tag, which is both the manual deploy and the rollback: it
+# rebuilds nothing that has already been built (the layer cache) and runs the same health
+# check as an automatic deploy.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to deploy, for example v1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Deployments serialise and are never cancelled midway: a cancelled deploy can leave the
+# web app on a half-swapped container.
+concurrency:
+  group: cd-azure
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  AZURE_WEBAPP_NAME: openactive-admin-dashboard
+
+jobs:
+  build:
+    name: Build and push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.deploy_ref }}
+      version: ${{ steps.tag.outputs.version }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+    steps:
+      # The release name reaches the shell as an environment variable, never interpolated
+      # into the script: an expression is pasted in as text before bash sees the line.
+      - id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          PRERELEASE: ${{ github.event.release.prerelease || false }}
+        run: |
+          # The image tag is the release name without its leading v, with anything outside
+          # the registry's tag alphabet folded to a dash — a git tag may contain a slash,
+          # a registry reference may not.
+          version=$(printf '%s' "${RELEASE_TAG#v}" | tr -c 'A-Za-z0-9_.-' '-')
+          case "$version" in
+            [A-Za-z0-9_]*) ;;
+            *) echo "::error::${RELEASE_TAG} does not yield a usable image tag"; exit 1 ;;
+          esac
+          {
+            echo "tag=$RELEASE_TAG"
+            echo "version=$version"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+      # Full history, because the guard below has to know whether the tag is on main.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+
+      # The release trigger does not gate on CI the way a push to main does, so this is
+      # what keeps an untested commit off the deployment: a tag is only deployable if its
+      # commit is an ancestor of main, and everything on main has passed CI.
+      - name: Guard — the tag is on main
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::${RELEASE_TAG} is not on main, so it has not passed CI"
+            exit 1
+          fi
+
+      # Three tags on one build: the version is what the deploy names and what the Azure
+      # portal then shows as the running image; `sha-<commit>` is the immutable fallback
+      # if a release is ever re-cut over the same name; `latest` tracks the newest full
+      # release only, so a prerelease never becomes what a bare `docker run` picks up.
+      #
+      # GHCR rejects an uppercase path, and an org or repo name may carry one.
+      - id: image
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          name="${REGISTRY}/${GITHUB_REPOSITORY,,}"
+          sha=$(git rev-parse HEAD)
+          {
+            echo "sha=$sha"
+            echo "deploy_ref=$name:$VERSION"
+            echo "tags<<TAGS"
+            echo "$name:$VERSION"
+            echo "$name:sha-$sha"
+            [ "$PRERELEASE" = "true" ] || echo "$name:latest"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.image.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Azure
+    needs: build
+    # A prerelease stops here: the image is in GHCR, and deploying it is a manual act.
+    if: needs.build.outputs.prerelease != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # the OIDC token azure/login exchanges; no stored Azure secret
+    environment:
+      name: production
+      url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # The web app's registry credentials, app settings and the Google OIDC client are
+      # configured once by hand (docs/deployment.md); a deploy only swaps the image.
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          images: ${{ needs.build.outputs.image }}
+
+      # App Service reports success as soon as the container is accepted, so the run is
+      # only green once Streamlit itself answers.
+      - name: Wait for the health endpoint
+        run: |
+          url="https://${AZURE_WEBAPP_NAME}.azurewebsites.net/_stcore/health"
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)
+            if [ "$code" = "200" ]; then
+              echo "healthy after ${attempt} attempt(s)"
+              exit 0
+            fi
+            echo "attempt ${attempt}: HTTP ${code:-none}"
+            sleep 10
+          done
+          echo "::error::the app did not become healthy within five minutes"
+          exit 1
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed"
+            echo
+            echo "- release: \`${{ needs.build.outputs.version }}\`"
+            echo "- image: \`${{ needs.build.outputs.image }}\`"
+            echo "- app: https://${AZURE_WEBAPP_NAME}.azurewebsites.net"
+          } >> "$GITHUB_STEP_SUMMARY"
