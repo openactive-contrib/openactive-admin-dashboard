@@ -141,22 +141,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # the OIDC token azure/login exchanges; no stored Azure secret
     environment:
       name: production
       url: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net
     steps:
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
+      # A publish profile, not `azure/login`: the profile is an app-level credential, so
+      # the deploy needs neither a federated identity credential nor an Azure role
+      # assignment — granting a role takes Owner or User Access Administrator on the
+      # resource, which this project does not have.
+      #
       # The web app's registry credentials, app settings and the Google OIDC client are
-      # configured once by hand (docs/deployment.md); a deploy only swaps the image.
+      # configured once by hand (docs/deployment.md); a deploy only swaps the image. Note
+      # that App Service pulls from GHCR itself, so this credential has no bearing on
+      # whether the pull is authorised — that is the package's visibility or the web app's
+      # DOCKER_REGISTRY_SERVER_* settings.
       - uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           images: ${{ needs.build.outputs.image }}
 
       # App Service reports success as soon as the container is accepted, so the run is

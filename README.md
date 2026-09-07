@@ -58,15 +58,15 @@ something the lockfile does not describe.
 `.github/workflows/cd.yml` runs when a release is published — `gh release create v1.2.3
 --generate-notes` is the deploy, and merging to `main` on its own changes nothing that is
 running. It builds `Dockerfile`, pushes the image to GHCR tagged with the release name (and
-`sha-<commit>`), and points an Azure App Service web app at it over an OIDC login — no
-long-lived Azure credential in the repo. A prerelease is built but not deployed, and a tag
-that is not an ancestor of `main` is refused, since only `main` has passed CI.
+`sha-<commit>`), and points an Azure App Service web app at it using that app's publish
+profile. A prerelease is built but not deployed, and a tag that is not an ancestor of
+`main` is refused, since only `main` has passed CI.
 
 The container keeps the Google OIDC gate; `docker/entrypoint.sh` writes Streamlit's
 `[auth]` secrets file from app settings at start-up, so nothing is baked into a layer.
 
-The web app, its GHCR pull credentials, its app settings and the federated credential are
-set up once by hand — the full procedure, plus rollback, is `docs/deployment.md`.
+The web app, its GHCR pull credentials, its app settings and the publish profile are set
+up once by hand — the full procedure, plus rollback, is `docs/deployment.md`.
 
 ## Where things are
 

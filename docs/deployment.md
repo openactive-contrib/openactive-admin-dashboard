@@ -69,7 +69,9 @@ passes the quotes through as part of the value.
 Fill these in and keep them to hand; every command below uses them.
 
 ```bash
-RG=openactive-admin-dashboard-rg
+# The existing group that already holds the OpenActive APIs — the dashboard lives beside
+# what it reads. A dedicated group would isolate nothing: same team, same lifecycle.
+RG=openactive
 LOCATION=uksouth
 PLAN=openactive-admin-dashboard-plan
 APP=openactive-admin-dashboard          # must match AZURE_WEBAPP_NAME in cd.yml
@@ -80,9 +82,11 @@ IMAGE=ghcr.io/$GH_ORG/$GH_REPO
 
 ### 1. Create the web app
 
+The resource group already exists — it holds the APIs the dashboard reads — so this only
+adds a plan and the app to it. `az group create` is idempotent if you are starting fresh.
+
 ```bash
 az login
-az group create --name "$RG" --location "$LOCATION"
 
 # B1 is the smallest tier that keeps the container warm. Streamlit holds a websocket per
 # session, so a plan that cold-starts drops sessions.
@@ -92,6 +96,14 @@ az appservice plan create --name "$PLAN" --resource-group "$RG" \
 az webapp create --name "$APP" --resource-group "$RG" --plan "$PLAN" \
   --deployment-container-image-name "$IMAGE:latest"
 ```
+
+It must be a **container** web app: an App Service created to run code rather than a
+container will not take an image from `azure/webapps-deploy`, and is easier to recreate
+than to convert.
+
+Check the app's **Default domain** on its Overview blade. App Service does not always issue
+the bare `<name>.azurewebsites.net` — where it appends a regional hash, the health poll and
+the environment link in `cd.yml` need that real hostname instead.
 
 ### 2. Let App Service pull from GHCR
 
@@ -181,42 +193,52 @@ hostname, the second defaults to Google's discovery document.
 Never set `STEWARDS_DISABLE_AUTH` on a deployment. It is honoured only when
 `STEWARDS_ENV=dev`, and the app prints a standing warning when it is on.
 
-### 6. Federated credentials for the workflow
+### 6. The publish profile for the workflow
 
-The workflow signs in to Azure with OIDC, so there is no Azure secret in GitHub.
+The deploy authenticates with a **publish profile** — an app-level credential Azure issues
+for one web app. The alternative, an Entra app with a federated identity credential, is the
+better credential in the abstract (short-lived tokens, nothing stored) but it needs an
+Azure **role assignment**, and granting one takes Owner or User Access Administrator on the
+resource. Contributor cannot, and the IAM blade greys out "Add role assignment" when you
+lack it. A publish profile needs no RBAC at all.
 
-```bash
-APP_ID=$(az ad app create --display-name "github-$GH_REPO" --query appId -o tsv)
-az ad sp create --id "$APP_ID"
+The cost is honest: this is a long-lived secret in GitHub, rotated by hand. It is scoped to
+this one web app, so it grants strictly less than Contributor on the resource — but it does
+not expire on its own, and anyone with the file can deploy to the app. Rotate it from the
+web app's Overview blade (**Reset publish profile**) if it is ever exposed, and re-paste the
+new one into the GitHub secret.
 
-SUB=$(az account show --query id -o tsv)
-az role assignment create --assignee "$APP_ID" --role Contributor \
-  --scope "/subscriptions/$SUB/resourceGroups/$RG"
-```
+**In Azure.** App Service → the web app:
 
-One federated credential covers every deploy: the subject matches the `production`
-environment that `cd.yml`'s deploy job declares, whichever trigger started the run.
+1. **Settings → Environment variables → App settings** → add `WEBSITE_WEBDEPLOY_USE_SCM` =
+   `true`, then **Apply**. Linux container apps need it before the profile will deploy.
+2. **Overview** → **Get publish profile** in the top bar. A `.PublishSettings` file
+   downloads; open it and check it starts with `<publishData>`.
 
-```bash
-az ad app federated-credential create --id "$APP_ID" --parameters '{
-  "name": "github-production",
-  "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:'"$GH_ORG/$GH_REPO"':environment:production",
-  "audiences": ["api://AzureADTokenExchange"]
-}'
-```
+If the download or the deploy is refused, check **Configuration → General settings → SCM
+Basic Auth Publishing Credentials** is **On**. Some tenants disable it by policy, and with
+it off this route is closed — the federated-credential route is then the only one, and
+someone with Owner has to make the role assignment.
 
-Then in the repository, Settings → Environments → **New environment** → `production` (add
-required reviewers here if a deploy should be approved), and Settings → Secrets and
-variables → Actions → **New repository secret** for each of:
+**In GitHub.** Settings → Secrets and variables → Actions → **New repository secret**:
 
-| Secret | Where it comes from |
+| Secret | Value |
 |---|---|
-| `AZURE_CLIENT_ID` | `$APP_ID` above |
-| `AZURE_TENANT_ID` | `az account show --query tenantId -o tsv` |
-| `AZURE_SUBSCRIPTION_ID` | `az account show --query id -o tsv` |
+| `AZURE_WEBAPP_PUBLISH_PROFILE` | the entire contents of the `.PublishSettings` file |
 
-Nothing else needs a secret: the push to GHCR uses the run's own `GITHUB_TOKEN`.
+Paste the whole XML document, not a fragment of it. That is the only secret the deploy
+needs — the GHCR push uses the run's own `GITHUB_TOKEN`.
+
+The deploy job declares a `production` environment, which GitHub creates on first use. It
+is worth visiting once anyway — Settings → Environments → `production` — because that is
+where a deploy is put behind **required reviewers**, and where the deployment history for
+the app is recorded.
+
+This credential has no bearing on whether App Service can **pull** the image: the platform
+does that itself, authorised by the package's visibility or the `DOCKER_REGISTRY_SERVER_*`
+settings from step 2. A deploy can succeed and the container still fail to start on an
+unauthorised pull, which surfaces as the health check timing out — `az webapp log tail`, or
+**Monitoring → Log stream** in the portal, shows the real `unauthorized`.
 
 ### 7. First deploy
 
