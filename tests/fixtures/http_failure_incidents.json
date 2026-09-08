@@ -1,0 +1,290 @@
+{
+  "data": [
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_halo-leisure",
+      "publisher_name": "Halo Leisure",
+      "feed_id": "feed_halo-leisure_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.halo-leisure.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-10",
+      "days_open": 11,
+      "consecutive_days": 11,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "detail": {
+        "http_status": "503",
+        "error_class": "Service unavailable",
+        "error_detail": "Upstream returned 503 on every retry",
+        "last_success": "2026-08-10"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_places-for-people",
+      "publisher_name": "Places for People",
+      "feed_id": "feed_places-for-people_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.places-for-people.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-12",
+      "days_open": 9,
+      "consecutive_days": 9,
+      "past_threshold": true,
+      "status": "awaiting_reply",
+      "last_contacted": "2026-08-18",
+      "trend": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": {
+        "http_status": "404",
+        "error_class": "Not found",
+        "error_detail": "Feed path may have moved",
+        "last_success": "2026-08-12"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_sport-structures",
+      "publisher_name": "Sport Structures",
+      "feed_id": "feed_sport-structures_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.sport-structures.example.org/openactive/session-series",
+      "first_detected": "2026-08-13",
+      "days_open": 8,
+      "consecutive_days": 8,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "detail": {
+        "http_status": "TLS",
+        "error_class": "Certificate expired",
+        "error_detail": "Certificate expired 2026-08-12",
+        "last_success": "2026-08-13"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_active-tameside",
+      "publisher_name": "Active Tameside",
+      "feed_id": "feed_active-tameside_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.active-tameside.example.org/openactive/slots",
+      "first_detected": "2026-08-16",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "detail": {
+        "http_status": "500",
+        "error_class": "Upstream exception",
+        "error_detail": "Stack trace returned in body",
+        "last_success": "2026-08-16"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_circadian-trust",
+      "publisher_name": "Circadian Trust",
+      "feed_id": "feed_circadian-trust_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.circadian-trust.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "detail": {
+        "http_status": "timeout",
+        "error_class": "No response",
+        "error_detail": "No response within 30s",
+        "last_success": "2026-08-17"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_everyone-health",
+      "publisher_name": "Everyone Health",
+      "feed_id": "feed_everyone-health_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.everyone-health.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        2,
+        3
+      ],
+      "detail": {
+        "http_status": "429",
+        "error_class": "Rate limited",
+        "error_detail": "Rate limited by publisher",
+        "last_success": "2026-08-18"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_goodgym",
+      "publisher_name": "GoodGym",
+      "feed_id": "feed_goodgym_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.goodgym.example.org/openactive/session-series",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "http_status": "502",
+        "error_class": "Bad gateway",
+        "error_detail": "Bad gateway from CDN",
+        "last_success": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_legacy-leisure",
+      "publisher_name": "Legacy Leisure",
+      "feed_id": "feed_legacy-leisure_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.legacy-leisure.example.org/openactive/slots",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "http_status": "503",
+        "error_class": "Service unavailable",
+        "error_detail": "Maintenance page returned",
+        "last_success": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "http_failure",
+      "publisher_id": "pub_fusion-lifestyle",
+      "publisher_name": "Fusion Lifestyle",
+      "feed_id": "feed_fusion-lifestyle_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.fusion-lifestyle.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "http_status": "timeout",
+        "error_class": "No response",
+        "error_detail": "Connection reset before headers",
+        "last_success": "2026-08-19"
+      },
+      "quality_score": null
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 9
+  }
+}

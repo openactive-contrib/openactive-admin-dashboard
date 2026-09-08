@@ -1,0 +1,655 @@
+{
+  "data": [
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_freedom-leisure",
+      "publisher_name": "Freedom Leisure",
+      "feed_id": "feed_freedom-leisure_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.freedom-leisure.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-07-30",
+      "days_open": 22,
+      "consecutive_days": 22,
+      "past_threshold": true,
+      "status": "awaiting_reply",
+      "last_contacted": "2026-08-06",
+      "trend": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "detail": {
+        "last_modified": "2026-07-30"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_1life-management",
+      "publisher_name": "1Life Management",
+      "feed_id": "feed_1life-management_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.1life-management.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-04",
+      "days_open": 17,
+      "consecutive_days": 17,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "detail": {
+        "last_modified": "2026-08-04"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_active-nation",
+      "publisher_name": "Active Nation",
+      "feed_id": "feed_active-nation_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.active-nation.example.org/openactive/session-series",
+      "first_detected": "2026-08-08",
+      "days_open": 13,
+      "consecutive_days": 13,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "detail": {
+        "last_modified": "2026-08-08"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_everybody-health",
+      "publisher_name": "Everybody Health",
+      "feed_id": "feed_everybody-health_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.everybody-health.example.org/openactive/slots",
+      "first_detected": "2026-08-10",
+      "days_open": 11,
+      "consecutive_days": 11,
+      "past_threshold": true,
+      "status": "awaiting_reply",
+      "last_contacted": "2026-08-17",
+      "trend": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "detail": {
+        "last_modified": "2026-08-10"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_tone-leisure",
+      "publisher_name": "Tone Leisure",
+      "feed_id": "feed_tone-leisure_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.tone-leisure.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-12",
+      "days_open": 9,
+      "consecutive_days": 9,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "detail": {
+        "last_modified": "2026-08-12"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_parkwood-leisure",
+      "publisher_name": "Parkwood Leisure",
+      "feed_id": "feed_parkwood-leisure_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.parkwood-leisure.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-13",
+      "days_open": 8,
+      "consecutive_days": 8,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "detail": {
+        "last_modified": "2026-08-13"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_brio-leisure",
+      "publisher_name": "Brio Leisure",
+      "feed_id": "feed_brio-leisure_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.brio-leisure.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-14",
+      "days_open": 7,
+      "consecutive_days": 7,
+      "past_threshold": true,
+      "status": "contact_due",
+      "last_contacted": null,
+      "trend": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "detail": {
+        "last_modified": "2026-08-14"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_fusion-lifestyle",
+      "publisher_name": "Fusion Lifestyle",
+      "feed_id": "feed_fusion-lifestyle_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.fusion-lifestyle.example.org/openactive/slots",
+      "first_detected": "2026-08-16",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "detail": {
+        "last_modified": "2026-08-16"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_halo-leisure",
+      "publisher_name": "Halo Leisure",
+      "feed_id": "feed_halo-leisure_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.halo-leisure.example.org/openactive/session-series",
+      "first_detected": "2026-08-16",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "detail": {
+        "last_modified": "2026-08-16"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_legacy-leisure",
+      "publisher_name": "Legacy Leisure",
+      "feed_id": "feed_legacy-leisure_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.legacy-leisure.example.org/openactive/session-series",
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        2,
+        3
+      ],
+      "detail": {
+        "last_modified": "2026-08-18"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_pendle-leisure",
+      "publisher_name": "Pendle Leisure",
+      "feed_id": "feed_pendle-leisure_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.pendle-leisure.example.org/openactive/slots",
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        2,
+        3
+      ],
+      "detail": {
+        "last_modified": "2026-08-18"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_sport-sisters-cic",
+      "publisher_name": "Sport Sisters CIC",
+      "feed_id": "feed_sport-sisters-cic_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.sport-sisters-cic.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_wealden-leisure",
+      "publisher_name": "Wealden Leisure",
+      "feed_id": "feed_wealden-leisure_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.wealden-leisure.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_circadian-trust",
+      "publisher_name": "Circadian Trust",
+      "feed_id": "feed_circadian-trust_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.circadian-trust.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_barnsley-premier-leisure",
+      "publisher_name": "Barnsley Premier Leisure",
+      "feed_id": "feed_barnsley-premier-leisure_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.barnsley-premier-leisure.example.org/openactive/slots",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_goodgym",
+      "publisher_name": "GoodGym",
+      "feed_id": "feed_goodgym_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.goodgym.example.org/openactive/session-series",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_places-for-people",
+      "publisher_name": "Places for People",
+      "feed_id": "feed_places-for-people_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.places-for-people.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "detail": {
+        "last_modified": "2026-08-17"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_active-tameside",
+      "publisher_name": "Active Tameside",
+      "feed_id": "feed_active-tameside_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.active-tameside.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "detail": {
+        "last_modified": "2026-08-17"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_sport-structures",
+      "publisher_name": "Sport Structures",
+      "feed_id": "feed_sport-structures_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.sport-structures.example.org/openactive/slots",
+      "first_detected": "2026-08-15",
+      "days_open": 6,
+      "consecutive_days": 6,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "detail": {
+        "last_modified": "2026-08-15"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_everyone-health",
+      "publisher_name": "Everyone Health",
+      "feed_id": "feed_everyone-health_session-series",
+      "feed_name": "session-series",
+      "feed_type": "SessionSeries",
+      "feed_url": "https://opendata.everyone-health.example.org/openactive/session-series",
+      "first_detected": "2026-08-15",
+      "days_open": 6,
+      "consecutive_days": 6,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "detail": {
+        "last_modified": "2026-08-15"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_nuffield-health",
+      "publisher_name": "Nuffield Health",
+      "feed_id": "feed_nuffield-health_scheduled-sessions",
+      "feed_name": "scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_url": "https://opendata.nuffield-health.example.org/openactive/scheduled-sessions",
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        2,
+        3
+      ],
+      "detail": {
+        "last_modified": "2026-08-18"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_serco-leisure",
+      "publisher_name": "Serco Leisure",
+      "feed_id": "feed_serco-leisure_facility-uses",
+      "feed_name": "facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_url": "https://opendata.serco-leisure.example.org/openactive/facility-uses",
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "new",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2
+      ],
+      "detail": {
+        "last_modified": "2026-08-19"
+      },
+      "quality_score": null
+    },
+    {
+      "monitor_id": "single_feed_stall",
+      "publisher_id": "pub_ymca-st-pauls",
+      "publisher_name": "YMCA St Pauls",
+      "feed_id": "feed_ymca-st-pauls_slots",
+      "feed_name": "slots",
+      "feed_type": "Slot",
+      "feed_url": "https://opendata.ymca-st-pauls.example.org/openactive/slots",
+      "first_detected": "2026-08-16",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "monitoring",
+      "last_contacted": null,
+      "trend": [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "detail": {
+        "last_modified": "2026-08-16"
+      },
+      "quality_score": null
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 23
+  }
+}
