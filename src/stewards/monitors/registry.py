@@ -134,13 +134,13 @@ SINGLE_FEED_STALL = Monitor(
     detail_model=StallDetail,
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
-        Col("feed_name", "Feed", ColKind.MONO),
         Col("feed_type", "Type", ColKind.TEXT),
         Col("detail.last_modified", "Last modified", ColKind.DATE),
         Col("days_open", "Days stalled", ColKind.DAYS),
         Col("trend", "30d trend", ColKind.SPARKLINE),
         Col("status", "Status", ColKind.STATUS),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+        Col("feed_id", "Feed", ColKind.MONO),
     ),
     filters=(
         FilterSpec("feed_type", "Feed type"),
@@ -165,13 +165,13 @@ HTTP_FAILURE = Monitor(
     detail_model=HttpFailureDetail,
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
-        Col("feed_name", "Feed", ColKind.MONO),
         Col("detail.http_status", "HTTP", ColKind.MONO),
         Col("detail.error_class", "Error", ColKind.TEXT),
         Col("days_open", "Consecutive failures", ColKind.DAYS),
         Col("detail.last_success", "Last success", ColKind.DATE),
         Col("status", "Status", ColKind.STATUS),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+        Col("feed_id", "Feed", ColKind.MONO),
     ),
     filters=(
         FilterSpec("detail.http_status", "Status code"),
