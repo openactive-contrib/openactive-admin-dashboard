@@ -14,6 +14,7 @@ import httpx
 import pytest
 import respx
 
+from fixture_loader import load_sample
 from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style
 from stewards.api.errors import ApiNotFound
@@ -23,7 +24,6 @@ from stewards.api.repository import (
     _fetch_summary,
     _fetch_trend,
 )
-from stewards.api.sample_transport import load_sample
 from stewards.config import Settings
 from stewards.monitors.registry import SINGLE_FEED_STALL
 from stewards.monitors.transforms import to_dataframe

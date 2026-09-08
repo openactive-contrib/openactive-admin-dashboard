@@ -116,25 +116,10 @@ def test_the_token_is_never_in_an_exception_message(client: StewardsClient) -> N
     assert "test-token" not in str(caught.value)
 
 
-def test_sample_data_mode_serves_bundled_payloads_without_a_network_call() -> None:
-    client = StewardsClient(Settings(api_base_url=BASE, api_token="", use_sample_data=True))
-    payload = client.get("/monitors/single_feed_stall/incidents")
-    assert payload["meta"]["snapshot_date"] == "2026-08-21"
-    assert len(payload["data"]) == 23
-
-
-def test_sample_data_mode_404s_an_endpoint_it_has_no_payload_for() -> None:
-    client = StewardsClient(Settings(api_base_url=BASE, api_token="", use_sample_data=True))
-    with pytest.raises(ApiNotFound):
-        client.get("/monitors/orphan_children/incidents")
-    with pytest.raises(ApiNotFound):
-        client.get("/quality")
-
-
 def test_get_client_is_cached_and_resettable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STEWARDS_USE_SAMPLE_DATA", "true")
     from stewards import config
 
+    monkeypatch.setenv("STEWARDS_API_BASE_URL", BASE)
     config.get_settings.cache_clear()
     reset_client()
     try:

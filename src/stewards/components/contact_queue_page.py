@@ -35,8 +35,6 @@ def render_contact_queue_page() -> None:
     tones = contact_queue.tone_frame(incidents)
 
     layout.render_header("Cross-monitor", TITLE, page.meta)
-    if get_settings().use_sample_data:
-        layout.render_sample_data_notice()
 
     with card("blurb_contact_queue"):
         st.markdown(

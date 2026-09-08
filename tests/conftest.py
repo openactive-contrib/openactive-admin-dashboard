@@ -1,8 +1,8 @@
 """Shared fixtures. No test touches the network, a real token, or BigQuery.
 
-Happy-path payloads are the ones bundled in `stewards/api/sample_data` — the app serves the
-same files in sample-data mode, so there is one copy of each contract shape. The variants a
-test needs and the app does not (empty, malformed, paginated) live in `tests/fixtures`.
+Happy-path payloads live in `tests/fixtures` as the canonical contract fixtures. The
+variants a test needs and the app does not (empty, malformed, paginated) live alongside
+those files.
 """
 
 from __future__ import annotations
@@ -17,12 +17,16 @@ import pytest
 
 from stewards import config
 from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
-from stewards.api.sample_transport import load_sample
 from stewards.config import Settings
 from stewards.monitors.registry import HTTP_FAILURE, SINGLE_FEED_STALL, Monitor
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 SNAPSHOT_DATE = date(2026, 8, 21)
+
+
+def load_sample(name: str) -> Any:
+    """Read a payload fixture under tests/fixtures by file stem."""
+    return json.loads((FIXTURE_DIR / f"{name}.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(autouse=True)

@@ -55,16 +55,6 @@ def render_footer(query: str, *, note: str = "") -> None:
     if query:
         st.caption(f"`{query}`")
 
-
-def render_sample_data_notice() -> None:
-    """Shown when the app is serving bundled payloads instead of the real API."""
-    st.warning(
-        "Sample data. The monitoring API is not connected, so every figure on this page is "
-        "an illustrative payload bundled with the app.",
-        icon=":material/science:",
-    )
-
-
 def tone_metric(
     label: str,
     value: str,

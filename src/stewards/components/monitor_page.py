@@ -16,7 +16,6 @@ from stewards.components.filters import render_filters
 from stewards.components.incident_table import render_monitor_table
 from stewards.components.surface import card
 from stewards.components.trend_chart import render_trend
-from stewards.config import get_settings
 from stewards.monitors import transforms
 from stewards.monitors.registry import Monitor
 
@@ -73,8 +72,6 @@ def render_monitor_page(monitor: Monitor) -> None:
 
     with header_slot:
         layout.render_header(monitor.crumb, monitor.name, page.meta)
-        if get_settings().use_sample_data:
-            layout.render_sample_data_notice()
     with blurb_slot:
         render_blurb(monitor)
     with kpi_slot:

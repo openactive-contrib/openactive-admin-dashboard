@@ -139,12 +139,6 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
     assert set(frame["Monitor"]) == {"Single-feed stalls", "HTTP endpoint failures"}
 
 
-def test_sample_data_mode_is_announced_on_every_data_page() -> None:
-    for name in ["00_overview.py", "01_contact_queue.py", *MONITOR_PAGES]:
-        app = run(name)
-        assert any("Sample data" in warning.value for warning in app.warning), name
-
-
 # --- the entry point ---------------------------------------------------------------------
 
 APP_FILE = VIEWS_DIR.parent / "app.py"
@@ -187,7 +181,6 @@ def test_the_app_reports_a_missing_configuration_instead_of_crashing(
 ) -> None:
     from stewards import config
 
-    monkeypatch.delenv("STEWARDS_USE_SAMPLE_DATA", raising=False)
     monkeypatch.delenv("STEWARDS_API_BASE_URL", raising=False)
     config.get_settings.cache_clear()
 

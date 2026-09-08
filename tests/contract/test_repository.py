@@ -11,6 +11,7 @@ import httpx
 import pytest
 import respx
 
+from fixture_loader import load_sample
 from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
@@ -27,7 +28,6 @@ from stewards.api.repository import (
     _fetch_summary,
     _fetch_trend,
 )
-from stewards.api.sample_transport import load_sample
 from stewards.config import Settings
 
 API_PREFIX = prefix(Style.CONTRACT)
@@ -246,18 +246,3 @@ def test_contact_queue_failure_is_typed(client: StewardsClient) -> None:
     respx.get(f"{BASE}/contact-queue").mock(return_value=httpx.Response(500))
     with pytest.raises(ApiUnavailable):
         _fetch_contact_queue(client)
-
-
-# --- sample-data parity ----------------------------------------------------------------
-
-
-def test_the_bundled_payloads_satisfy_the_contract() -> None:
-    """The sample transport and the real API must be indistinguishable to the repository."""
-    client = StewardsClient(
-        Settings(api_base_url="https://sample.invalid", use_sample_data=True)
-    )
-    assert _fetch_summary(client).data.open_incidents == 32
-    assert len(_fetch_incidents("single_feed_stall", client).data) == 23
-    assert len(_fetch_incidents("http_failure", client).data) == 9
-    assert len(_fetch_trend("http_failure", client=client).data) == 30
-    assert len(_fetch_contact_queue(client).data) == 10

@@ -163,6 +163,14 @@ which the GitHub secret must be re-pasted.
 The workflow declares a `production` environment, which GitHub creates on first use. Visit
 Settings → Environments → `production` to put deploys behind required reviewers.
 
+### Google OAuth client
+
+Google Cloud Console → APIs & Services → Credentials → the OAuth 2.0 Client ID (type *Web application*). Add the deployed callback as an authorised redirect URI, keeping the localhost one alongside it:
+
+```
+https://openactive-admin-dashboard-hdb3fpcvcmgygydn.ukwest-01.azurewebsites.net/oauth2callback
+```
+
 ## Releasing
 
 Releases → **Draft a new release** → choose a tag → **Publish release**. Or:

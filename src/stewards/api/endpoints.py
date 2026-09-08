@@ -1,10 +1,10 @@
 """Logical endpoint -> path and query string, per API shape.
 
 Two shapes exist. `Style.CONTRACT` is the versioned REST contract this app was built
-against — `/api/v1/monitors/<id>/incidents` — and is the shape `sample_data/` serves.
-`Style.ADMIN` is the interim admin API on the stewards service, which exposes one pair of
-per-monitor paths derived from the monitor id (`/admin/single-feed-stall-incidents` and
-`/admin/single-feed-stall-trend`), and takes the snapshot it should answer for as `as_of`.
+against — `/api/v1/monitors/<id>/incidents` — and `Style.ADMIN` is the interim admin API
+on the stewards service, which exposes one pair of per-monitor paths derived from the
+monitor id (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`),
+and takes the snapshot it should answer for as `as_of`.
 
 Both shapes route all four reads. An endpoint a deployment has not built yet answers 404,
 which the client turns into `ApiNotFound` and the page renders as "registered in the

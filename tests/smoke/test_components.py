@@ -11,6 +11,7 @@ from datetime import date
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from fixture_loader import load_sample
 from stewards.api.errors import (
     ApiContractError,
     ApiError,
@@ -19,7 +20,6 @@ from stewards.api.errors import (
     ApiUnavailable,
 )
 from stewards.api.models import Meta, Summary, SummaryResponse
-from stewards.api.sample_transport import load_sample
 
 SNAPSHOT = date(2026, 8, 21)
 
@@ -40,8 +40,8 @@ def run(script, *args: object) -> AppTest:
 
 
 def _email_script() -> None:
+    from fixture_loader import load_sample
     from stewards.api.models import IncidentPage
-    from stewards.api.sample_transport import load_sample
     from stewards.components.email_draft import render_email_draft
     from stewards.monitors.registry import get_monitor
 

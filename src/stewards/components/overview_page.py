@@ -156,8 +156,6 @@ def render_overview_page() -> None:
         title,
         response.meta,
     )
-    if get_settings().use_sample_data:
-        layout.render_sample_data_notice()
 
     render_fleet_kpis(summary)
     threshold_days = get_settings().contact_threshold_days

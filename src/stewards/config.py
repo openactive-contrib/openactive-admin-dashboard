@@ -29,24 +29,12 @@ class Settings:
     env: str = "prod"
     allowed_email_domain: str = DEFAULT_ALLOWED_DOMAIN
     contact_threshold_days: int = DEFAULT_THRESHOLD_DAYS
-    use_sample_data: bool = False
     disable_auth: bool = False
     docs_url: str = DEFAULT_DOCS_URL
 
     @property
     def is_dev(self) -> bool:
         return self.env == "dev"
-
-    @property
-    def effective_api_style(self) -> Style:
-        """The shape requests are actually built for.
-
-        Sample-data mode always speaks the contract shape whatever `api_style` says: the
-        bundled payloads are named for it, and they cover the summary and contact queue
-        that the interim admin API has not implemented. Without this, pointing a local run
-        at the admin API would silently disable those pages in sample mode too.
-        """
-        return Style.CONTRACT if self.use_sample_data else self.api_style
 
 
 _TRUE = frozenset({"1", "true", "yes", "on"})
@@ -59,12 +47,10 @@ def _flag(source: Mapping[str, str], key: str) -> bool:
 def load_settings(source: Mapping[str, str]) -> Settings:
     """Build settings from a flat string mapping (env vars or flattened secrets).
 
-    `use_sample_data` serves bundled payloads instead of calling the API, so the app is
-    runnable before the API exists. `disable_auth` is honoured only when `env` is `dev`.
-    `api_style` picks which URL shape the deployment's API speaks — see `api/endpoints.py`.
+    `disable_auth` is honoured only when `env` is `dev`. `api_style` picks which URL
+    shape the deployment's API speaks — see `api/endpoints.py`.
     """
     env = source.get("STEWARDS_ENV", "prod").strip().lower() or "prod"
-    use_sample_data = _flag(source, "STEWARDS_USE_SAMPLE_DATA")
     base_url = source.get("STEWARDS_API_BASE_URL", "").strip()
     token = source.get("STEWARDS_API_TOKEN", "").strip()
 
@@ -78,12 +64,7 @@ def load_settings(source: Mapping[str, str]) -> Settings:
         ) from exc
 
     if not base_url:
-        if not use_sample_data:
-            raise ConfigError(
-                "STEWARDS_API_BASE_URL is not set. Point it at the stewards API, or set "
-                "STEWARDS_USE_SAMPLE_DATA=true to run against the bundled sample payloads."
-            )
-        base_url = "https://sample.invalid"
+        raise ConfigError("STEWARDS_API_BASE_URL is not set. Point it at the stewards API.")
 
     threshold = source.get("STEWARDS_CONTACT_THRESHOLD_DAYS", "").strip()
     try:
@@ -104,7 +85,6 @@ def load_settings(source: Mapping[str, str]) -> Settings:
         allowed_email_domain=source.get("STEWARDS_ALLOWED_DOMAIN", "").strip()
         or DEFAULT_ALLOWED_DOMAIN,
         contact_threshold_days=threshold_days,
-        use_sample_data=use_sample_data,
         disable_auth=env == "dev" and _flag(source, "STEWARDS_DISABLE_AUTH"),
         docs_url=source.get("STEWARDS_DOCS_URL", "").strip() or DEFAULT_DOCS_URL,
     )

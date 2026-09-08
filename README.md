@@ -13,20 +13,13 @@ states the snapshot date rather than implying live data.
 uv sync --extra dev
 ```
 
-Only part of the backing API is built, so the app ships sample payloads and can be run in
-full today:
-
-```bash
-STEWARDS_USE_SAMPLE_DATA=true STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
-  uv run streamlit run src/stewards/app.py
-```
-
 Against the real API, copy `.streamlit/secrets.toml.example` to
 `.streamlit/secrets.toml`, fill in the Google OIDC client, the API token and — for the
 interim admin API — `api_style = "admin"` with `api_token_param = "token"`, then run:
 
 ```bash
-uv run streamlit run src/stewards/app.py
+STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
+  uv run streamlit run src/stewards/app.py
 ```
 
 Endpoints that a deployment has not implemented yet report themselves as not live on the

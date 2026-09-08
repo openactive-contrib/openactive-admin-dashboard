@@ -11,9 +11,7 @@ custom JS components).
 
 ## Current state
 
-Two of the eight monitors in the brief are built: `single_feed_stall` and `http_failure`.
-The remaining six land one at a time as their API endpoints go live. **The whole procedure
-for adding one — registry entry, page, home-page card, API contract, sample payloads,
+**The whole procedure for adding one — registry entry, page, home-page card, API contract, sample payloads,
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
@@ -26,17 +24,11 @@ contract below). The app also requests `/admin/contact-queue` and the other moni
 the typed "endpoint is not live" state rather than failing. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
 `/api/v1/monitors/<id>/...` design) and `admin` — selected by `STEWARDS_API_STYLE`.
 
-The app also ships sample payloads so every page can be run and reviewed today:
+Run the app against the live API in dev mode with auth disabled:
 
 ```bash
-STEWARDS_USE_SAMPLE_DATA=true STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
-  uv run streamlit run src/stewards/app.py
+STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true uv run streamlit run src/stewards/app.py
 ```
-
-The payloads in `src/stewards/api/sample_data/` are served through an `httpx.MockTransport`
-and are also the happy-path contract fixtures for the tests — one copy of each shape. When
-the real API lands, point `STEWARDS_API_BASE_URL` at it and drop the flags; nothing else
-changes. Any page in sample-data mode renders a banner saying so.
 
 Also built out: the overview and the cross-monitor contact queue. Runbooks are **not** in
 the app: they live in `docs/` and are published to GitHub Pages by
@@ -62,8 +54,6 @@ src/stewards/
   api/errors.py              ApiUnavailable | ApiUnauthorized | ApiNotFound | ApiContractError
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
-  api/sample_transport.py    MockTransport serving sample_data/ before the API exists
-  api/sample_data/*.json     bundled payloads, one per endpoint
   monitors/registry.py       Monitor / Col / ColKind / Group / Severity + MONITOR_REGISTRY
   monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score tones
   monitors/transforms.py     incidents -> DataFrame, tone frame, KPIs, filters, CSV
@@ -120,7 +110,7 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 
 | Variable | Meaning |
 |---|---|
-| `STEWARDS_API_BASE_URL` | Required unless sample-data mode is on |
+| `STEWARDS_API_BASE_URL` | Required live API base URL |
 | `STEWARDS_API_TOKEN` | Token for the API; not the user's identity |
 | `STEWARDS_API_STYLE` | `contract` (default) or `admin` — which URL shape the deployment speaks |
 | `STEWARDS_API_TOKEN_PARAM` | Query parameter the token rides in; empty (default) means a bearer header |
@@ -128,7 +118,6 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_CONTACT_THRESHOLD_DAYS` | Contact threshold, default 7 |
 | `STEWARDS_ALLOWED_DOMAIN` | Google workspace allowlist, default `theodi.org` |
 | `STEWARDS_DOCS_URL` | Runbooks site the sidebar links out to, default the project's GitHub Pages URL |
-| `STEWARDS_USE_SAMPLE_DATA` | Serve the bundled payloads instead of calling the API |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
 
 ## The `/summary` contract
@@ -188,8 +177,6 @@ uv run mypy src
 - No page or component builds a URL. `api/endpoints.py` maps each of the four logical reads
   onto a path and query per shape; both shapes route all four, and an endpoint a deployment
   has not built yet answers 404, which becomes `ApiNotFound` on the page that needs it.
-  Sample-data mode always speaks `contract` (`Settings.effective_api_style`), because that
-  is what the payload files are named for.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
   params, so the controls respond without a refetch and stay unit-testable.
 - The full brand palette lives in `components/theme.py`; `.streamlit/config.toml` mirrors it

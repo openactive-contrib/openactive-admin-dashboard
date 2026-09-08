@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from fixture_loader import load_sample
 from stewards.api.models import DetailModel, IncidentPage
-from stewards.api.sample_transport import SAMPLE_DIR, load_sample
 from stewards.monitors.registry import (
     MONITOR_REGISTRY,
     Group,
@@ -17,6 +17,7 @@ from stewards.monitors.registry import (
 from stewards.monitors.transforms import resolve_field
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "src" / "stewards"
+SAMPLE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 pytestmark = pytest.mark.parametrize(
     "monitor", MONITOR_REGISTRY, ids=[m.id for m in MONITOR_REGISTRY]

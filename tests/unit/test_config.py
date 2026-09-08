@@ -24,7 +24,6 @@ def test_minimal_settings() -> None:
     assert settings.env == "prod"
     assert settings.allowed_email_domain == DEFAULT_ALLOWED_DOMAIN
     assert settings.contact_threshold_days == DEFAULT_THRESHOLD_DAYS
-    assert not settings.use_sample_data
     assert not settings.disable_auth
     assert not settings.is_dev
 
@@ -32,22 +31,6 @@ def test_minimal_settings() -> None:
 def test_a_missing_base_url_is_a_config_error() -> None:
     with pytest.raises(ConfigError, match="STEWARDS_API_BASE_URL"):
         load_settings({})
-
-
-def test_sample_data_mode_needs_no_base_url() -> None:
-    settings = load_settings({"STEWARDS_USE_SAMPLE_DATA": "true"})
-    assert settings.use_sample_data
-    assert settings.api_base_url
-
-
-@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
-def test_truthy_flag_spellings(value: str) -> None:
-    assert load_settings(BASE | {"STEWARDS_USE_SAMPLE_DATA": value}).use_sample_data
-
-
-@pytest.mark.parametrize("value", ["0", "false", "no", "", "maybe"])
-def test_everything_else_is_false(value: str) -> None:
-    assert not load_settings(BASE | {"STEWARDS_USE_SAMPLE_DATA": value}).use_sample_data
 
 
 def test_auth_can_only_be_disabled_in_dev() -> None:
@@ -190,15 +173,6 @@ def test_a_blank_api_shape_falls_back_to_the_contract() -> None:
     assert load_settings(BASE | {"STEWARDS_API_STYLE": "  "}).api_style is Style.CONTRACT
 
 
-def test_sample_data_mode_speaks_the_contract_shape_whatever_the_style_says() -> None:
-    """The bundled payloads are named for the contract, and cover endpoints admin lacks."""
-    settings = load_settings(
-        {"STEWARDS_USE_SAMPLE_DATA": "true", "STEWARDS_API_STYLE": "admin"}
-    )
-    assert settings.api_style is Style.ADMIN  # what the deployment is configured for
-    assert settings.effective_api_style is Style.CONTRACT  # what requests are built for
-
-
 def test_a_live_deployment_uses_the_style_it_declares() -> None:
     settings = load_settings(BASE | {"STEWARDS_API_STYLE": "admin"})
-    assert settings.effective_api_style is Style.ADMIN
+    assert settings.api_style is Style.ADMIN

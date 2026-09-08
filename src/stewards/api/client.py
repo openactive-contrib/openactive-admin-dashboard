@@ -30,17 +30,12 @@ def build_client(
     unless `api_token_param` names a query parameter to carry it instead.
     """
     if transport is None:
-        if settings.use_sample_data:
-            from stewards.api.sample_transport import sample_transport
-
-            transport = sample_transport()
-        else:
-            transport = httpx.HTTPTransport(retries=RETRIES)
+        transport = httpx.HTTPTransport(retries=RETRIES)
     headers = {"Accept": "application/json"}
     if settings.api_token and not settings.api_token_param:
         headers["Authorization"] = f"Bearer {settings.api_token}"
     return httpx.Client(
-        base_url=f"{settings.api_base_url}{endpoints.prefix(settings.effective_api_style)}",
+        base_url=f"{settings.api_base_url}{endpoints.prefix(settings.api_style)}",
         headers=headers,
         timeout=TIMEOUT,
         transport=transport,
@@ -63,7 +58,7 @@ class StewardsClient:
     @property
     def style(self) -> endpoints.Style:
         """Which URL shape requests are built for."""
-        return self._settings.effective_api_style
+        return self._settings.api_style
 
     def _query(self, params: dict[str, Any] | None) -> dict[str, Any] | None:
         """The caller's query, plus the token when this API takes it as a parameter.
