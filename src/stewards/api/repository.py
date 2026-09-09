@@ -8,6 +8,7 @@ once a day, so the cache is deliberately generous and there is no refresh button
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import date
 
 import streamlit as st
@@ -15,8 +16,8 @@ from pydantic import BaseModel, ValidationError
 
 from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
-from stewards.api.errors import ApiContractError
-from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
+from stewards.api.errors import ApiContractError, ApiError
+from stewards.api.models import IncidentPage, SummaryResponse, TrendPoint, TrendResponse
 
 log = logging.getLogger(__name__)
 
@@ -94,6 +95,26 @@ def _fetch_trend(
     return _parse(TrendResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
+def _fetch_monitor_trends(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, tuple[TrendPoint, ...]]:
+    """Each monitor's daily series, for the overview card states and the sidebar badges.
+
+    A monitor whose trend endpoint this deployment has not built yet is left out of the
+    mapping rather than raising: the overview judges it on the sparkline in `/summary`
+    instead, and one missing endpoint must not cost the whole page.
+    """
+    trends: dict[str, tuple[TrendPoint, ...]] = {}
+    for monitor_id in monitor_ids:
+        try:
+            trends[monitor_id] = _fetch_trend(monitor_id, client=client, as_of=as_of).data
+        except ApiError as exc:
+            log.info("No trend series for %s: %s", monitor_id, exc)
+    return trends
+
+
 def _fetch_contact_queue(
     client: StewardsClient | None = None, as_of: date | None = None
 ) -> IncidentPage:
@@ -115,6 +136,11 @@ def fetch_incidents(monitor_id: str) -> IncidentPage:
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_trend(monitor_id: str, days: int = 30) -> TrendResponse:
     return _fetch_trend(monitor_id, days)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_monitor_trends(monitor_ids: tuple[str, ...]) -> dict[str, tuple[TrendPoint, ...]]:
+    return _fetch_monitor_trends(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading contact queue…")

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from stewards.api.models import DetailModel, HttpFailureDetail, StallDetail
+from stewards.monitors.health import HealthPolicy
 
 
 class Group(StrEnum):
@@ -84,6 +85,7 @@ class Monitor:
     detail_model: type[DetailModel] = DetailModel
     summary_field: str = "feed_name"
     threshold_days: int = 7
+    health: HealthPolicy = field(default_factory=HealthPolicy)
     has_threshold_filter: bool = True
     filters: tuple[FilterSpec, ...] = ()
     extras: tuple[str, ...] = ()

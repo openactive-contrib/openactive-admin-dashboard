@@ -25,6 +25,7 @@ from stewards.api.repository import (
     PAGE_SIZE,
     _fetch_contact_queue,
     _fetch_incidents,
+    _fetch_monitor_trends,
     _fetch_summary,
     _fetch_trend,
 )
@@ -217,6 +218,42 @@ def test_malformed_trend_is_a_contract_error(client: StewardsClient) -> None:
     )
     with pytest.raises(ApiContractError):
         _fetch_trend("http_failure", client=client)
+
+
+# --- every monitor's trend, for the overview card states -------------------------------
+
+
+@respx.mock
+def test_monitor_trends_returns_a_series_per_monitor(client: StewardsClient) -> None:
+    for monitor_id in ("single_feed_stall", "http_failure"):
+        respx.get(f"{BASE}/monitors/{monitor_id}/trend").mock(
+            return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_trend"))
+        )
+    trends = _fetch_monitor_trends(("single_feed_stall", "http_failure"), client)
+    assert set(trends) == {"single_feed_stall", "http_failure"}
+    assert len(trends["single_feed_stall"]) == 30
+    assert trends["http_failure"][0].open_count == 9
+
+
+@respx.mock
+def test_a_monitor_whose_trend_is_not_deployed_is_left_out(client: StewardsClient) -> None:
+    """A registry entry landing before its endpoint must not cost the whole overview."""
+    respx.get(f"{BASE}/monitors/single_feed_stall/trend").mock(
+        return_value=httpx.Response(200, json=load_sample("single_feed_stall_trend"))
+    )
+    respx.get(f"{BASE}/monitors/http_failure/trend").mock(return_value=httpx.Response(404))
+    trends = _fetch_monitor_trends(("single_feed_stall", "http_failure"), client)
+    assert set(trends) == {"single_feed_stall"}
+
+
+@respx.mock
+def test_a_failing_trend_endpoint_does_not_raise(client: StewardsClient) -> None:
+    respx.get(f"{BASE}/monitors/single_feed_stall/trend").mock(return_value=httpx.Response(500))
+    assert _fetch_monitor_trends(("single_feed_stall",), client) == {}
+
+
+def test_no_monitors_means_no_requests(client: StewardsClient) -> None:
+    assert _fetch_monitor_trends((), client) == {}
 
 
 # --- contact queue ---------------------------------------------------------------------

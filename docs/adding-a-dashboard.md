@@ -58,6 +58,7 @@ Settle these before writing anything. Every one of them is a field on the regist
 | Columns | `columns` | The table, in order. See the column kinds below. |
 | Detail fields | `detail_model` | The typed view of `Incident.detail`. Omit for a monitor with no extra fields. |
 | Contact threshold | `threshold_days` | Days before an incident is contact-due. Default 7. `days_open == threshold_days` **is** past threshold. |
+| Health policy | `health` | Which way is bad, and how fast counts as bad, for the home-page card state. The default reads a rising incident count as deterioration; a monitor whose figure is a volume declares `HealthPolicy(direction=Direction.DOWN_IS_BAD, clear_level=None)`. See "Card state" below. |
 | Filters | `filters` | One selectbox per `FilterSpec`; options are the distinct values in the snapshot. |
 | KPI labels | `kpi_labels` | Three labels: count, publishers affected, past threshold. |
 | Queue summary field | `summary_field` | Which field identifies the row in the cross-monitor contact queue. Defaults to `feed_name`. |
@@ -127,6 +128,7 @@ logged: every error message names the path, which carries no query string.
 | fleet summary | overview KPIs, home-page cards, sidebar badges | `fetch_summary()` |
 | incidents | the monitor page table | `fetch_incidents(id)` |
 | trend | the monitor page chart | `fetch_trend(id)` |
+| trend, every monitor | the home-page card states and the sidebar badge tones | `fetch_monitor_trends(ids)` |
 | contact queue | the cross-monitor queue | `fetch_contact_queue()` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
@@ -210,6 +212,12 @@ endpoint is visible instead of silently missing.
 figure for this snapshot. That is not the same as zero: the card reads em dash and grey
 with a "not reported" note, and gets no sidebar badge. Send zero only when the figure is
 genuinely zero. Null points in `sparkline` are dropped from the line, as on a row trend.
+
+The card's **state** is judged on the monitor's daily series, so the overview reads
+`/monitors/<id>/trend` for every registered monitor as well. A monitor whose trend endpoint
+is not deployed yet is judged on the `sparkline` in this entry instead — seven points are
+enough for a verdict, thirty are better — and one missing trend endpoint costs that
+monitor's history, not the page.
 
 ### Contact queue
 
@@ -338,14 +346,50 @@ default, so this is additive. The drafted message is a golden-file test — upda
 Both are automatic. No page code, no layout work:
 
 - `monitors/overview.build_tiles` emits one card per registry entry, in registry order, from
-  the matching `/summary` monitor counts.
+  the matching `/summary` monitor counts plus that monitor's trend series.
 - `monitors/overview.nav_badges` emits the sidebar count pill. A monitor with nothing open
   gets no pill, so the sidebar shows only what needs attention.
-- Card state and tone: green with nothing open; red once anything is past the threshold;
-  grey when non-zero and `INFORMATIONAL`; amber otherwise. The sidebar pill reuses the same
-  tone, so the two can never disagree.
+- Card state and tone come from `monitors/health.assess_monitor` over the daily series — see
+  "Card state" below. The sidebar pill reuses the same assessment over the same series, so
+  the two can never disagree.
 - The card's sparkline is `MonitorCount.sparkline`; fewer than two points draws nothing at
   all rather than an empty axis.
+
+### Card state
+
+`CRITICAL`, `WARNING`, `HEALTHY` and `NO DATA` are computed, not configured. `monitors/health.py`
+holds the arithmetic and nothing else in the app decides a card state:
+
+- **Speed and direction** — the **Theil-Sen slope** of the series (the median of the
+  pairwise slopes), divided by the series' own median level to give a rate per day. Being
+  relative, the rate is comparable across a monitor counting in single digits and one
+  counting in hundreds; `max(level, level_floor)` keeps 0 → 1 → 2 from reading as +100%/day.
+- **Confidence** — the **Mann-Kendall** S statistic with its tie correction, as a two-sided
+  p-value. Daily counts plateau, so the tie correction is what stops a flat run of equal
+  numbers from reading as a trend. Below `min_points` snapshots no trend is claimed at all.
+- **Level** — the **Iglewicz-Hoaglin modified z-score** of the latest point against the
+  recent median and its median absolute deviation, which catches a step change days before a
+  slope can see it. A step must also clear `level_floor` in absolute terms, so one incident
+  after a quiet month is not a crisis.
+
+The rules, most severe first: at or beyond `clear_level` is healthy whatever the history did;
+then a significant trend in the bad direction at or above `critical_rate` (or an extreme
+step) is critical; at or above `warn_rate` (or a lesser step) is a warning; a level above
+`clear_level` with no significant movement is a warning; anything else is healthy. The
+past-threshold series escalates on top of that: a non-empty backlog is critical unless it is
+both trending down and below its own recent range, where it is a warning.
+
+An `INFORMATIONAL` monitor renders a warning as grey "Info" instead of amber — that is the
+one place `severity` changes behaviour.
+
+**Direction is a parameter, not a special case.** Every rule runs on the *oriented* series
+(the raw value times the direction's sign), so a monitor whose numbers falling is the problem
+— a total opportunity count, coverage — declares
+`health=HealthPolicy(direction=Direction.DOWN_IS_BAD, clear_level=None)` and gets the same
+arithmetic read the other way up. `clear_level=None` says the monitor has no all-clear point:
+only its movement can be judged. Tune `warn_rate` and `critical_rate` per monitor if the
+defaults (1%/day and 5%/day, roughly a third in a month and a doubling in a fortnight) are
+the wrong scale for it.
 
 The only thing needed to make the card show real figures is the `/summary` entry for the new
 `monitor_id` — from the live API, or from `summary.json` in sample-data mode (next step).
@@ -477,6 +521,8 @@ this site.
       row, a below-threshold row, an exactly-at-threshold row and a null optional field
 - [ ] `summary.json` carries a `MonitorCount` for the new id, sparkline included
 - [ ] home-page card shows the right count, state colour and unit noun
+- [ ] `health` policy declared if the monitor's figure is a volume rather than a fault count,
+      or if the default rates are the wrong scale for it
 - [ ] sidebar badge shows the open count
 - [ ] page renders: header with snapshot date, blurb, three KPIs, trend, filters, table
 - [ ] selecting a row opens an email draft that names the monitor and the days open

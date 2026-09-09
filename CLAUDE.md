@@ -20,8 +20,9 @@ API (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`, 
 plus `?token=`), and `/admin/summary` is live too — it sends `null` for the counts its batch
 does not compute yet, which the overview shows as "not reported" (see the `/summary`
 contract below). The app also requests `/admin/contact-queue` and the other monitors'
-`/admin/<slug>-incidents`; those are not deployed yet, so they 404 and those pages render
-the typed "endpoint is not live" state rather than failing. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
+`/admin/<slug>-incidents` and `/admin/<slug>-trend`; those are not deployed yet, so they 404
+and those pages render the typed "endpoint is not live" state rather than failing — a
+missing trend costs that monitor's card its history, not the overview. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
 `/api/v1/monitors/<id>/...` design) and `admin` — selected by `STEWARDS_API_STYLE`.
 
 Run the app against the live API in dev mode with auth disabled:
@@ -56,6 +57,7 @@ src/stewards/
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
   monitors/registry.py       Monitor / Col / ColKind / Group / Severity + MONITOR_REGISTRY
   monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score tones
+  monitors/health.py         trend arithmetic -> CRITICAL/WARNING/HEALTHY, per monitor
   monitors/transforms.py     incidents -> DataFrame, tone frame, KPIs, filters, CSV
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/contact_queue.py  the cross-monitor union, shaped
@@ -120,6 +122,19 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_DOCS_URL` | Runbooks site the sidebar links out to, default the project's GitHub Pages URL |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
 
+## Monitor card states
+
+`CRITICAL` / `WARNING` / `HEALTHY` / `NO DATA` on an overview card is computed from the
+monitor's own daily series, not configured: `monitors/health.py` runs a Theil-Sen slope
+(relative to the series' own level, so it is scale-free), a tie-corrected Mann-Kendall
+p-value and an Iglewicz-Hoaglin modified z-score for a step change, and the past-threshold
+series escalates on top. The overview therefore reads every monitor's trend
+(`repository.fetch_monitor_trends`) and falls back to the `/summary` sparkline for a monitor
+whose trend endpoint is not deployed. Which way is bad is per monitor: `Monitor.health` is a
+`HealthPolicy`, and a monitor whose figure is a volume rather than a fault count declares
+`Direction.DOWN_IS_BAD` — every rule runs on the oriented series, so there is no second code
+path for it. `docs/adding-a-dashboard.md` §7 "Card state" is the full account.
+
 ## The `/summary` contract
 
 Every count in `BUILD_BRIEF.md` §3 is `int | None`. A deployment sends `null` for a figure
@@ -144,6 +159,9 @@ zero. `monitors.overview.format_delta` owns the sign convention.
   malformed payload and a two-page paginated response. Never hit the network in tests.
 - Threshold arithmetic has its own module, `tests/unit/test_thresholds.py`; it is the logic
   most likely to be quietly wrong.
+- `tests/unit/test_health.py` owns the trend arithmetic, the other logic most likely to be
+  quietly wrong: every rule is asserted at its boundary and the direction parameter is
+  asserted to be a mirror of itself rather than a second code path.
 - `tests/unit/test_registry.py` parametrises over the whole registry, so every future
   monitor is validated for free — ids, page module, sample payload, resolvable column and
   filter fields, detail model.

@@ -127,6 +127,15 @@ def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
     assert len(app.get("vega_lite_chart")) == len(MONITOR_REGISTRY)
 
 
+def test_each_tile_says_which_way_its_series_is_moving() -> None:
+    """The state chip is derived from the daily series, so the card states the movement."""
+    from stewards.monitors.registry import MONITOR_REGISTRY
+
+    app = run("00_overview.py")
+    captions = [caption.value for caption in app.caption]
+    assert sum("snapshots" in caption for caption in captions) == len(MONITOR_REGISTRY)
+
+
 def test_overview_banner_names_the_threshold() -> None:
     app = run("00_overview.py")
     assert any("7-day" in warning.value for warning in app.warning)

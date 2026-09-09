@@ -12,6 +12,7 @@ from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
 from stewards.monitors.overview import Tile, build_tiles, format_count, format_delta
+from stewards.monitors.registry import monitor_ids
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.transforms import EMPTY
 from stewards.monitors.trend import sparkline_chart
@@ -126,6 +127,9 @@ def render_tile(tile: Tile) -> None:
             if chart is not None:
                 st.altair_chart(chart, width="stretch")
 
+        if tile.trend_note:
+            st.caption(tile.trend_note)
+
         st.divider()
         with st.container(
             horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
@@ -145,7 +149,10 @@ def render_overview_page() -> None:
         return
 
     summary = response.data
-    tiles = build_tiles(summary)
+    # The card states are judged on each monitor's daily series; `fetch_monitor_trends`
+    # leaves out a monitor whose trend endpoint this deployment does not serve, and that
+    # monitor is judged on the sparkline in the summary instead.
+    tiles = build_tiles(summary, repository.fetch_monitor_trends(monitor_ids()))
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"
         if summary.publishers_monitored
