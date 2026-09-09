@@ -52,7 +52,7 @@ def test_column_lookup_by_label() -> None:
 
 
 def test_crumb_names_the_group() -> None:
-    assert get_monitor("http_failure").crumb == "Availability monitor"
+    assert get_monitor("feed_ingestion_error").crumb == "Availability monitor"
 
 
 def test_detail_column_paths() -> None:

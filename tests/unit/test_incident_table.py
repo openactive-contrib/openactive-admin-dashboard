@@ -37,7 +37,7 @@ def test_no_columns_gives_no_config() -> None:
 
 
 def test_registry_columns_all_map() -> None:
-    for monitor_id in ("single_feed_stall", "http_failure"):
+    for monitor_id in ("single_feed_stall", "feed_ingestion_error"):
         monitor = get_monitor(monitor_id)
         assert len(column_config(monitor.columns)) == len(monitor.columns)
 

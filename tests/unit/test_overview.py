@@ -175,13 +175,13 @@ def test_a_monitor_declares_which_way_is_bad() -> None:
     ],
 )
 def test_tile_note(count: int | None, past: int | None, fragment: str) -> None:
-    assert fragment in tile_note(get_monitor("http_failure"), count, past)
+    assert fragment in tile_note(get_monitor("feed_ingestion_error"), count, past)
 
 
 def test_nav_badges_carry_the_count_and_the_tile_tone(summary: SummaryResponse) -> None:
     badges = nav_badges(summary.data)
     assert badges["single_feed_stall"] == NavBadge("23", Tone.RED)
-    assert badges["http_failure"] == NavBadge("9", Tone.RED)
+    assert badges["feed_ingestion_error"] == NavBadge("9", Tone.RED)
     assert badges["contact_queue"] == NavBadge("10", Tone.RED)
 
 
@@ -190,12 +190,12 @@ def test_a_monitor_with_nothing_open_gets_no_badge() -> None:
         publishers_monitored=170,
         monitors=(
             MonitorCount(monitor_id="single_feed_stall", count=0),
-            MonitorCount(monitor_id="http_failure", count=4, past_threshold_count=0),
+            MonitorCount(monitor_id="feed_ingestion_error", count=4, past_threshold_count=0),
         ),
     )
     badges = nav_badges(summary)
     assert "single_feed_stall" not in badges
-    assert badges["http_failure"] == NavBadge("4", Tone.AMBER)
+    assert badges["feed_ingestion_error"] == NavBadge("4", Tone.AMBER)
 
 
 def test_no_contact_queue_badge_when_nothing_is_past_threshold() -> None:
@@ -258,9 +258,9 @@ def test_a_monitor_the_api_does_not_report_is_shown_at_zero() -> None:
         monitors=(MonitorCount(monitor_id="single_feed_stall", count=3),),
     )
     tiles = {t.monitor.id: t for t in build_tiles(summary)}
-    assert tiles["http_failure"].count == 0
-    assert tiles["http_failure"].state is Tone.GREEN
-    assert tiles["http_failure"].sparkline == ()
+    assert tiles["feed_ingestion_error"].count == 0
+    assert tiles["feed_ingestion_error"].state is Tone.GREEN
+    assert tiles["feed_ingestion_error"].sparkline == ()
 
 
 def test_a_null_count_reads_as_unknown_rather_than_zero() -> None:
@@ -286,17 +286,17 @@ def test_an_all_clear_snapshot_reads_green(payload) -> None:
 
 
 def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) -> None:
-    assert sidebar_counts(summary.data) == {"single_feed_stall": 23, "http_failure": 9}
+    assert sidebar_counts(summary.data) == {"single_feed_stall": 23, "feed_ingestion_error": 9}
 
 
 def test_sidebar_counts_skips_a_monitor_whose_count_is_null() -> None:
     summary = Summary(
         monitors=(
             MonitorCount(monitor_id="single_feed_stall", count=None),
-            MonitorCount(monitor_id="http_failure", count=9),
+            MonitorCount(monitor_id="feed_ingestion_error", count=9),
         )
     )
-    assert sidebar_counts(summary) == {"http_failure": 9}
+    assert sidebar_counts(summary) == {"feed_ingestion_error": 9}
 
 
 def test_sidebar_counts_of_an_empty_summary_is_empty() -> None:

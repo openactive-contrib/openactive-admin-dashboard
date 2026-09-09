@@ -15,9 +15,11 @@ custom JS components).
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
-**Only part of the backing API exists.** `single_feed_stall` reads the live interim admin
-API (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`, `?as_of=`
-plus `?token=`), and `/admin/summary` is live too — it sends `null` for the counts its batch
+**Only part of the backing API exists.** `single_feed_stall` and `feed_ingestion_error` read
+the live interim admin API (`/admin/single-feed-stall-incidents` and
+`/admin/single-feed-stall-trend`, `/admin/feed-ingestion-error-incidents` and
+`/admin/feed-ingestion-error-trend`, `?as_of=` plus `?token=`), and `/admin/summary` is live
+too — it sends `null` for the counts its batch
 does not compute yet, which the overview shows as "not reported" (see the `/summary`
 contract below). The app also requests `/admin/contact-queue` and the other monitors'
 `/admin/<slug>-incidents` and `/admin/<slug>-trend`; those are not deployed yet, so they 404
@@ -218,8 +220,8 @@ uv run mypy src
   `st.line_chart` cannot draw a dashed series or a transparent plot area. Tile sparklines
   are axis-less; the trend chart is solid teal over dashed red.
 - Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
-- Route URLs drop the filename's numeric prefix: `views/12_http_failures.py` serves
-  `/http_failures`.
+- Route URLs drop the filename's numeric prefix: `views/12_feed_ingestion_errors.py` serves
+  `/feed_ingestion_errors`.
 - `layout.render_header` requires a `Meta`: every page it serves is backed by the daily
   batch, so the snapshot line is never optional.
 

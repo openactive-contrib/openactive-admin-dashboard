@@ -19,9 +19,10 @@ _OBSERVATIONS = {
         "the feed still responds with HTTP 200, but the most recent modified timestamp "
         "has not advanced for {days} days. The last change we recorded was {evidence}."
     ),
-    "http_failure": (
-        "the feed endpoint has failed to respond correctly on {days} consecutive daily "
-        "fetches. The last successful fetch was {evidence}."
+    "feed_ingestion_error": (
+        "our daily crawl has failed to ingest the feed on {days} consecutive days, either "
+        "because the endpoint did not respond correctly or because the page it returned "
+        "could not be parsed. The last successful ingestion was {evidence}."
     ),
 }
 
@@ -31,7 +32,7 @@ _DEFAULT_OBSERVATION = (
 
 _EVIDENCE_FIELDS = {
     "single_feed_stall": "last_modified",
-    "http_failure": "last_success",
+    "feed_ingestion_error": "last_completed",
 }
 
 

@@ -293,7 +293,7 @@ def _empty_trend_script() -> None:
     from stewards.components.trend_chart import render_trend
     from stewards.monitors.registry import get_monitor
 
-    render_trend(get_monitor("http_failure"), [])
+    render_trend(get_monitor("feed_ingestion_error"), [])
 
 
 def test_an_empty_trend_says_so_instead_of_charting_nothing() -> None:
@@ -371,7 +371,7 @@ def _url_path_script() -> None:
         "overview": "",
         "contact_queue": "contact_queue",
         "single_feed_stall": "single_feed_stalls",
-        "http_failure": "http_failures",
+        "feed_ingestion_error": "feed_ingestion_errors",
     }
     actual = {key: nav.page_for(key).url_path for key in expected}
     assert actual == expected, actual
@@ -382,7 +382,8 @@ def test_navigation_builds_a_page_per_registry_entry_with_count_badges() -> None
 
 
 def test_the_page_url_paths_drop_the_numeric_prefix() -> None:
-    """The nav filenames are ordered `12_http_failures.py`; the route is `/http_failures`."""
+    """The nav filenames are ordered `12_feed_ingestion_errors.py`; the route is
+    `/feed_ingestion_errors`."""
     run(_url_path_script)
 
 
@@ -396,7 +397,7 @@ def _sidebar_script() -> None:
         {
             "contact_queue": NavBadge("10", Tone.RED),
             "single_feed_stall": NavBadge("23", Tone.RED),
-            "http_failure": NavBadge("9", Tone.AMBER),
+            "feed_ingestion_error": NavBadge("9", Tone.AMBER),
         }
     )
 

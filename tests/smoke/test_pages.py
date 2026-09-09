@@ -17,10 +17,10 @@ PAGES = [
     "00_overview.py",
     "01_contact_queue.py",
     "10_single_feed_stalls.py",
-    "12_http_failures.py",
+    "12_feed_ingestion_errors.py",
 ]
 
-MONITOR_PAGES = ["10_single_feed_stalls.py", "12_http_failures.py"]
+MONITOR_PAGES = ["10_single_feed_stalls.py", "12_feed_ingestion_errors.py"]
 
 
 def run(name: str) -> AppTest:
@@ -84,14 +84,14 @@ def test_threshold_toggle_narrows_the_table() -> None:
 
 
 def test_search_narrows_the_table() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.text_input[0].set_value("halo").run()
     assert len(app.dataframe[0].value) == 1
     assert not app.exception
 
 
 def test_search_with_no_match_renders_an_empty_state_not_an_error() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.text_input[0].set_value("no-such-publisher").run()
     assert not app.exception
     assert not app.dataframe
@@ -99,7 +99,7 @@ def test_search_with_no_match_renders_an_empty_state_not_an_error() -> None:
 
 
 def test_selectbox_filter_narrows_the_table() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.selectbox[0].set_value("503").run()
     assert not app.exception
     assert len(app.dataframe[0].value) == 2
@@ -145,7 +145,7 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
     app = run("01_contact_queue.py")
     frame = app.dataframe[0].value
     assert len(frame) == 10
-    assert set(frame["Monitor"]) == {"Single-feed stalls", "HTTP endpoint failures"}
+    assert set(frame["Monitor"]) == {"Single-feed stalls", "Feed ingestion errors"}
 
 
 # --- the entry point ---------------------------------------------------------------------

@@ -18,7 +18,7 @@ import pytest
 from stewards import config
 from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
 from stewards.config import Settings
-from stewards.monitors.registry import HTTP_FAILURE, SINGLE_FEED_STALL, Monitor
+from stewards.monitors.registry import FEED_INGESTION_ERROR, SINGLE_FEED_STALL, Monitor
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 SNAPSHOT_DATE = date(2026, 8, 21)
@@ -68,8 +68,8 @@ def stall_monitor() -> Monitor:
 
 
 @pytest.fixture
-def http_monitor() -> Monitor:
-    return HTTP_FAILURE
+def ingestion_monitor() -> Monitor:
+    return FEED_INGESTION_ERROR
 
 
 @pytest.fixture
@@ -78,8 +78,8 @@ def stall_page() -> IncidentPage:
 
 
 @pytest.fixture
-def http_page() -> IncidentPage:
-    return IncidentPage.model_validate(load_sample("http_failure_incidents"))
+def ingestion_page() -> IncidentPage:
+    return IncidentPage.model_validate(load_sample("feed_ingestion_error_incidents"))
 
 
 @pytest.fixture

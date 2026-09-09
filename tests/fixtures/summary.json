@@ -22,7 +22,7 @@
         ]
       },
       {
-        "monitor_id": "http_failure",
+        "monitor_id": "feed_ingestion_error",
         "count": 9,
         "past_threshold_count": 3,
         "sparkline": [

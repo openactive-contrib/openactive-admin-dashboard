@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 
-from stewards.api.models import HttpFailureDetail, Incident, StallDetail
+from stewards.api.models import FeedIngestionErrorDetail, Incident, StallDetail
 from stewards.monitors.registry import Col, ColKind, Monitor
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.transforms import (
@@ -75,19 +75,20 @@ def test_detail_model_ignores_keys_it_does_not_know(stall_monitor: Monitor) -> N
     assert detail.last_modified == date(2026, 8, 14)
 
 
-def test_detail_model_is_per_monitor(http_monitor: Monitor) -> None:
+def test_detail_model_is_per_monitor(ingestion_monitor: Monitor) -> None:
     incident = make_incident(
-        monitor_id="http_failure",
+        monitor_id="feed_ingestion_error",
         detail={
-            "http_status": "503",
-            "error_class": "Service unavailable",
-            "last_success": "2026-08-10",
+            "error_code": "503",
+            "error_message": "HTTP 503 fetching https://example.org/openactive/sessions",
+            "last_completed": "2026-08-10",
         },
     )
-    detail = parse_detail(http_monitor, incident)
-    assert isinstance(detail, HttpFailureDetail)
-    assert detail.http_status == "503"
-    assert detail.last_success == date(2026, 8, 10)
+    detail = parse_detail(ingestion_monitor, incident)
+    assert isinstance(detail, FeedIngestionErrorDetail)
+    assert detail.error_code == "503"
+    assert detail.error_message == "HTTP 503 fetching https://example.org/openactive/sessions"
+    assert detail.last_completed == date(2026, 8, 10)
 
 
 # --- cell formatting ------------------------------------------------------------------
@@ -160,7 +161,7 @@ def test_dataframe_values_are_formatted_per_kind(stall_monitor: Monitor) -> None
     assert row["Last modified"] == "2026-08-14"
     assert row["Days stalled"] == "22d"
     assert row["Status"] == "Contact due"
-    assert row["30d trend"] == [1, 2, 3]
+    assert row["Recent trend"] == [1, 2, 3]
 
 
 def test_empty_input_gives_an_empty_frame_with_the_declared_columns(
@@ -195,10 +196,10 @@ def test_tone_frame_is_empty_for_no_incidents(stall_monitor: Monitor) -> None:
 
 
 def test_rag_columns_lists_only_shaded_labels(
-    stall_monitor: Monitor, http_monitor: Monitor
+    stall_monitor: Monitor, ingestion_monitor: Monitor
 ) -> None:
     assert rag_columns(stall_monitor) == ["Days stalled", "Status"]
-    assert rag_columns(http_monitor) == ["Consecutive failures", "Status"]
+    assert rag_columns(ingestion_monitor) == ["Consecutive failures"]
 
 
 # --- KPIs -----------------------------------------------------------------------------
@@ -246,8 +247,10 @@ def test_search_on_no_incidents_returns_empty() -> None:
     assert search_incidents([], "anything") == []
 
 
-def test_filter_options_are_sorted_and_exclude_blanks(http_monitor: Monitor, http_page) -> None:
-    options = filter_options(http_monitor, http_page.data, "detail.http_status")
+def test_filter_options_are_sorted_and_exclude_blanks(
+    ingestion_monitor: Monitor, ingestion_page
+) -> None:
+    options = filter_options(ingestion_monitor, ingestion_page.data, "detail.error_code")
     assert options == sorted(options)
     assert "" not in options
     assert "503" in options
@@ -258,35 +261,39 @@ def test_filter_options_on_a_missing_field_is_empty(stall_monitor: Monitor) -> N
 
 
 def test_apply_filters_combines_search_selection_and_threshold(
-    http_monitor: Monitor, http_page
+    ingestion_monitor: Monitor, ingestion_page
 ) -> None:
-    incidents = list(http_page.data)
-    only_503 = apply_filters(http_monitor, incidents, selections={"detail.http_status": "503"})
-    assert {i.detail["http_status"] for i in only_503} == {"503"}
+    incidents = list(ingestion_page.data)
+    only_503 = apply_filters(
+        ingestion_monitor, incidents, selections={"detail.error_code": "503"}
+    )
+    assert {i.detail["error_code"] for i in only_503} == {"503"}
 
-    past = apply_filters(http_monitor, incidents, past_threshold_only=True)
+    past = apply_filters(ingestion_monitor, incidents, past_threshold_only=True)
     assert past
     assert all(i.past_threshold for i in past)
 
     both = apply_filters(
-        http_monitor,
+        ingestion_monitor,
         incidents,
-        selections={"detail.http_status": "503"},
+        selections={"detail.error_code": "503"},
         past_threshold_only=True,
     )
-    assert all(i.past_threshold and i.detail["http_status"] == "503" for i in both)
+    assert all(i.past_threshold and i.detail["error_code"] == "503" for i in both)
 
 
-def test_apply_filters_ignores_a_blank_selection(http_monitor: Monitor, http_page) -> None:
-    incidents = list(http_page.data)
+def test_apply_filters_ignores_a_blank_selection(
+    ingestion_monitor: Monitor, ingestion_page
+) -> None:
+    incidents = list(ingestion_page.data)
     assert (
-        apply_filters(http_monitor, incidents, selections={"detail.http_status": ""})
+        apply_filters(ingestion_monitor, incidents, selections={"detail.error_code": ""})
         == incidents
     )
 
 
-def test_apply_filters_on_no_incidents_returns_empty(http_monitor: Monitor) -> None:
-    assert apply_filters(http_monitor, [], search="x", past_threshold_only=True) == []
+def test_apply_filters_on_no_incidents_returns_empty(ingestion_monitor: Monitor) -> None:
+    assert apply_filters(ingestion_monitor, [], search="x", past_threshold_only=True) == []
 
 
 def test_threshold_toggle_keeps_the_boundary_row(stall_monitor: Monitor) -> None:
@@ -316,11 +323,11 @@ def test_a_sparkline_cell_drops_the_snapshots_with_no_figure() -> None:
     One null and the whole cell falls back to rendering the raw list as text, which is what
     the table showed before this rule.
     """
-    col = Col("trend", "30d trend", ColKind.SPARKLINE)
+    col = Col("trend", "Recent trend", ColKind.SPARKLINE)
     assert format_cell(col, (1, 2, None, 4)) == [1.0, 2.0, 4.0]
 
 
 def test_a_sparkline_cell_with_no_usable_points_is_empty() -> None:
-    col = Col("trend", "30d trend", ColKind.SPARKLINE)
+    col = Col("trend", "Recent trend", ColKind.SPARKLINE)
     assert format_cell(col, ()) == []
     assert format_cell(col, (None, None)) == []

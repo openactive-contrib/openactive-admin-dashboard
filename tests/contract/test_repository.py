@@ -53,7 +53,7 @@ def test_summary_returns_a_model(client: StewardsClient) -> None:
     assert isinstance(response, SummaryResponse)
     assert response.data.publishers_monitored == 170
     assert response.meta.snapshot_date == date(2026, 8, 21)
-    assert response.data.count_for("http_failure").count == 9
+    assert response.data.count_for("feed_ingestion_error").count == 9
     assert response.data.count_for("orphan_children") is None
 
 
@@ -205,19 +205,19 @@ def test_trend_day_count_is_overridable(client: StewardsClient) -> None:
 
 @respx.mock
 def test_empty_trend_parses(client: StewardsClient, payload) -> None:
-    respx.get(f"{BASE}/monitors/http_failure/trend").mock(
+    respx.get(f"{BASE}/monitors/feed_ingestion_error/trend").mock(
         return_value=httpx.Response(200, json=payload("trend_empty"))
     )
-    assert _fetch_trend("http_failure", client=client).data == ()
+    assert _fetch_trend("feed_ingestion_error", client=client).data == ()
 
 
 @respx.mock
 def test_malformed_trend_is_a_contract_error(client: StewardsClient) -> None:
-    respx.get(f"{BASE}/monitors/http_failure/trend").mock(
+    respx.get(f"{BASE}/monitors/feed_ingestion_error/trend").mock(
         return_value=httpx.Response(200, json={"data": [{"date": "2026-08-21"}], "meta": {}})
     )
     with pytest.raises(ApiContractError):
-        _fetch_trend("http_failure", client=client)
+        _fetch_trend("feed_ingestion_error", client=client)
 
 
 # --- every monitor's trend, for the overview card states -------------------------------
@@ -225,14 +225,14 @@ def test_malformed_trend_is_a_contract_error(client: StewardsClient) -> None:
 
 @respx.mock
 def test_monitor_trends_returns_a_series_per_monitor(client: StewardsClient) -> None:
-    for monitor_id in ("single_feed_stall", "http_failure"):
+    for monitor_id in ("single_feed_stall", "feed_ingestion_error"):
         respx.get(f"{BASE}/monitors/{monitor_id}/trend").mock(
             return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_trend"))
         )
-    trends = _fetch_monitor_trends(("single_feed_stall", "http_failure"), client)
-    assert set(trends) == {"single_feed_stall", "http_failure"}
+    trends = _fetch_monitor_trends(("single_feed_stall", "feed_ingestion_error"), client)
+    assert set(trends) == {"single_feed_stall", "feed_ingestion_error"}
     assert len(trends["single_feed_stall"]) == 30
-    assert trends["http_failure"][0].open_count == 9
+    assert trends["feed_ingestion_error"][0].open_count == 9
 
 
 @respx.mock
@@ -241,8 +241,10 @@ def test_a_monitor_whose_trend_is_not_deployed_is_left_out(client: StewardsClien
     respx.get(f"{BASE}/monitors/single_feed_stall/trend").mock(
         return_value=httpx.Response(200, json=load_sample("single_feed_stall_trend"))
     )
-    respx.get(f"{BASE}/monitors/http_failure/trend").mock(return_value=httpx.Response(404))
-    trends = _fetch_monitor_trends(("single_feed_stall", "http_failure"), client)
+    respx.get(f"{BASE}/monitors/feed_ingestion_error/trend").mock(
+        return_value=httpx.Response(404)
+    )
+    trends = _fetch_monitor_trends(("single_feed_stall", "feed_ingestion_error"), client)
     assert set(trends) == {"single_feed_stall"}
 
 
@@ -266,7 +268,7 @@ def test_contact_queue_returns_the_cross_monitor_union(client: StewardsClient) -
     )
     page = _fetch_contact_queue(client)
     assert len(page.data) == 10
-    assert {i.monitor_id for i in page.data} == {"single_feed_stall", "http_failure"}
+    assert {i.monitor_id for i in page.data} == {"single_feed_stall", "feed_ingestion_error"}
     assert all(i.past_threshold for i in page.data)
 
 

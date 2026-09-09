@@ -32,7 +32,7 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         mock.get(f"{BASE}/contact-queue").mock(
             return_value=httpx.Response(200, json=load_sample("contact_queue"))
         )
-        for monitor_id in ("single_feed_stall", "http_failure"):
+        for monitor_id in ("single_feed_stall", "feed_ingestion_error"):
             mock.get(f"{BASE}/monitors/{monitor_id}/incidents").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_incidents"))
             )

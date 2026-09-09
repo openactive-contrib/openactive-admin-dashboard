@@ -33,11 +33,10 @@ class StallDetail(DetailModel):
     last_modified: date | None = None
 
 
-class HttpFailureDetail(DetailModel):
-    http_status: str | None = None
-    error_class: str | None = None
-    error_detail: str | None = None
-    last_success: date | None = None
+class FeedIngestionErrorDetail(DetailModel):
+    error_code: str | None = None
+    error_message: str | None = None
+    last_completed: date | None = None
 
 
 class Incident(ApiModel):

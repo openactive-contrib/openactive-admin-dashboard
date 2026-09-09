@@ -10,7 +10,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from stewards.api.models import DetailModel, HttpFailureDetail, StallDetail
+from stewards.api.models import DetailModel, FeedIngestionErrorDetail, StallDetail
 from stewards.monitors.health import HealthPolicy
 
 
@@ -127,10 +127,9 @@ SINGLE_FEED_STALL = Monitor(
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Individual feeds whose max(modified) has not advanced across consecutive daily "
-        "snapshots while the endpoint still returns 200. Sibling feeds on the same dataset "
-        "are excluded when the whole dataset is stalled — those appear under dataset-wide "
-        "stalls instead."
+        "Individual feeds that haven't been updated across several daily checks, even "
+        "though they're still responding. "
+        "If the entire dataset is affected, it's reported separately as a dataset-wide issue."
     ),
     unit="feeds stalled",
     detail_model=StallDetail,
@@ -139,7 +138,12 @@ SINGLE_FEED_STALL = Monitor(
         Col("feed_type", "Type", ColKind.TEXT),
         Col("detail.last_modified", "Last modified", ColKind.DATE),
         Col("days_open", "Days stalled", ColKind.DAYS),
-        Col("trend", "30d trend", ColKind.SPARKLINE),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The most recent daily snapshots; one with no figure is omitted",
+        ),
         Col("status", "Status", ColKind.STATUS),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
         Col("feed_id", "Feed", ColKind.MONO),
@@ -153,42 +157,51 @@ SINGLE_FEED_STALL = Monitor(
     kpi_labels=("feeds stalled", "publishers affected", "past threshold"),
 )
 
-HTTP_FAILURE = Monitor(
-    id="http_failure",
-    name="HTTP endpoint failures",
+FEED_INGESTION_ERROR = Monitor(
+    id="feed_ingestion_error",
+    name="Feed ingestion errors",
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Feed endpoints returning a non-200 status, TLS error or timeout on consecutive "
-        "daily fetches. Single-day blips are suppressed; an incident opens on the second "
-        "consecutive failure and carries the last successful fetch."
+        "Feeds the daily crawl could not ingest: the endpoint returned a non-200 status, a "
+        "TLS error or a timeout."
     ),
-    unit="endpoints failing",
-    detail_model=HttpFailureDetail,
+    unit="feeds failing ingestion",
+    detail_model=FeedIngestionErrorDetail,
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
-        Col("detail.http_status", "HTTP", ColKind.MONO),
-        Col("detail.error_class", "Error", ColKind.TEXT),
+        Col("detail.error_code", "Error code", ColKind.MONO),
         Col("days_open", "Consecutive failures", ColKind.DAYS),
-        Col("detail.last_success", "Last success", ColKind.DATE),
-        Col("status", "Status", ColKind.STATUS),
+        Col("detail.last_completed", "Last completed", ColKind.DATE),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The most recent daily snapshots; one with no figure is omitted",
+        ),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
         Col("feed_id", "Feed", ColKind.MONO),
+        Col(
+            "detail.error_message",
+            "Error message",
+            ColKind.TEXT,
+            help="The error the crawl recorded; hover a cell to read it in full",
+        ),
     ),
     filters=(
-        FilterSpec("detail.http_status", "Status code"),
-        FilterSpec("detail.error_class", "Error class"),
+        FilterSpec("detail.error_code", "Error code"),
+        FilterSpec("feed_type", "Feed type"),
     ),
     schedule="daily 04:00 UTC · suppress 1 day",
-    query="monitor_http_failure_v3",
-    page="views/12_http_failures.py",
-    kpi_labels=("endpoints failing", "publishers affected", "past threshold"),
+    query="monitor_feed_ingestion_error_v1",
+    page="views/12_feed_ingestion_errors.py",
+    kpi_labels=("feeds failing ingestion", "publishers affected", "past threshold"),
 )
 
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     SINGLE_FEED_STALL,
-    HTTP_FAILURE,
+    FEED_INGESTION_ERROR,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}

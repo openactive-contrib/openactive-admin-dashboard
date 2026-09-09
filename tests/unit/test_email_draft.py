@@ -66,15 +66,15 @@ def test_draft_names_the_monitor_and_the_days_open() -> None:
     assert "single-feed stalls" in draft
 
 
-def test_http_draft_uses_the_last_successful_fetch() -> None:
+def test_ingestion_draft_uses_the_last_successful_ingestion() -> None:
     incident = stall_incident(
-        monitor_id="http_failure",
+        monitor_id="feed_ingestion_error",
         days_open=11,
-        detail={"http_status": "503", "last_success": "2026-08-10"},
+        detail={"error_code": "503", "last_completed": "2026-08-10"},
     )
-    draft = draft_email(get_monitor("http_failure"), incident, SNAPSHOT)
-    assert "11 consecutive daily" in draft
-    assert "The last successful fetch was 2026-08-10." in draft
+    draft = draft_email(get_monitor("feed_ingestion_error"), incident, SNAPSHOT)
+    assert "11 consecutive days" in draft
+    assert "The last successful ingestion was 2026-08-10." in draft
 
 
 def test_reply_window_is_measured_from_the_snapshot() -> None:
@@ -117,5 +117,5 @@ def test_sender_name_is_overridable() -> None:
 
 
 def test_subject_line_falls_back_when_the_feed_is_unnamed() -> None:
-    subject = subject_line(get_monitor("http_failure"), stall_incident(feed_name=None))
-    assert subject == "OpenActive data check: OpenActive feed — http endpoint failures"
+    subject = subject_line(get_monitor("feed_ingestion_error"), stall_incident(feed_name=None))
+    assert subject == "OpenActive data check: OpenActive feed — feed ingestion errors"

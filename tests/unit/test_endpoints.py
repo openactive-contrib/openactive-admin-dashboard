@@ -29,7 +29,7 @@ def test_the_contract_shape_is_versioned_and_the_admin_shape_sits_at_the_root() 
     ("monitor_id", "expected"),
     [
         ("single_feed_stall", "single-feed-stall"),
-        ("http_failure", "http-failure"),
+        ("feed_ingestion_error", "feed-ingestion-error"),
         ("zerofuture", "zerofuture"),
     ],
 )
@@ -61,7 +61,8 @@ def test_admin_incidents_path_carries_the_snapshot_and_the_paging_query() -> Non
 
 def test_incidents_paging_defaults_to_the_first_page() -> None:
     for style in Style:
-        assert endpoints.incidents(style, "http_failure", as_of=AS_OF).params["page"] == 1
+        endpoint = endpoints.incidents(style, "feed_ingestion_error", as_of=AS_OF)
+        assert endpoint.params["page"] == 1
 
 
 # --- trend --------------------------------------------------------------------------------

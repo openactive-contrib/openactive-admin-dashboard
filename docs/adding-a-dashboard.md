@@ -265,7 +265,7 @@ ZERO_FUTURE = Monitor(
         Col("detail.future_count", "Future items", ColKind.NUMBER),
         Col("detail.last_nonzero", "Last non-zero", ColKind.DATE),
         Col("days_open", "Days at zero", ColKind.DAYS),
-        Col("trend", "30d trend", ColKind.SPARKLINE),
+        Col("trend", "Recent trend", ColKind.SPARKLINE),
         Col("status", "Status", ColKind.STATUS),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
     ),
@@ -280,7 +280,7 @@ ZERO_FUTURE = Monitor(
 
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     SINGLE_FEED_STALL,
-    HTTP_FAILURE,
+    FEED_INGESTION_ERROR,
     ZERO_FUTURE,
 )
 ```
