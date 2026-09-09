@@ -163,8 +163,9 @@ FEED_INGESTION_ERROR = Monitor(
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Feeds the daily crawl could not ingest: the endpoint returned a non-200 status, a "
-        "TLS error or a timeout."
+        "Feeds that the daily crawl could not ingest because the endpoint returned an error, such as a non-200 status, "
+        "TLS error, or timeout. Only includes feeds that have successfully run at least once in the past 15 days but "
+        "failed during the latest crawl."
     ),
     unit="feeds failing ingestion",
     detail_model=FeedIngestionErrorDetail,
