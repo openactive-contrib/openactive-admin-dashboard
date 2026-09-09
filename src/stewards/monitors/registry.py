@@ -127,9 +127,8 @@ SINGLE_FEED_STALL = Monitor(
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Individual feeds that haven't been updated across several daily checks, even "
-        "though they're still responding. "
-        "If the entire dataset is affected, it's reported separately as a dataset-wide issue."
+        "Individual feeds that haven’t published new data for at least 5 days, despite having published data within the "
+        "last 120 days. Feeds that are part of a wider dataset issue are reported separately as dataset-wide stalls."
     ),
     unit="feeds stalled",
     detail_model=StallDetail,
