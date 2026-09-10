@@ -7,8 +7,18 @@
     "feeds": 412,
     "datasets": 178,
     "monitors": [
-      { "monitor_id": "single_feed_stall", "count": 0, "past_threshold_count": 0, "sparkline": [] },
-      { "monitor_id": "http_failure", "count": 0, "past_threshold_count": 0, "sparkline": [] }
+      {
+        "monitor_id": "single_feed_stall",
+        "count": 0,
+        "past_threshold_count": 0,
+        "sparkline": []
+      },
+      {
+        "monitor_id": "feed_ingestion_error",
+        "count": 0,
+        "past_threshold_count": 0,
+        "sparkline": []
+      }
     ]
   },
   "meta": {

@@ -8,6 +8,20 @@
     "datasets": 178,
     "monitors": [
       {
+        "monitor_id": "dataset_stall",
+        "count": 4,
+        "past_threshold_count": 3,
+        "sparkline": [
+          1,
+          2,
+          2,
+          3,
+          4,
+          4,
+          4
+        ]
+      },
+      {
         "monitor_id": "single_feed_stall",
         "count": 23,
         "past_threshold_count": 7,
@@ -22,7 +36,7 @@
         ]
       },
       {
-        "monitor_id": "http_failure",
+        "monitor_id": "feed_ingestion_error",
         "count": 9,
         "past_threshold_count": 3,
         "sparkline": [
@@ -34,6 +48,12 @@
           8,
           9
         ]
+      },
+      {
+        "monitor_id": "dataset_orphaned_children",
+        "count": 590056,
+        "past_threshold_count": 0,
+        "sparkline": []
       }
     ],
     "publishers_with_issues_delta": 3,
@@ -43,7 +63,7 @@
   "meta": {
     "snapshot_date": "2026-08-21",
     "generated_at": "2026-08-21T06:12:04Z",
-    "total": 2,
+    "total": 4,
     "page": 1,
     "page_size": 100
   }

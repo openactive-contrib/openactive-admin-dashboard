@@ -68,6 +68,6 @@ up once by hand — the full procedure, plus rollback, is `docs/deployment.md`.
 - `.claude/skills/add-monitor/SKILL.md` — how to add the next monitor
 - `Data Stewards Dashboard.dc.html` — the approved UI mockup
 
-Two of the eight monitors are built (`single_feed_stall`, `http_failure`), plus the overview,
-and the cross-monitor contact queue. The rest follow their API endpoints. Runbooks are
-published separately from `docs/` to GitHub Pages.
+Two of the eight monitors are built (`single_feed_stall`, `feed_ingestion_error`), plus the
+overview, and the cross-monitor contact queue. The rest follow their API endpoints. Runbooks
+are published separately from `docs/` to GitHub Pages.

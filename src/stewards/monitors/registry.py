@@ -10,7 +10,16 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from stewards.api.models import DetailModel, HttpFailureDetail, StallDetail
+from stewards.api.models import (
+    DatasetStallDetail,
+    DetailModel,
+    FeedIngestionErrorDetail,
+    OrphanedChildrenDetail,
+    OrphanKind,
+    StallDetail,
+)
+from stewards.monitors.health import Direction, HealthPolicy
+from stewards.monitors.tile_viz import Gauge, Sparkline, TileViz
 
 
 class Group(StrEnum):
@@ -35,13 +44,19 @@ class ColKind(StrEnum):
     DAYS = "days"
     PERCENT = "percent"
     SCORE = "score"
+
+    #: A 0-100 figure where high is bad, the mirror of PERCENT. A share of something
+    #: broken needs the opposite shading, or a wholly orphaned dataset renders green.
+    RISK = "risk"
     SPARKLINE = "sparkline"
     STATUS = "status"
     LINK = "link"
 
 
 #: Kinds that carry RAG semantics and are therefore background-shaded in the table.
-RAG_KINDS = frozenset({ColKind.DAYS, ColKind.STATUS, ColKind.PERCENT, ColKind.SCORE})
+RAG_KINDS = frozenset(
+    {ColKind.DAYS, ColKind.STATUS, ColKind.PERCENT, ColKind.SCORE, ColKind.RISK}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +76,49 @@ class Col:
     @property
     def detail_attr(self) -> str:
         return self.field.removeprefix("detail.")
+
+    @property
+    def is_part(self) -> bool:
+        """True for a column reading the exploded row rather than the incident."""
+        return self.field.startswith(PART_PREFIX)
+
+
+#: Field-path prefix for the item an exploded row was built from. See `Monitor.rows`.
+PART_PREFIX = "part."
+
+
+@dataclass(frozen=True, slots=True)
+class RowSpec:
+    """Explode each incident into one table row per item of a detail list field.
+
+    A monitor whose incident is a measurement rather than a single fault often carries its
+    answer as a breakdown — orphans per child type, say. Declaring the breakdown here makes
+    each item a row, addressable as `part.<name>`, instead of collapsing it into one cell.
+    """
+
+    field: str
+    item_model: type[DetailModel]
+
+
+@dataclass(frozen=True, slots=True)
+class RowDetail:
+    """A table shown under the incident table when a row is selected.
+
+    `field` names a detail field holding a list of models — the parents a dataset's children
+    are missing, the feeds a stalled dataset covers — and `columns` are read against each
+    item with the `part.` prefix, exactly as the main table reads an exploded row. Declaring
+    it here is what keeps the renderer generic: no component knows which monitor it is
+    drawing.
+    """
+
+    field: str
+    title: str
+    caption: str
+    columns: tuple[Col, ...]
+
+    #: Optional detail field holding the true total, for a caption saying `{count}` where the
+    #: API reports only the worst few items.
+    count_field: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,7 +142,44 @@ class Monitor:
     detail_model: type[DetailModel] = DetailModel
     summary_field: str = "feed_name"
     threshold_days: int = 7
+    health: HealthPolicy = field(default_factory=HealthPolicy)
+
+    #: How the overview card draws this monitor's figure. See `monitors.tile_viz`.
+    viz: TileViz = field(default_factory=Sparkline)
+
+    #: Set to explode each incident into several table rows. None means one row per incident.
+    rows: RowSpec | None = None
+
+    #: A table shown beneath the incident table for the selected row, where the monitor's
+    #: detail carries a list worth its own columns.
+    row_detail: RowDetail | None = None
+
+    #: Field the table is ordered by, descending, then publisher name. The default suits a
+    #: monitor whose incidents age; one that measures a volume orders by the volume.
+    sort_field: str = "days_open"
+
+    #: When set, the first KPI is the sum of this field over the shown rows rather than a
+    #: count of them — the headline figure for a monitor that measures a quantity.
+    kpi_sum_field: str | None = None
+
     has_threshold_filter: bool = True
+
+    #: Help text on the past-threshold toggle. The default names the day count, which only
+    #: makes sense for a monitor whose incidents have an age.
+    threshold_help: str = ""
+
+    #: What one incident of this monitor is, in publisher-facing copy: "this <entity> has
+    #: stopped publishing". A monitor whose incident is a whole dataset says so.
+    entity: str = "feed"
+
+    #: Label and field path per line of the identifying block in the publisher email. The
+    #: default names a feed; a dataset-level monitor names its dataset.
+    email_fields: tuple[tuple[str, str], ...] = (
+        ("Feed", "feed_name"),
+        ("Feed type", "feed_type"),
+        ("Endpoint", "feed_url"),
+    )
+
     filters: tuple[FilterSpec, ...] = ()
     extras: tuple[str, ...] = ()
     schedule: str = "daily 04:00 UTC"
@@ -119,74 +214,239 @@ class Monitor:
         raise KeyError(label)
 
 
+DATASET_STALL = Monitor(
+    id="dataset_stall",
+    name="Dataset-wide stalls",
+    group=Group.AVAILABILITY,
+    # Strictly worse than a single stalled feed: nothing at all is reaching consumers from
+    # this publisher, so it is the first card a steward should see.
+    severity=Severity.CRITICAL,
+    blurb=(
+        "Datasets in which every feed has stopped publishing new or updated items for at "
+        "least 5 days, despite having published within the last 120 days. Nothing is "
+        "reaching consumers from the publisher at all, so the whole dataset is frozen "
+        "rather than one part of it. A dataset silent for longer than the 120-day lookback "
+        "counts as retired, not stalled, and the feeds inside a frozen dataset are reported "
+        "here once instead of as unrelated single-feed stalls."
+    ),
+    unit="datasets frozen",
+    detail_model=DatasetStallDetail,
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("detail.dataset_name", "Dataset", ColKind.TEXT),
+        Col(
+            "detail.feed_count",
+            "Feeds",
+            ColKind.NUMBER,
+            help="How many feeds this dataset publishes, all of them silent",
+        ),
+        Col("detail.last_modified", "Last published", ColKind.DATE),
+        Col("days_open", "Days stalled", ColKind.DAYS),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The most recent daily snapshots; one with no figure is omitted",
+        ),
+        Col(
+            "detail.dataset_url", "Dataset feed", ColKind.LINK, help="Opens the dataset's feed"
+        ),
+    ),
+    # The whole dataset is one incident, so its feeds are the breakdown a steward opens
+    # rather than rows of their own: the point of this monitor is that they failed together.
+    row_detail=RowDetail(
+        field="detail.feeds",
+        title="Frozen feeds",
+        caption=(
+            "Every feed in this dataset, and when each last published. A feed with no date "
+            "has not published inside the lookback window at all."
+        ),
+        columns=(
+            Col("part.feed_name", "Feed", ColKind.TEXT, primary=True),
+            Col("part.last_published", "Last published", ColKind.DATE),
+            Col("part.consecutive_days", "Days silent", ColKind.DAYS),
+            Col("part.feed_id", "Feed id", ColKind.MONO),
+        ),
+    ),
+    # The admin API reports every incident as `open`, so there is no status worth a column,
+    # and nothing categorical to filter a frozen dataset by — search and the threshold
+    # toggle are the controls that mean something here.
+    filters=(),
+    summary_field="detail.dataset_name",
+    entity="dataset",
+    email_fields=(
+        ("Dataset", "detail.dataset_name"),
+        ("Feeds", "detail.feed_count"),
+        ("Endpoint", "detail.dataset_url"),
+    ),
+    query="monitor_dataset_stall_v1",
+    page="views/10_dataset_stalls.py",
+    kpi_labels=("datasets frozen", "publishers affected", "past threshold"),
+)
+
+
 SINGLE_FEED_STALL = Monitor(
     id="single_feed_stall",
     name="Single-feed stalls",
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Individual feeds whose max(modified) has not advanced across consecutive daily "
-        "snapshots while the endpoint still returns 200. Sibling feeds on the same dataset "
-        "are excluded when the whole dataset is stalled — those appear under dataset-wide "
-        "stalls instead."
+        "Individual feeds that have not published new data for at least 5 days, despite "
+        "having published data within the last 120 days. Feeds that are part of a wider "
+        "dataset issue are reported separately as dataset-wide stalls."
     ),
     unit="feeds stalled",
     detail_model=StallDetail,
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
-        Col("feed_name", "Feed", ColKind.MONO),
         Col("feed_type", "Type", ColKind.TEXT),
         Col("detail.last_modified", "Last modified", ColKind.DATE),
         Col("days_open", "Days stalled", ColKind.DAYS),
-        Col("trend", "30d trend", ColKind.SPARKLINE),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The most recent daily snapshots; one with no figure is omitted",
+        ),
         Col("status", "Status", ColKind.STATUS),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+        Col("feed_id", "Feed", ColKind.MONO),
     ),
     filters=(
         FilterSpec("feed_type", "Feed type"),
         FilterSpec("status", "Status"),
     ),
     query="monitor_single_feed_stall_v2",
-    page="views/10_single_feed_stalls.py",
+    page="views/11_single_feed_stalls.py",
     kpi_labels=("feeds stalled", "publishers affected", "past threshold"),
 )
 
-HTTP_FAILURE = Monitor(
-    id="http_failure",
-    name="HTTP endpoint failures",
+FEED_INGESTION_ERROR = Monitor(
+    id="feed_ingestion_error",
+    name="Feed ingestion errors",
     group=Group.AVAILABILITY,
     severity=Severity.HIGH,
     blurb=(
-        "Feed endpoints returning a non-200 status, TLS error or timeout on consecutive "
-        "daily fetches. Single-day blips are suppressed; an incident opens on the second "
-        "consecutive failure and carries the last successful fetch."
+        "Feeds that the daily crawl could not ingest because the endpoint returned an "
+        "error, such as a non-200 status, TLS error, or timeout. Only includes feeds that "
+        "have successfully run at least once in the past 15 days but failed during the "
+        "latest crawl."
     ),
-    unit="endpoints failing",
-    detail_model=HttpFailureDetail,
+    unit="feeds failing ingestion",
+    detail_model=FeedIngestionErrorDetail,
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
-        Col("feed_name", "Feed", ColKind.MONO),
-        Col("detail.http_status", "HTTP", ColKind.MONO),
-        Col("detail.error_class", "Error", ColKind.TEXT),
+        Col("detail.error_code", "Error code", ColKind.MONO),
         Col("days_open", "Consecutive failures", ColKind.DAYS),
-        Col("detail.last_success", "Last success", ColKind.DATE),
-        Col("status", "Status", ColKind.STATUS),
+        Col("detail.last_completed", "Last completed", ColKind.DATE),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The most recent daily snapshots; one with no figure is omitted",
+        ),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+        Col("feed_id", "Feed", ColKind.MONO),
+        Col(
+            "detail.error_message",
+            "Error message",
+            ColKind.TEXT,
+            help="The error the crawl recorded; hover a cell to read it in full",
+        ),
     ),
     filters=(
-        FilterSpec("detail.http_status", "Status code"),
-        FilterSpec("detail.error_class", "Error class"),
+        FilterSpec("detail.error_code", "Error code"),
+        FilterSpec("feed_type", "Feed type"),
     ),
     schedule="daily 04:00 UTC · suppress 1 day",
-    query="monitor_http_failure_v3",
-    page="views/12_http_failures.py",
-    kpi_labels=("endpoints failing", "publishers affected", "past threshold"),
+    query="monitor_feed_ingestion_error_v1",
+    page="views/12_feed_ingestion_errors.py",
+    kpi_labels=("feeds failing ingestion", "publishers affected", "past threshold"),
 )
+
+
+DATASET_ORPHANED_CHILDREN = Monitor(
+    id="dataset_orphaned_children",
+    name="Orphaned children",
+    group=Group.CONTENT,
+    severity=Severity.HIGH,
+    blurb=(
+        "Child items whose parent is absent from the feed that should contain it: "
+        "ScheduledSessions whose superEvent is missing from the SessionSeries feed, and "
+        "Slots without their FacilityUse. A consumer cannot render these items at all, "
+        "because the parent carries the name, location and activity. Counted per dataset "
+        "over the children the crawl reached, so a dataset whose parent feed failed to "
+        "ingest is reported by the ingestion monitor rather than counted as orphans here."
+    ),
+    unit="orphaned children",
+    detail_model=OrphanedChildrenDetail,
+    # The answer a steward needs is which child type is orphaned, so each dataset becomes
+    # one row per kind rather than one row carrying a collapsed breakdown.
+    rows=RowSpec("detail.by_kind", OrphanKind),
+    # The batch reports no history for this monitor yet — `sparkline` is empty and the trend
+    # endpoint is not deployed — so the card reads today's figure against a fixed benchmark
+    # instead of against a series it does not have.
+    viz=Gauge(benchmark=785_000),
+    # A volume, not a fault count: only its movement can be judged, so there is no level at
+    # which the monitor is clear.
+    health=HealthPolicy(direction=Direction.UP_IS_BAD, clear_level=None),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("detail.dataset_name", "Dataset", ColKind.TEXT),
+        Col("part.kind", "Child type", ColKind.TEXT),
+        Col("part.orphan_count", "Orphans", ColKind.NUMBER),
+        Col(
+            "part.checked_count",
+            "Children checked",
+            ColKind.NUMBER,
+            help="Children of this type the crawl resolved a parent for, or failed to",
+        ),
+        Col("part.orphan_percent", "Share orphaned", ColKind.RISK),
+        Col(
+            "part.missing_parent_count",
+            "Missing parents",
+            ColKind.NUMBER,
+            help="Distinct parent ids these children point at that the feed does not contain",
+        ),
+        Col("detail.dataset_url", "Dataset feed", ColKind.LINK),
+    ),
+    row_detail=RowDetail(
+        field="detail.missing_parents",
+        title="Missing parents",
+        caption=(
+            "The parent ids these children reference that the dataset's parent feed does "
+            "not contain, worst first. The API reports the largest offenders, not all "
+            "{count} it counted."
+        ),
+        count_field="detail.missing_parent_count",
+        columns=(
+            Col("part.missing_id", "Missing parent id", ColKind.TEXT, primary=True),
+            Col("part.child_count", "Children affected", ColKind.NUMBER),
+        ),
+    ),
+    filters=(FilterSpec("part.kind", "Child type"),),
+    sort_field="part.orphan_count",
+    kpi_sum_field="part.orphan_count",
+    threshold_help="Show only the datasets the API has flagged past its own threshold.",
+    summary_field="detail.dataset_name",
+    entity="dataset",
+    email_fields=(
+        ("Dataset", "detail.dataset_name"),
+        ("Endpoint", "detail.dataset_url"),
+    ),
+    schedule="daily 04:00 UTC",
+    query="monitor_dataset_orphaned_children_v1",
+    page="views/22_dataset_orphaned_children.py",
+    kpi_labels=("orphaned children", "publishers affected", "datasets flagged"),
+)
+
 
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
+    DATASET_STALL,
     SINGLE_FEED_STALL,
-    HTTP_FAILURE,
+    FEED_INGESTION_ERROR,
+    DATASET_ORPHANED_CHILDREN,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}

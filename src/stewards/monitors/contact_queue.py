@@ -77,8 +77,14 @@ def to_dataframe(incidents: Sequence[Incident]) -> pd.DataFrame:
             "Publisher": incident.publisher_name,
             "Monitor": monitor.name,
             "Detail": _detail(monitor, incident),
-            "Days open": days_label(incident.days_open),
-            "First detected": incident.first_detected.isoformat(),
+            "Days open": (
+                EMPTY if incident.days_open is None else days_label(incident.days_open)
+            ),
+            "First detected": (
+                EMPTY
+                if incident.first_detected is None
+                else incident.first_detected.isoformat()
+            ),
             "Last contacted": (
                 incident.last_contacted.isoformat() if incident.last_contacted else EMPTY
             ),
@@ -94,7 +100,11 @@ def tone_frame(incidents: Sequence[Incident]) -> pd.DataFrame:
     rows = [
         {
             **dict.fromkeys(COLUMNS, ""),
-            "Days open": days_tone(incident.days_open, monitor.threshold_days).value,
+            "Days open": (
+                ""
+                if incident.days_open is None
+                else days_tone(incident.days_open, monitor.threshold_days).value
+            ),
             "Status": status_tone(incident.status).value,
         }
         for monitor, incident in _pairs(incidents)

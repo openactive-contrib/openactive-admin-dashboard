@@ -15,13 +15,20 @@ custom JS components).
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
-**Only part of the backing API exists.** `single_feed_stall` reads the live interim admin
-API (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`, `?as_of=`
-plus `?token=`), and `/admin/summary` is live too — it sends `null` for the counts its batch
+**Only part of the backing API exists.** `dataset_stall`, `single_feed_stall` and
+`feed_ingestion_error` read the live interim admin API (`/admin/<slug>-incidents` and
+`/admin/<slug>-trend`, `?as_of=` plus `?token=`), and `/admin/summary` is live
+too — it sends `null` for the counts its batch
 does not compute yet, which the overview shows as "not reported" (see the `/summary`
-contract below). The app also requests `/admin/contact-queue` and the other monitors'
-`/admin/<slug>-incidents`; those are not deployed yet, so they 404 and those pages render
-the typed "endpoint is not live" state rather than failing. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
+contract below). `dataset_orphaned_children` reads
+`/admin/dataset-orphaned-children-incidents`, which is live, but has **no history at all**:
+its `/summary` sparkline is empty and its trend endpoint 404s, so its card is judged on a
+declared benchmark rather than on a series (see "Monitor card states"). The app also
+requests `/admin/contact-queue`; that is not deployed yet, so it 404s and that page renders
+the typed "endpoint is not live" state rather than failing. A missing **trend** costs only
+the chart: `repository.fetch_trend_points` swallows the error, so the monitor's own page
+still renders its KPIs, filters and table, and the overview falls back to the summary
+sparkline. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
 `/api/v1/monitors/<id>/...` design) and `admin` — selected by `STEWARDS_API_STYLE`.
 
 Run the app against the live API in dev mode with auth disabled:
@@ -54,9 +61,13 @@ src/stewards/
   api/errors.py              ApiUnavailable | ApiUnauthorized | ApiNotFound | ApiContractError
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
-  monitors/registry.py       Monitor / Col / ColKind / Group / Severity + MONITOR_REGISTRY
-  monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score tones
-  monitors/transforms.py     incidents -> DataFrame, tone frame, KPIs, filters, CSV
+  monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
+                             + MONITOR_REGISTRY (registry order is card and sidebar order)
+  monitors/tile_viz.py       Sparkline | Gauge — what a monitor's overview card draws
+  monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score/risk tones
+  monitors/health.py         trend arithmetic -> CRITICAL/WARNING/HEALTHY, per monitor
+  monitors/gauge.py          the same verdict from a fixed benchmark, for a monitor with no series
+  monitors/transforms.py     incidents -> Rows -> DataFrame, tone frame, KPIs, filters
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/contact_queue.py  the cross-monitor union, shaped
   monitors/trend.py          30-snapshot series
@@ -85,12 +96,15 @@ tests/
 3. **No raw dicts past the client boundary.** `api/client.py` returns parsed JSON;
    `api/repository.py` returns pydantic models. Pages and components see models or
    DataFrames. `Incident.detail` is the one untyped field, and it is only ever read through
-   the `detail_model` its monitor declares — never with a string key in a page.
+   the `detail_model` its monitor declares — never with a string key in a page. `Incident`
+   folds top-level keys it does not declare into `detail`, so a monitor whose batch reports
+   its measurements un-nested still reaches them through that typed path.
 4. **Adding a monitor must not touch shared code.** One registry entry + one page stub +
    sample payloads + one test module. If a new monitor forces an edit to `transforms.py` or
    `incident_table.py`, generalise the component instead of special-casing.
 5. **Read-only.** No mute, assign, re-crawl, or send-email actions. A copyable email
-   draft is the only output. CSV export was removed from the header on request — do not
+   draft is the only output; what it says about an incident comes off the registry entry
+   (`entity`, `email_fields`, `summary_field`), never a monitor id in the renderer. CSV export was removed from the header on request — do not
    reintroduce a download button without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
@@ -120,6 +134,30 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_DOCS_URL` | Runbooks site the sidebar links out to, default the project's GitHub Pages URL |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
 
+## Monitor card states
+
+A card's visualisation is declared per monitor — `Monitor.viz` is a `Sparkline` (the
+default) or a `Gauge` — and `components.overview_page.tile_chart` dispatches on it. Adding a
+third is one variant in `monitors/tile_viz.py`, one builder returning `alt.Chart | None`, and
+one `case`; switching a card between them is one line in its registry entry.
+
+`CRITICAL` / `WARNING` / `HEALTHY` / `NO DATA` on an overview card is computed from the
+monitor's own daily series, not configured: `monitors/health.py` runs a Theil-Sen slope
+(relative to the series' own level, so it is scale-free), a tie-corrected Mann-Kendall
+p-value and an Iglewicz-Hoaglin modified z-score for a step change, and the past-threshold
+series escalates on top. The overview therefore reads every monitor's trend
+(`repository.fetch_monitor_trends`) and falls back to the `/summary` sparkline for a monitor
+whose trend endpoint is not deployed. Which way is bad is per monitor: `Monitor.health` is a
+`HealthPolicy`, and a monitor whose figure is a volume rather than a fault count declares
+`Direction.DOWN_IS_BAD` — every rule runs on the oriented series, so there is no second code
+path for it.
+
+A monitor with **no series at all** is the one exception: `viz=Gauge(benchmark=…)` makes
+`monitors/gauge.assess_benchmark` produce the verdict from that benchmark instead, returning
+the same `Health` type so the chip, tone and sidebar pill run through unchanged code. Its
+`movement` is always unknown and its `points` zero, so the card claims no trend it cannot
+support. `docs/adding-a-dashboard.md` §7 "Card state" is the full account.
+
 ## The `/summary` contract
 
 Every count in `BUILD_BRIEF.md` §3 is `int | None`. A deployment sends `null` for a figure
@@ -137,13 +175,16 @@ zero. `monitors.overview.format_delta` owns the sign convention.
 ## Testing bar
 
 - `pytest` must pass. Coverage on `src/stewards/{monitors,components,api}` ≥ 90%, project
-  ≥ 80%. Currently 100% / 99% / 100% and 99% overall.
+  ≥ 80%. Currently 100% / 99% / 99% and 99% overall.
 - Every pure function gets: a happy path, an empty-input case, and one boundary case
   (`days_open == threshold`, zero rows, null score, missing optional field).
 - API client tested with `respx` against fixtures — including 401, 500, a timeout, a
   malformed payload and a two-page paginated response. Never hit the network in tests.
 - Threshold arithmetic has its own module, `tests/unit/test_thresholds.py`; it is the logic
   most likely to be quietly wrong.
+- `tests/unit/test_health.py` owns the trend arithmetic, the other logic most likely to be
+  quietly wrong: every rule is asserted at its boundary and the direction parameter is
+  asserted to be a mirror of itself rather than a second code path.
 - `tests/unit/test_registry.py` parametrises over the whole registry, so every future
   monitor is validated for free — ids, page module, sample payload, resolvable column and
   filter fields, detail model.
@@ -200,8 +241,8 @@ uv run mypy src
   `st.line_chart` cannot draw a dashed series or a transparent plot area. Tile sparklines
   are axis-less; the trend chart is solid teal over dashed red.
 - Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
-- Route URLs drop the filename's numeric prefix: `views/12_http_failures.py` serves
-  `/http_failures`.
+- Route URLs drop the filename's numeric prefix: `views/12_feed_ingestion_errors.py` serves
+  `/feed_ingestion_errors`.
 - `layout.render_header` requires a `Meta`: every page it serves is backed by the daily
   batch, so the snapshot line is never optional.
 

@@ -8,6 +8,7 @@ once a day, so the cache is deliberately generous and there is no refresh button
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import date
 
 import streamlit as st
@@ -15,8 +16,8 @@ from pydantic import BaseModel, ValidationError
 
 from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
-from stewards.api.errors import ApiContractError
-from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
+from stewards.api.errors import ApiContractError, ApiError
+from stewards.api.models import IncidentPage, SummaryResponse, TrendPoint, TrendResponse
 
 log = logging.getLogger(__name__)
 
@@ -94,6 +95,44 @@ def _fetch_trend(
     return _parse(TrendResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
+def _fetch_trend_points(
+    monitor_id: str,
+    days: int = 30,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> tuple[TrendPoint, ...]:
+    """One monitor's daily series, empty when this deployment does not serve it.
+
+    The same tolerance `_fetch_monitor_trends` applies for the overview, for the monitor's
+    own page: a trend endpoint that is not live costs that page its chart, never its
+    incidents. A monitor page that could not load its *incidents* still fails loudly.
+    """
+    try:
+        return _fetch_trend(monitor_id, days, client=client, as_of=as_of).data
+    except ApiError as exc:
+        log.info("No trend series for %s: %s", monitor_id, exc)
+        return ()
+
+
+def _fetch_monitor_trends(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, tuple[TrendPoint, ...]]:
+    """Each monitor's daily series, for the overview card states and the sidebar badges.
+
+    A monitor whose trend endpoint this deployment has not built yet is left out of the
+    mapping rather than raising: the overview judges it on the sparkline in `/summary`
+    instead, and one missing endpoint must not cost the whole page.
+    """
+    trends: dict[str, tuple[TrendPoint, ...]] = {}
+    for monitor_id in monitor_ids:
+        points = _fetch_trend_points(monitor_id, client=client, as_of=as_of)
+        if points:
+            trends[monitor_id] = points
+    return trends
+
+
 def _fetch_contact_queue(
     client: StewardsClient | None = None, as_of: date | None = None
 ) -> IncidentPage:
@@ -113,8 +152,13 @@ def fetch_incidents(monitor_id: str) -> IncidentPage:
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_trend(monitor_id: str, days: int = 30) -> TrendResponse:
-    return _fetch_trend(monitor_id, days)
+def fetch_trend_points(monitor_id: str, days: int = 30) -> tuple[TrendPoint, ...]:
+    return _fetch_trend_points(monitor_id, days)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_monitor_trends(monitor_ids: tuple[str, ...]) -> dict[str, tuple[TrendPoint, ...]]:
+    return _fetch_monitor_trends(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading contact queue…")

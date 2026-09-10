@@ -1,0 +1,165 @@
+{
+  "data": [
+    {
+      "monitor_id": "dataset_stall",
+      "publisher_id": "pub_shirley-high-school",
+      "publisher_name": "Shirley High School",
+      "dataset_url": "https://shirleyhighschool.bookteq.com/api/open-active",
+      "dataset_name": "Shirley High School Facilities",
+      "feed_count": 2,
+      "first_detected": "2026-09-01",
+      "days_open": 9,
+      "consecutive_days": 9,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        404,
+        null,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "detail": {
+        "last_modified": "2026-09-01",
+        "feeds": [
+          {
+            "feed_id": "shirleyhighschool-bookteq-com-api-open-active-slots",
+            "feed_name": "slots",
+            "last_published": "2026-09-01",
+            "consecutive_days": 9
+          },
+          {
+            "feed_id": "shirleyhighschool-bookteq-com-api-open-active-facility-uses",
+            "feed_name": "facility-uses",
+            "last_published": null,
+            "consecutive_days": null
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_stall",
+      "publisher_id": "pub_leisure-sk",
+      "publisher_name": "Leisure SK",
+      "dataset_url": "https://leisuresk.example.org/OpenActive",
+      "dataset_name": "Leisure SK Sessions and Facilities",
+      "feed_count": 3,
+      "first_detected": "2026-08-14",
+      "days_open": 7,
+      "consecutive_days": 7,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        112,
+        98,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "detail": {
+        "last_modified": "2026-08-14",
+        "feeds": [
+          {
+            "feed_id": "leisuresk-example-org-openactive-session-series",
+            "feed_name": "session-series",
+            "last_published": "2026-08-14",
+            "consecutive_days": 7
+          },
+          {
+            "feed_id": "leisuresk-example-org-openactive-scheduled-sessions",
+            "feed_name": "scheduled-sessions",
+            "last_published": "2026-08-12",
+            "consecutive_days": 9
+          },
+          {
+            "feed_id": "leisuresk-example-org-openactive-facility-uses",
+            "feed_name": "facility-uses",
+            "last_published": null,
+            "consecutive_days": null
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_stall",
+      "publisher_id": "pub_conwy",
+      "publisher_name": "Conwy",
+      "dataset_url": "https://conwy.example.org/openactive",
+      "dataset_name": "Conwy Sessions",
+      "feed_count": 2,
+      "first_detected": "2026-08-16",
+      "days_open": 5,
+      "consecutive_days": 5,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        40,
+        38,
+        null,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "detail": {
+        "last_modified": "2026-08-16",
+        "feeds": [
+          {
+            "feed_id": "conwy-example-org-openactive-session-series",
+            "feed_name": "session-series",
+            "last_published": "2026-08-16",
+            "consecutive_days": 5
+          },
+          {
+            "feed_id": "conwy-example-org-openactive-scheduled-sessions",
+            "feed_name": "scheduled-sessions",
+            "last_published": "2026-08-15",
+            "consecutive_days": 6
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_stall",
+      "publisher_id": "pub_unknown",
+      "publisher_name": "",
+      "dataset_url": "https://unnamed.example.org/OpenActive",
+      "dataset_name": "unnamed.example.org",
+      "feed_count": 1,
+      "first_detected": "2026-08-09",
+      "days_open": 12,
+      "consecutive_days": 12,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [],
+      "detail": {
+        "last_modified": null,
+        "feeds": []
+      }
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 4
+  }
+}

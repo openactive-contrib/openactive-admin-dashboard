@@ -55,6 +55,7 @@ def render_footer(query: str, *, note: str = "") -> None:
     if query:
         st.caption(f"`{query}`")
 
+
 def tone_metric(
     label: str,
     value: str,

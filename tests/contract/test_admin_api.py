@@ -152,7 +152,7 @@ def test_the_real_payload_fills_every_column_the_registry_declares(
     assert frame["Days stalled"].tolist() == ["13d", "7d", "1d", "5d"]
     assert set(frame["Status"]) == {"Open"}
     # The null point is dropped: LineChartColumn needs numbers, or the cell renders as text.
-    assert frame["30d trend"].tolist()[-1] == [1.0, 2.0, 4.0, 5.0]
+    assert frame["Recent trend"].tolist()[-1] == [1.0, 2.0, 4.0, 5.0]
 
 
 # --- the fleet-wide endpoints -------------------------------------------------------------
@@ -213,11 +213,11 @@ def test_an_endpoint_that_is_not_deployed_yet_surfaces_as_not_found(
     client: StewardsClient,
 ) -> None:
     """What every unbuilt endpoint does today: the server 404s, the page says so."""
-    for path in ("/admin/http-failure-incidents", "/admin/contact-queue"):
+    for path in ("/admin/feed-ingestion-error-incidents", "/admin/contact-queue"):
         respx.get(f"{BASE}{path}").mock(
             return_value=httpx.Response(404, json={"error": "unknown report"})
         )
     with pytest.raises(ApiNotFound):
-        _fetch_incidents("http_failure", client, as_of=AS_OF)
+        _fetch_incidents("feed_ingestion_error", client, as_of=AS_OF)
     with pytest.raises(ApiNotFound):
         _fetch_contact_queue(client, as_of=AS_OF)

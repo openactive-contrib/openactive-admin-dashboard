@@ -26,7 +26,7 @@ def column_config(columns: Sequence[Col]) -> dict[str, Any]:
                 config[col.label] = st.column_config.NumberColumn(
                     col.label, format="%d", help=col.help
                 )
-            case ColKind.PERCENT | ColKind.SCORE:
+            case ColKind.PERCENT | ColKind.SCORE | ColKind.RISK:
                 config[col.label] = st.column_config.ProgressColumn(
                     col.label, min_value=0, max_value=100, format="%d", help=col.help
                 )

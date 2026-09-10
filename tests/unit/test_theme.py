@@ -247,7 +247,7 @@ def test_the_card_surface_is_the_white_surface_on_the_canvas() -> None:
 def test_card_keys_carry_the_prefix_the_stylesheet_targets() -> None:
     from stewards.components.surface import CARD_PREFIX, card_key
 
-    assert card_key("tile_http_failure").startswith(CARD_PREFIX)
+    assert card_key("tile_feed_ingestion_error").startswith(CARD_PREFIX)
     assert CARD_PREFIX in _card_selector()
 
 

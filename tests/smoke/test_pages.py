@@ -16,11 +16,27 @@ VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 PAGES = [
     "00_overview.py",
     "01_contact_queue.py",
-    "10_single_feed_stalls.py",
-    "12_http_failures.py",
+    "10_dataset_stalls.py",
+    "11_single_feed_stalls.py",
+    "12_feed_ingestion_errors.py",
+    "22_dataset_orphaned_children.py",
 ]
 
-MONITOR_PAGES = ["10_single_feed_stalls.py", "12_http_failures.py"]
+MONITOR_PAGES = [
+    "10_dataset_stalls.py",
+    "11_single_feed_stalls.py",
+    "12_feed_ingestion_errors.py",
+    "22_dataset_orphaned_children.py",
+]
+
+#: Page filename -> registry id, so the counts a page must render are read from the monitor
+#: rather than hard-coded per page.
+MONITOR_IDS = {
+    "10_dataset_stalls.py": "dataset_stall",
+    "11_single_feed_stalls.py": "single_feed_stall",
+    "12_feed_ingestion_errors.py": "feed_ingestion_error",
+    "22_dataset_orphaned_children.py": "dataset_orphaned_children",
+}
 
 
 def run(name: str) -> AppTest:
@@ -59,24 +75,28 @@ def test_every_page_states_the_snapshot(name: str) -> None:
 
 @pytest.mark.parametrize("name", MONITOR_PAGES)
 def test_monitor_page_has_three_metrics_a_chart_and_one_table(name: str) -> None:
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor(MONITOR_IDS[name])
     app = run(name)
+    # One table: the row-detail tables render only once a row is selected.
     assert len(app.dataframe) == 1
-    assert len(app.toggle) == 1
-    assert len(app.selectbox) == 2
+    assert len(app.toggle) == (1 if monitor.has_threshold_filter else 0)
+    assert len(app.selectbox) == len(monitor.filters)
     assert len(app.text_input) == 1
 
 
 def test_monitor_page_table_carries_every_declared_column() -> None:
     from stewards.monitors.registry import get_monitor
 
-    app = run("10_single_feed_stalls.py")
+    app = run("11_single_feed_stalls.py")
     frame = app.dataframe[0].value
     assert list(frame.columns) == [c.label for c in get_monitor("single_feed_stall").columns]
     assert len(frame) == 23
 
 
 def test_threshold_toggle_narrows_the_table() -> None:
-    app = run("10_single_feed_stalls.py")
+    app = run("11_single_feed_stalls.py")
     assert len(app.dataframe[0].value) == 23
     app.toggle[0].set_value(True).run()
     assert len(app.dataframe[0].value) == 7
@@ -84,14 +104,14 @@ def test_threshold_toggle_narrows_the_table() -> None:
 
 
 def test_search_narrows_the_table() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.text_input[0].set_value("halo").run()
     assert len(app.dataframe[0].value) == 1
     assert not app.exception
 
 
 def test_search_with_no_match_renders_an_empty_state_not_an_error() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.text_input[0].set_value("no-such-publisher").run()
     assert not app.exception
     assert not app.dataframe
@@ -99,7 +119,7 @@ def test_search_with_no_match_renders_an_empty_state_not_an_error() -> None:
 
 
 def test_selectbox_filter_narrows_the_table() -> None:
-    app = run("12_http_failures.py")
+    app = run("12_feed_ingestion_errors.py")
     app.selectbox[0].set_value("503").run()
     assert not app.exception
     assert len(app.dataframe[0].value) == 2
@@ -127,6 +147,25 @@ def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
     assert len(app.get("vega_lite_chart")) == len(MONITOR_REGISTRY)
 
 
+def test_each_tile_says_which_way_its_series_is_moving() -> None:
+    """A tile judged on a daily series states the movement; one judged on a benchmark says so.
+
+    A monitor with no history has no movement to report, and inventing one is the whole
+    thing `monitors.gauge` exists to avoid — so its card names the benchmark instead.
+    """
+    from stewards.monitors.registry import MONITOR_REGISTRY
+    from stewards.monitors.tile_viz import Sparkline
+
+    app = run("00_overview.py")
+    captions = [caption.value for caption in app.caption]
+    text = " ".join(captions) + " ".join(m.value for m in app.markdown)
+    series_tiles = [m for m in MONITOR_REGISTRY if isinstance(m.viz, Sparkline)]
+    assert sum("snapshots" in caption for caption in captions) == len(series_tiles)
+    for monitor in MONITOR_REGISTRY:
+        if not isinstance(monitor.viz, Sparkline):
+            assert "benchmark" in text
+
+
 def test_overview_banner_names_the_threshold() -> None:
     app = run("00_overview.py")
     assert any("7-day" in warning.value for warning in app.warning)
@@ -136,7 +175,7 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
     app = run("01_contact_queue.py")
     frame = app.dataframe[0].value
     assert len(frame) == 10
-    assert set(frame["Monitor"]) == {"Single-feed stalls", "HTTP endpoint failures"}
+    assert set(frame["Monitor"]) == {"Single-feed stalls", "Feed ingestion errors"}
 
 
 # --- the entry point ---------------------------------------------------------------------

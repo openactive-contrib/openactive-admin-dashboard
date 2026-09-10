@@ -14,7 +14,7 @@ from stewards.monitors.registry import (
     Monitor,
     Severity,
 )
-from stewards.monitors.transforms import resolve_field
+from stewards.monitors.transforms import detail_caption, detail_items, expand, resolve_field
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "src" / "stewards"
 SAMPLE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -65,16 +65,30 @@ def test_sample_payload_exists(monitor: Monitor) -> None:
 def test_every_column_field_resolves_against_the_payload(monitor: Monitor) -> None:
     page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
     assert page.data, f"{monitor.id} sample payload has no incidents"
-    for incident in page.data:
+    rows = expand(monitor, page.data)
+    assert rows, f"{monitor.id} sample payload expands to no rows"
+    for row in rows:
         for col in monitor.columns:
-            resolve_field(monitor, incident, col.field)  # must not raise
+            resolve_field(monitor, row, col.field)  # must not raise
+
+
+def test_every_declared_column_reports_a_value_somewhere(monitor: Monitor) -> None:
+    """A column no payload row can fill is a typo in the field path, not a sparse column."""
+    rows = expand(
+        monitor, IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents")).data
+    )
+    for col in monitor.columns:
+        assert any(resolve_field(monitor, row, col.field) is not None for row in rows), (
+            f"{monitor.id} column {col.field!r} resolves to None on every payload row"
+        )
 
 
 def test_declared_filters_resolve_and_are_labelled(monitor: Monitor) -> None:
     page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    rows = expand(monitor, page.data)
     for spec in monitor.filters:
         assert spec.label
-        assert any(resolve_field(monitor, i, spec.field) is not None for i in page.data)
+        assert any(resolve_field(monitor, row, spec.field) is not None for row in rows)
 
 
 def test_detail_model_validates_every_payload_detail(monitor: Monitor) -> None:
@@ -90,3 +104,59 @@ def test_payload_monitor_id_matches_the_registry(monitor: Monitor) -> None:
 
 def test_meta_chips_state_the_threshold(monitor: Monitor) -> None:
     assert f"contact after {monitor.threshold_days}d" in monitor.meta_chips
+
+
+def test_a_declared_row_detail_resolves_against_the_payload(monitor: Monitor) -> None:
+    """Its list field, its columns and its caption's count field must all be real paths."""
+    spec = monitor.row_detail
+    if spec is None:
+        return
+    assert spec.title
+    assert spec.caption
+    assert spec.columns[0].primary
+    labels = [col.label for col in spec.columns]
+    assert len(labels) == len(set(labels)), f"{monitor.id} row detail reuses a column label"
+
+    page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    seen = [detail_items(monitor, incident, spec) for incident in page.data]
+    assert any(seen), f"{monitor.id} declares a row detail no payload row fills"
+    for incident, rows in zip(page.data, seen, strict=True):
+        # The caption must format cleanly whether or not the count field is reported.
+        assert "{count}" not in detail_caption(monitor, incident, spec)
+        for row in rows:
+            for col in spec.columns:
+                resolve_field(monitor, row, col.field)  # must not raise
+
+
+def test_a_row_detail_column_reports_a_value_somewhere(monitor: Monitor) -> None:
+    spec = monitor.row_detail
+    if spec is None:
+        return
+    page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    rows = [row for incident in page.data for row in detail_items(monitor, incident, spec)]
+    for col in spec.columns:
+        assert any(resolve_field(monitor, row, col.field) is not None for row in rows), (
+            f"{monitor.id} row-detail column {col.field!r} resolves to None on every item"
+        )
+
+
+def test_the_identifying_email_fields_resolve_against_the_payload(monitor: Monitor) -> None:
+    """A label with an unresolvable path would put a permanent em dash in publisher copy."""
+    assert monitor.email_fields, f"{monitor.id} names nothing in its email"
+    assert monitor.entity
+    labels = [label for label, _ in monitor.email_fields]
+    assert len(labels) == len(set(labels)), f"{monitor.id} reuses an email label"
+
+    page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    for label, path in monitor.email_fields:
+        assert label
+        assert any(resolve_field(monitor, i, path) is not None for i in page.data), (
+            f"{monitor.id} email field {path!r} resolves to None on every payload row"
+        )
+
+
+def test_the_queue_summary_field_resolves_against_the_payload(monitor: Monitor) -> None:
+    """It identifies the row in the contact queue and seeds the page's search."""
+    page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    rows = expand(monitor, page.data)
+    assert any(resolve_field(monitor, row, monitor.summary_field) is not None for row in rows)

@@ -40,17 +40,17 @@ def test_queue_is_oldest_first(contact_queue_page: IncidentPage) -> None:
 def test_one_publisher_failing_two_monitors_appears_once_per_monitor() -> None:
     rows = [
         incident("single_feed_stall", "Halo Leisure", 12),
-        incident("http_failure", "Halo Leisure", 9),
+        incident("feed_ingestion_error", "Halo Leisure", 9),
     ]
     frame = contact_queue.to_dataframe(rows)
     assert list(frame["Publisher"]) == ["Halo Leisure", "Halo Leisure"]
-    assert list(frame["Monitor"]) == ["Single-feed stalls", "HTTP endpoint failures"]
+    assert list(frame["Monitor"]) == ["Single-feed stalls", "Feed ingestion errors"]
     assert list(frame["Days open"]) == ["12d", "9d"]
 
 
 def test_monitor_column_uses_the_registry_name() -> None:
-    frame = contact_queue.to_dataframe([incident("http_failure", "Halo Leisure", 9)])
-    assert frame.iloc[0]["Monitor"] == "HTTP endpoint failures"
+    frame = contact_queue.to_dataframe([incident("feed_ingestion_error", "Halo Leisure", 9)])
+    assert frame.iloc[0]["Monitor"] == "Feed ingestion errors"
 
 
 def test_detail_column_uses_the_monitor_summary_field() -> None:

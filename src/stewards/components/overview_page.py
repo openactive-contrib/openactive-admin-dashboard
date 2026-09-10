@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import altair as alt
 import streamlit as st
 
 from stewards.api import repository
@@ -11,8 +12,11 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
+from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import Tile, build_tiles, format_count, format_delta
+from stewards.monitors.registry import monitor_ids
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.tile_viz import Gauge
 from stewards.monitors.transforms import EMPTY
 from stewards.monitors.trend import sparkline_chart
 
@@ -105,8 +109,29 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
             nav.switch_to("contact_queue")
 
 
+def tile_chart(tile: Tile) -> alt.Chart | alt.LayerChart | None:
+    """The tile's visualisation, as its monitor declares it.
+
+    None means draw nothing: a series too short to plot, or a figure the snapshot did not
+    report. Adding a visualisation is one `TileViz` variant, one builder and one case here —
+    no page or tile learns about it.
+    """
+    colour = theme.FOREGROUND[tile.state]
+    match tile.monitor.viz:
+        case Gauge() as spec:
+            return gauge_chart(
+                tile.count,
+                spec,
+                value_colour=colour,
+                track_colour=theme.SURFACE_SUNKEN,
+                benchmark_colour=theme.INK_SOFTER,
+            )
+        case _:
+            return sparkline_chart(tile.sparkline, colour)
+
+
 def render_tile(tile: Tile) -> None:
-    """Name and state chip, then the count beside its sparkline, then the note and a link."""
+    """Name and state chip, then the count beside its chart, then the note and a link."""
     colour = theme.markdown_colour(tile.state)
     with card(f"tile_{tile.monitor.id}"):
         with st.container(
@@ -122,9 +147,12 @@ def render_tile(tile: Tile) -> None:
                 "", tile.value, tile.state, slug=f"tile{tile.monitor.id}", sub=tile.monitor.unit
             )
         with spark_col:
-            chart = sparkline_chart(tile.sparkline, theme.FOREGROUND[tile.state])
+            chart = tile_chart(tile)
             if chart is not None:
                 st.altair_chart(chart, width="stretch")
+
+        if tile.trend_note:
+            st.caption(tile.trend_note)
 
         st.divider()
         with st.container(
@@ -145,7 +173,10 @@ def render_overview_page() -> None:
         return
 
     summary = response.data
-    tiles = build_tiles(summary)
+    # The card states are judged on each monitor's daily series; `fetch_monitor_trends`
+    # leaves out a monitor whose trend endpoint this deployment does not serve, and that
+    # monitor is judged on the sparkline in the summary instead.
+    tiles = build_tiles(summary, repository.fetch_monitor_trends(monitor_ids()))
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"
         if summary.publishers_monitored
