@@ -95,6 +95,25 @@ def _fetch_trend(
     return _parse(TrendResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
+def _fetch_trend_points(
+    monitor_id: str,
+    days: int = 30,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> tuple[TrendPoint, ...]:
+    """One monitor's daily series, empty when this deployment does not serve it.
+
+    The same tolerance `_fetch_monitor_trends` applies for the overview, for the monitor's
+    own page: a trend endpoint that is not live costs that page its chart, never its
+    incidents. A monitor page that could not load its *incidents* still fails loudly.
+    """
+    try:
+        return _fetch_trend(monitor_id, days, client=client, as_of=as_of).data
+    except ApiError as exc:
+        log.info("No trend series for %s: %s", monitor_id, exc)
+        return ()
+
+
 def _fetch_monitor_trends(
     monitor_ids: Sequence[str],
     client: StewardsClient | None = None,
@@ -108,10 +127,9 @@ def _fetch_monitor_trends(
     """
     trends: dict[str, tuple[TrendPoint, ...]] = {}
     for monitor_id in monitor_ids:
-        try:
-            trends[monitor_id] = _fetch_trend(monitor_id, client=client, as_of=as_of).data
-        except ApiError as exc:
-            log.info("No trend series for %s: %s", monitor_id, exc)
+        points = _fetch_trend_points(monitor_id, client=client, as_of=as_of)
+        if points:
+            trends[monitor_id] = points
     return trends
 
 
@@ -134,8 +152,8 @@ def fetch_incidents(monitor_id: str) -> IncidentPage:
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_trend(monitor_id: str, days: int = 30) -> TrendResponse:
-    return _fetch_trend(monitor_id, days)
+def fetch_trend_points(monitor_id: str, days: int = 30) -> tuple[TrendPoint, ...]:
+    return _fetch_trend_points(monitor_id, days)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)

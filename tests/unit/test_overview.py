@@ -12,6 +12,7 @@ from stewards.monitors.overview import (
     MINUS,
     NavBadge,
     build_tiles,
+    format_badge,
     format_count,
     format_delta,
     monitor_health,
@@ -25,6 +26,7 @@ from stewards.monitors.overview import (
 )
 from stewards.monitors.registry import MONITOR_REGISTRY, Severity, get_monitor
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.tile_viz import Gauge, Sparkline
 
 
 def counts(
@@ -286,7 +288,11 @@ def test_an_all_clear_snapshot_reads_green(payload) -> None:
 
 
 def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) -> None:
-    assert sidebar_counts(summary.data) == {"single_feed_stall": 23, "feed_ingestion_error": 9}
+    assert sidebar_counts(summary.data) == {
+        "single_feed_stall": 23,
+        "feed_ingestion_error": 9,
+        "dataset_orphaned_children": 590056,
+    }
 
 
 def test_sidebar_counts_skips_a_monitor_whose_count_is_null() -> None:
@@ -376,3 +382,114 @@ def test_the_live_admin_summary_parses_with_its_nulls(payload) -> None:
     assert format_count(summary.publishers_monitored) == "179"
     assert format_delta(summary.open_incidents_delta) is None
     assert format_delta(summary.past_threshold_delta) == "+2"
+
+
+# --- a monitor judged on a benchmark rather than on a series -------------------------------
+
+ORPHANS = get_monitor("dataset_orphaned_children")
+BENCHMARK = 785_000
+
+
+def test_a_gauge_monitor_is_judged_on_its_benchmark_not_on_its_sparkline() -> None:
+    """It has no sparkline to be judged on: the batch sends an empty one."""
+    assert isinstance(ORPHANS.viz, Gauge)
+    health = monitor_health(ORPHANS, counts(BENCHMARK, monitor_id=ORPHANS.id))
+    assert health.state is HealthState.WARNING
+    assert "benchmark" in health.reason
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (0, HealthState.HEALTHY),
+        (700_000, HealthState.HEALTHY),
+        (784_293, HealthState.WARNING),
+        (2_000_000, HealthState.CRITICAL),
+    ],
+)
+def test_the_gauge_bands_decide_the_card_state(count: int, expected: HealthState) -> None:
+    health = monitor_health(ORPHANS, counts(count, monitor_id=ORPHANS.id))
+    assert health.state is expected
+
+
+def test_a_gauge_monitor_ignores_a_trend_the_deployment_later_starts_serving() -> None:
+    """Deliberate: the benchmark is the one reference, so the chip and the meter agree.
+
+    Switching the entry back to `Sparkline` is what returns it to trend-based judgement,
+    and that is asserted below so the two paths cannot silently converge.
+    """
+    rising = trend((1, 2, 3, 4, 5, 6, 7))
+    with_trend = monitor_health(ORPHANS, counts(700_000, monitor_id=ORPHANS.id), rising)
+    without = monitor_health(ORPHANS, counts(700_000, monitor_id=ORPHANS.id))
+    assert with_trend == without
+    assert with_trend.state is HealthState.HEALTHY
+
+
+def test_a_sparkline_monitor_is_still_judged_on_its_series() -> None:
+    stalls = get_monitor("single_feed_stall")
+    assert isinstance(stalls.viz, Sparkline)
+    rising = trend((5, 8, 12, 18, 26, 38, 55))
+    assert monitor_health(stalls, counts(55), rising).state is HealthState.CRITICAL
+
+
+def test_a_null_count_is_unknown_even_for_a_gauge_monitor() -> None:
+    """An unreported figure is decisive whatever reference the monitor uses."""
+    health = monitor_health(ORPHANS, counts(None, monitor_id=ORPHANS.id))
+    assert health.state is HealthState.UNKNOWN
+
+
+def test_a_gauge_tile_says_where_it_stands_instead_of_naming_a_day_threshold() -> None:
+    """The contact threshold counts days, which this monitor's incidents do not have."""
+    note = tile_note(ORPHANS, 784_293, 0)
+    assert "785,000 benchmark" in note
+    assert "7-day" not in note
+    assert "threshold" not in note
+
+
+def test_a_gauge_tile_still_reports_an_empty_snapshot_as_all_clear() -> None:
+    assert tile_note(ORPHANS, 0, 0) == "no open incidents in this snapshot"
+
+
+def test_a_gauge_tile_carries_no_trend_line_it_cannot_support(summary) -> None:
+    tile = next(t for t in build_tiles(summary.data) if t.monitor.id == ORPHANS.id)
+    assert tile.sparkline == ()
+    assert tile.trend_note == ""
+    assert "benchmark" in tile.note
+
+
+# --- the sidebar pill ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (0, "0"),
+        (1, "1"),
+        (29, "29"),
+        (9_999, "9999"),
+        (10_000, "10k"),
+        (784_293, "784k"),
+        (999_999, "999k"),
+        (1_000_000, "1.0M"),
+        (1_640_000, "1.6M"),
+    ],
+)
+def test_format_badge_abbreviates_a_large_count(count: int, expected: str) -> None:
+    """A six-figure count has to stay a pill; the exact figure is on the card."""
+    assert format_badge(count) == expected
+
+
+def test_the_sidebar_pill_for_a_six_figure_monitor_is_abbreviated(summary) -> None:
+    badges = nav_badges(summary.data)
+    assert badges[ORPHANS.id].text == "590k"
+    # The two smaller monitors are unaffected: below the cutoff, the figure is exact.
+    assert badges["single_feed_stall"].text == "23"
+    assert badges["feed_ingestion_error"].text == "9"
+
+
+def test_the_sidebar_pill_takes_its_tone_from_the_same_verdict_as_the_card(summary) -> None:
+    badges = nav_badges(summary.data)
+    tiles = {tile.monitor.id: tile for tile in build_tiles(summary.data)}
+    for monitor_id, badge in badges.items():
+        if monitor_id in tiles:
+            assert badge.tone is tiles[monitor_id].state

@@ -469,3 +469,185 @@ def test_the_gate_renders_the_login_screen_when_nobody_is_signed_in() -> None:
     """Regression: with the gate on, `st.user` carries no usable identity keys yet."""
     app = run(_gate_before_login_script)
     assert any("Continue with Google" in b.label for b in app.button)
+
+
+# --- a monitor page whose trend endpoint is not live ---------------------------------------
+
+
+def _monitor_page_missing_trend_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.monitor_page import render_monitor_page
+    from stewards.monitors.registry import get_monitor
+
+    def missing(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no trend endpoint here")
+
+    st.cache_data.clear()
+    original = repository._fetch_trend
+    repository._fetch_trend = missing  # type: ignore[assignment]
+    try:
+        render_monitor_page(get_monitor("single_feed_stall"))
+    finally:
+        repository._fetch_trend = original
+        st.cache_data.clear()
+
+
+def test_a_monitor_page_survives_a_trend_endpoint_that_is_not_live() -> None:
+    """The regression this guards: the trend read used to share the incidents' try block,
+    so a 404 on the chart took the KPIs, filters and table down with it — on a page whose
+    incidents had loaded perfectly well."""
+    app = run(_monitor_page_missing_trend_script)
+    assert not app.error
+    # The page is whole: header with its snapshot, three KPIs, the filters, the table.
+    assert len(app.dataframe) == 1
+    assert len(app.dataframe[0].value) == 23
+    assert len(app.text_input) == 1
+    assert any("Snapshot" in m.value for m in app.markdown)
+    # Only the chart is missing, and the page says so rather than showing an empty axis.
+    assert not app.get("vega_lite_chart")
+    assert any("No trend history" in caption.value for caption in app.caption)
+
+
+def _orphan_page_script() -> None:
+    from stewards.components.monitor_page import render_monitor_page
+    from stewards.monitors.registry import get_monitor
+
+    render_monitor_page(get_monitor("dataset_orphaned_children"))
+
+
+def test_a_gauge_monitor_shows_its_benchmark_where_the_trend_chart_would_be() -> None:
+    """Its trend endpoint 404s in this deployment — see tests/smoke/conftest.py."""
+    app = run(_orphan_page_script)
+    text = " ".join(
+        [
+            *(c.value for c in app.caption),
+            *(m.value for m in app.markdown),
+            *(h.value for h in app.subheader),
+        ]
+    )
+    assert "benchmark of 785,000" in text
+    assert "no trend to judge" in text
+    # The meter is drawn, unlike the empty trend chart it stands in for.
+    assert len(app.get("vega_lite_chart")) == 1
+
+
+def test_the_orphan_page_leads_with_the_orphan_count_not_the_dataset_count() -> None:
+    app = run(_orphan_page_script)
+    text = " ".join(m.value for m in app.markdown)
+    # The quantity, matching the summary card, not the seven datasets carrying it.
+    assert "590,056" in text
+    assert "orphaned children" in text.lower()
+    assert "PUBLISHERS AFFECTED" in text
+
+
+def test_selecting_an_orphan_row_offers_the_email_draft_and_the_missing_parents() -> None:
+    app = run(_orphan_page_script)
+    frame = app.dataframe[0].value
+    assert list(frame.columns)[:3] == ["Publisher", "Dataset", "Child type"]
+    # Two rows for a dataset the batch broke down by both child types.
+    assert list(frame["Publisher"]).count("Played") == 2
+
+
+# --- the missing-parents table a selected row opens ---------------------------------------
+
+
+def _missing_parents_script() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import IncidentPage
+    from stewards.components.monitor_page import render_missing_parents
+    from stewards.monitors.registry import get_monitor
+
+    page = IncidentPage.model_validate(load_sample("dataset_orphaned_children_incidents"))
+    render_missing_parents(get_monitor("dataset_orphaned_children"), page.data[0])
+
+
+def test_the_missing_parents_table_names_the_parents_and_their_children() -> None:
+    app = run(_missing_parents_script)
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == ["Missing parent id", "Children affected"]
+    assert len(frame) == 3
+    # Worst first, as the API reports them.
+    assert list(frame["Children affected"]) == sorted(frame["Children affected"], reverse=True)
+    assert all("facility-uses" in value for value in frame["Missing parent id"])
+    assert any("59" in caption.value for caption in app.caption)
+
+
+def _missing_parents_absent_script() -> None:
+    import streamlit as st
+
+    from stewards.api.models import Incident
+    from stewards.components.monitor_page import render_missing_parents
+    from stewards.monitors.registry import get_monitor
+
+    incident = Incident.model_validate(
+        {
+            "monitor_id": "dataset_orphaned_children",
+            "publisher_id": "pub_x",
+            "publisher_name": "Publisher X",
+            "past_threshold": False,
+            "status": "open",
+            "detail": {"missing_parents": []},
+        }
+    )
+    render_missing_parents(get_monitor("dataset_orphaned_children"), incident)
+    render_missing_parents(get_monitor("single_feed_stall"), incident)
+    st.write("done")
+
+
+def test_a_row_with_no_missing_parents_renders_no_table_at_all() -> None:
+    """And neither does a monitor whose detail model has no such field — no id branching."""
+    app = run(_missing_parents_absent_script)
+    assert not app.dataframe
+    assert not app.expander
+
+
+def _benchmark_unreported_script() -> None:
+    from stewards.components.trend_chart import render_figure
+    from stewards.monitors.registry import get_monitor
+
+    render_figure(get_monitor("dataset_orphaned_children"), (), None)
+
+
+def test_a_benchmark_with_no_figure_says_so_rather_than_drawing_an_empty_meter() -> None:
+    app = run(_benchmark_unreported_script)
+    assert not app.get("vega_lite_chart")
+    assert any("does not report a figure" in caption.value for caption in app.caption)
+
+
+def _selected_row_script() -> None:
+    import streamlit as st
+
+    from stewards.components import monitor_page
+    from stewards.components.monitor_page import render_monitor_page
+    from stewards.monitors.registry import get_monitor
+
+    def first_row(*_args: object, **_kwargs: object) -> int:
+        """Stand in for the click AppTest cannot make on an `st.dataframe`."""
+        return 0
+
+    st.cache_data.clear()
+    original = monitor_page.render_monitor_table
+    monitor_page.render_monitor_table = first_row  # type: ignore[assignment]
+    try:
+        render_monitor_page(get_monitor("dataset_orphaned_children"))
+    finally:
+        monitor_page.render_monitor_table = original
+        st.cache_data.clear()
+
+
+def test_a_selected_row_opens_its_email_draft_and_its_missing_parents() -> None:
+    """The whole point of selecting a row: who to write to, and what to tell them."""
+    app = run(_selected_row_script)
+    draft = " ".join(code.value for code in app.code)
+    assert "Subject: OpenActive data check" in draft
+    assert "orphaned children" in draft
+    # The worst dataset sorts first, so that is the row the draft is for.
+    assert "Loughborough University" in draft
+    assert "432,823 items" in draft
+    # And its missing parents, in their own table.
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == ["Missing parent id", "Children affected"]
+    assert len(frame) == 3

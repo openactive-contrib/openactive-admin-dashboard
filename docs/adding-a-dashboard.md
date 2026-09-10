@@ -59,10 +59,15 @@ Settle these before writing anything. Every one of them is a field on the regist
 | Detail fields | `detail_model` | The typed view of `Incident.detail`. Omit for a monitor with no extra fields. |
 | Contact threshold | `threshold_days` | Days before an incident is contact-due. Default 7. `days_open == threshold_days` **is** past threshold. |
 | Health policy | `health` | Which way is bad, and how fast counts as bad, for the home-page card state. The default reads a rising incident count as deterioration; a monitor whose figure is a volume declares `HealthPolicy(direction=Direction.DOWN_IS_BAD, clear_level=None)`. See "Card state" below. |
-| Filters | `filters` | One selectbox per `FilterSpec`; options are the distinct values in the snapshot. |
+| Card visualisation | `viz` | `Sparkline()` (default) draws the monitor's own daily series. `Gauge(benchmark=…)` draws this snapshot's figure against a fixed reference, for a monitor the batch reports no history for. See "Card state" below. |
+| Table rows | `rows` | `None` (default) is one table row per incident. `RowSpec("detail.<list field>", ItemModel)` explodes each incident into one row per item of that list, addressable as `part.<name>`. |
+| Table order | `sort_field` | The field the table is ordered by, descending, then publisher name. Defaults to `days_open`, which suits a monitor whose incidents age; one that measures a volume orders by the volume, e.g. `part.orphan_count`. |
+| Headline KPI | `kpi_sum_field` | `None` (default) makes the first KPI a count of incidents. Set it to make the KPI the **sum** of that field — the headline figure for a monitor that measures a quantity rather than counting faults. |
+| Filters | `filters` | One selectbox per `FilterSpec`; options are the distinct values in the snapshot. A `part.<name>` field filters the breakdown rows. |
 | KPI labels | `kpi_labels` | Three labels: count, publishers affected, past threshold. |
-| Queue summary field | `summary_field` | Which field identifies the row in the cross-monitor contact queue. Defaults to `feed_name`. |
+| Queue summary field | `summary_field` | Which field identifies the row in the cross-monitor contact queue. Defaults to `feed_name`. It also joins the page's search haystack, so a monitor identified by something other than a feed name is searchable by it. |
 | Threshold toggle | `has_threshold_filter` | `True` (default) adds the "Past threshold only" toggle to the filter row. Set `False` for an informational monitor where the threshold means nothing. |
+| Threshold help | `threshold_help` | Help text on that toggle. The default names the day count, which only makes sense for a monitor whose incidents have an age. |
 | Schedule | `schedule` | Free text shown as a meta chip, e.g. `daily 04:00 UTC · suppress 1 day`. |
 | Query name | `query` | The BigQuery/API query identifier, shown in the page footer for provenance. |
 | Page module | `page` | `views/NN_<name>.py`, relative to `src/stewards/`. |
@@ -82,12 +87,38 @@ Settle these before writing anything. Every one of them is a field on the regist
 | `DATE` | ISO date | no |
 | `DAYS` | `12d`, coloured against `threshold_days` | yes |
 | `PERCENT` / `SCORE` | `ProgressColumn` 0–100 | yes (green ≥ 80, amber ≥ 60, else red) |
+| `RISK` | `ProgressColumn` 0–100, where **high is bad** | yes (red ≥ 50, amber ≥ 20, else green) |
 | `SPARKLINE` | `LineChartColumn` from `Incident.trend` | no |
 | `STATUS` | humanised status label | yes |
 | `LINK` | `LinkColumn` showing `feed ↗` | no |
 
 The first column must have `primary=True` (asserted), and column labels must be unique
 within a monitor (asserted).
+
+`RISK` exists because `PERCENT`/`SCORE` shade a *quality* figure, where high is good. A share
+of something broken needs the opposite shading, or a wholly orphaned dataset renders green.
+
+### Field paths
+
+A `Col.field`, a `FilterSpec.field`, `sort_field` and `kpi_sum_field` all read the same three
+kinds of path:
+
+| Path | Reads |
+|---|---|
+| `days_open` | an attribute of `Incident` |
+| `detail.<name>` | a field of the monitor's `detail_model` |
+| `part.<name>` | a field of the item the row was exploded from, where the monitor declares `rows` |
+
+A `part.<name>` path on a row with no breakdown item — an incident the batch reported without
+one — falls back to `detail.<name>`. A dataset reported without a breakdown therefore produces
+exactly one row carrying its own dataset-level figures, rather than a row of blanks; and
+because it is one row, a `kpi_sum_field` total counts it once. Name the two models' fields
+alike for this to work.
+
+The API's measurements do not have to arrive nested under `detail`. `Incident` folds any
+top-level key it does not itself declare into `detail`, so a monitor whose batch reports
+`orphan_count` beside `publisher_name` reaches it as `detail.orphan_count` with no change to
+any shared model. A key present in both wins from `detail`.
 
 ## 2. The API contract
 
@@ -352,8 +383,11 @@ Both are automatic. No page code, no layout work:
 - Card state and tone come from `monitors/health.assess_monitor` over the daily series — see
   "Card state" below. The sidebar pill reuses the same assessment over the same series, so
   the two can never disagree.
-- The card's sparkline is `MonitorCount.sparkline`; fewer than two points draws nothing at
-  all rather than an empty axis.
+- The card's visualisation is whatever its `viz` declares. `Sparkline()` draws
+  `MonitorCount.sparkline`, and fewer than two points draws nothing at all rather than an
+  empty axis. `Gauge(benchmark=…)` draws this snapshot's figure against that benchmark.
+- The sidebar pill abbreviates a count of 10,000 or more (`784,293` → `784k`), because it is
+  a pill; the exact figure is on the card.
 
 ### Card state
 
@@ -390,6 +424,36 @@ arithmetic read the other way up. `clear_level=None` says the monitor has no all
 only its movement can be judged. Tune `warn_rate` and `critical_rate` per monitor if the
 defaults (1%/day and 5%/day, roughly a third in a month and a doubling in a fortnight) are
 the wrong scale for it.
+
+#### A monitor with no history: the benchmark path
+
+All of the above needs a series. A monitor whose batch reports only this snapshot's number —
+an empty `sparkline` and no trend endpoint — has none, and the arithmetic correctly says so:
+its card would read `NO DATA` forever, and its chart would draw nothing.
+
+Such a monitor declares `viz=Gauge(benchmark=…)` instead, and `monitors/gauge.py` takes over
+both the drawing and the verdict:
+
+- The benchmark sits at the **midpoint** of a track that runs to twice it, so position alone
+  says whether the figure is above or below the reference. Past twice the benchmark the bar
+  clamps; the caption still states the real multiple.
+- `assess_benchmark` returns the same `Health` the trend arithmetic returns, so the chip, the
+  tone and the sidebar pill are produced by exactly the code they always were. Bands are
+  multiples of the benchmark: above `critical_ratio` is critical, above `warn_ratio` is a
+  warning, at or below it is healthy.
+- `movement` is always `UNKNOWN` and `points` stays zero. One number carries a level and says
+  nothing about direction, so the card renders no trend line it cannot support — the same
+  reason a null count is `NO DATA` rather than an all-clear.
+
+**One reference, not two.** A `Gauge` monitor is judged on its benchmark even once its trend
+endpoint goes live, so the needle and the chip can never tell different stories. Switching
+the entry back to `viz=Sparkline()` is what returns it to trend-based judgement — one line,
+and `tests/unit/test_overview.py` asserts both paths so they cannot silently converge.
+
+The form is a meter rather than a dial deliberately: the reader's job is "above or below the
+benchmark", which position on a track answers at a glance and at tile size. Adding a third
+visualisation is one variant in `monitors/tile_viz.py`, one builder returning
+`alt.Chart | None`, and one `case` in `components/overview_page.tile_chart`.
 
 The only thing needed to make the card show real figures is the `/summary` entry for the new
 `monitor_id` — from the live API, or from `summary.json` in sample-data mode (next step).
@@ -483,7 +547,8 @@ A `tests/unit/test_<id>.py` module. Every pure function gets a happy path, an em
 case and one boundary case:
 
 - `to_dataframe(monitor, incidents)` produces the declared columns, in the declared order;
-- `days_open == threshold_days` classifies as past threshold;
+- `days_open == threshold_days` classifies as past threshold, where the monitor reports an
+  age at all;
 - an empty payload yields an empty frame with the declared columns, not an exception;
 - `monitor_kpis` counts incidents, distinct publishers and past-threshold rows;
 - the monitor appears in the home-page cards and, if it has queue rows, in the queue union.

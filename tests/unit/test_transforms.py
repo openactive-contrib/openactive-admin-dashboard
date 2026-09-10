@@ -6,24 +6,46 @@ from datetime import date
 
 import pytest
 
-from stewards.api.models import FeedIngestionErrorDetail, Incident, StallDetail
-from stewards.monitors.registry import Col, ColKind, Monitor
+from stewards.api.models import (
+    DetailModel,
+    FeedIngestionErrorDetail,
+    Incident,
+    OrphanKind,
+    StallDetail,
+)
+from stewards.monitors.registry import (
+    Col,
+    ColKind,
+    FilterSpec,
+    Group,
+    Monitor,
+    RowSpec,
+    Severity,
+)
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.transforms import (
     EMPTY,
     Kpi,
+    Row,
     apply_filters,
     cell_tone,
+    expand,
+    field_total,
     filter_options,
     format_cell,
+    incident_of,
     monitor_kpis,
     parse_detail,
+    part_of,
     rag_columns,
     resolve_field,
     search_incidents,
+    snapshot_total,
     sort_by_age,
+    sort_rows,
     to_dataframe,
     tone_frame,
+    unique_incidents,
 )
 
 
@@ -331,3 +353,237 @@ def test_a_sparkline_cell_with_no_usable_points_is_empty() -> None:
     col = Col("trend", "Recent trend", ColKind.SPARKLINE)
     assert format_cell(col, ()) == []
     assert format_cell(col, (None, None)) == []
+
+
+# --- the row: an incident, and the breakdown item it came from -----------------------------
+
+
+def kind_monitor(**overrides: object) -> Monitor:
+    """A throwaway monitor that explodes its incidents, for testing the mechanism itself."""
+    base: dict[str, object] = {
+        "id": "kinds",
+        "name": "Kinds",
+        "group": Group.CONTENT,
+        "severity": Severity.MEDIUM,
+        "blurb": "A" * 90,
+        "unit": "things",
+        "columns": (
+            Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+            Col("part.kind", "Kind", ColKind.TEXT),
+            Col("part.orphan_count", "Count", ColKind.NUMBER),
+        ),
+        "rows": RowSpec("detail.by_kind", OrphanKind),
+        "detail_model": _ByKindDetail,
+        "sort_field": "part.orphan_count",
+    }
+    return Monitor(**(base | overrides))  # type: ignore[arg-type]
+
+
+class _ByKindDetail(DetailModel):
+    by_kind: tuple[OrphanKind, ...] = ()
+
+
+def kinded(**overrides: object) -> Incident:
+    base: dict[str, object] = {
+        "monitor_id": "kinds",
+        "publisher_id": "pub_k",
+        "publisher_name": "Publisher K",
+        "past_threshold": False,
+        "status": "open",
+        "detail": {
+            "by_kind": [
+                {"kind": "Slot", "orphan_count": 5, "checked_count": 10},
+                {"kind": "ScheduledSession", "orphan_count": 2, "checked_count": 10},
+            ]
+        },
+    }
+    return Incident.model_validate(base | overrides)
+
+
+def test_a_monitor_with_no_row_spec_gets_one_row_per_incident(
+    stall_monitor: Monitor, stall_page
+) -> None:
+    """The two shipped monitors must be untouched by the row machinery."""
+    rows = expand(stall_monitor, stall_page.data)
+    assert len(rows) == len(stall_page.data)
+    assert all(row.part is None for row in rows)
+    assert [row.incident for row in rows] == list(stall_page.data)
+
+
+def test_a_row_spec_explodes_each_incident_into_its_breakdown() -> None:
+    rows = expand(kind_monitor(), [kinded()])
+    assert [row.part.kind for row in rows if row.part] == ["Slot", "ScheduledSession"]
+    assert len({id(row.incident) for row in rows}) == 1
+
+
+@pytest.mark.parametrize("detail", [{}, {"by_kind": []}, {"by_kind": None}])
+def test_an_incident_with_no_breakdown_still_gets_its_own_row(detail: object) -> None:
+    rows = expand(kind_monitor(), [kinded(detail=detail)])
+    assert len(rows) == 1
+    assert rows[0].part is None
+
+
+def test_expanding_nothing_is_nothing() -> None:
+    assert expand(kind_monitor(), []) == []
+
+
+def test_a_part_field_reads_the_breakdown_and_a_bare_incident_reads_none() -> None:
+    monitor = kind_monitor()
+    row = expand(monitor, [kinded()])[0]
+    assert resolve_field(monitor, row, "part.kind") == "Slot"
+    assert resolve_field(monitor, row, "part.no_such_field") is None
+    # A bare incident carries no part, so a part field is absent rather than an error.
+    assert resolve_field(monitor, kinded(), "part.kind") is None
+
+
+def test_the_row_helpers_accept_a_bare_incident() -> None:
+    """Every caller with no breakdown — the contact queue, the registry tests — passes one."""
+    incident = kinded()
+    assert incident_of(incident) is incident
+    assert part_of(incident) is None
+    row = Row(incident, OrphanKind(kind="Slot"))
+    assert incident_of(row) is incident
+    assert part_of(row).kind == "Slot"
+
+
+def test_unique_incidents_counts_a_dataset_once_however_many_rows_it_has() -> None:
+    rows = expand(kind_monitor(), [kinded(), kinded(publisher_id="pub_j")])
+    assert len(rows) == 4
+    assert len(unique_incidents(rows)) == 2
+    assert unique_incidents([]) == []
+
+
+# --- ordering by the monitor's own field ---------------------------------------------------
+
+
+def test_sort_rows_puts_the_largest_figure_first() -> None:
+    monitor = kind_monitor()
+    rows = sort_rows(monitor, expand(monitor, [kinded()]))
+    assert [row.part.orphan_count for row in rows if row.part] == [5, 2]
+
+
+def test_sort_rows_falls_back_to_the_publisher_name_when_the_field_ties() -> None:
+    monitor = kind_monitor(sort_field="part.no_such_field")
+    rows = expand(monitor, [kinded(publisher_name="Zed"), kinded(publisher_name="Alice")])
+    ordered = sort_rows(monitor, rows)
+    assert next(row.incident.publisher_name for row in ordered) == "Alice"
+
+
+def test_sort_rows_on_days_open_matches_the_age_order(stall_monitor: Monitor) -> None:
+    """The default sort field, so the two shipped monitors keep the order they had."""
+    incidents = [
+        make_incident(days_open=3, publisher_name="C"),
+        make_incident(days_open=11, publisher_name="A"),
+        make_incident(days_open=7, publisher_name="B"),
+    ]
+    by_age = [i.publisher_name for i in sort_by_age(incidents)]
+    by_field = [
+        r.incident.publisher_name
+        for r in sort_rows(stall_monitor, expand(stall_monitor, incidents))
+    ]
+    assert by_age == ["A", "B", "C"]
+    assert by_field == by_age
+
+
+def test_a_monitor_reporting_no_age_sorts_last_rather_than_raising() -> None:
+    """`days_open` is optional, and the contact queue sorts a mixed bag of monitors."""
+    aged = make_incident(days_open=4, publisher_name="Aged")
+    ageless = kinded(publisher_name="Ageless")
+    assert [i.publisher_name for i in sort_by_age([ageless, aged])] == ["Aged", "Ageless"]
+
+
+def test_a_null_days_open_carries_no_threshold_tone(stall_monitor: Monitor) -> None:
+    """There is no age to shade against the threshold, so the cell is left unstyled."""
+    col = Col("days_open", "Days stalled", ColKind.DAYS)
+    assert cell_tone(col, kinded(), None, 7) is None
+    assert format_cell(col, None) == EMPTY
+
+
+# --- a headline figure that is a quantity, not a row count ---------------------------------
+
+
+def test_field_total_sums_the_rows_that_report_the_field() -> None:
+    monitor = kind_monitor()
+    rows = expand(monitor, [kinded(), kinded(detail={})])
+    assert field_total(monitor, rows, "part.orphan_count") == 7
+    assert field_total(monitor, [], "part.orphan_count") == 0
+
+
+def test_field_total_ignores_a_value_that_is_not_a_number() -> None:
+    monitor = kind_monitor()
+    rows = expand(monitor, [kinded()])
+    assert field_total(monitor, rows, "part.kind") == 0
+    # A bool is an int in Python and would silently count as one here.
+    assert field_total(monitor, rows, "past_threshold") == 0
+
+
+def test_the_headline_kpi_sums_where_the_monitor_declares_a_sum_field() -> None:
+    monitor = kind_monitor(kpi_sum_field="part.orphan_count")
+    rows = expand(monitor, [kinded()])
+    assert monitor_kpis(monitor, rows)[0].value == "7"
+    # Without the field it is a count of incidents, not of rows.
+    assert monitor_kpis(kind_monitor(), rows)[0].value == "1"
+
+
+def test_kpis_count_distinct_incidents_not_rows() -> None:
+    monitor = kind_monitor()
+    rows = expand(monitor, [kinded(), kinded(publisher_id="pub_j", past_threshold=True)])
+    _, publishers, flagged = monitor_kpis(monitor, rows)
+    assert len(rows) == 4
+    assert publishers.value == "2"
+    assert flagged.value == "1"
+
+
+def test_the_snapshot_total_is_the_quantity_or_the_incident_count() -> None:
+    rows = expand(kind_monitor(), [kinded(), kinded(publisher_id="pub_j")])
+    assert snapshot_total(kind_monitor(kpi_sum_field="part.orphan_count"), rows) == 14
+    assert snapshot_total(kind_monitor(), rows) == 2
+
+
+def test_an_empty_snapshot_totals_zero() -> None:
+    assert snapshot_total(kind_monitor(kpi_sum_field="part.orphan_count"), []) == 0
+    assert snapshot_total(kind_monitor(), []) == 0
+
+
+# --- filtering and searching over rows -----------------------------------------------------
+
+
+def test_filters_and_options_read_a_breakdown_field() -> None:
+    monitor = kind_monitor(filters=(FilterSpec("part.kind", "Kind"),))
+    rows = expand(monitor, [kinded()])
+    assert filter_options(monitor, rows, "part.kind") == ["ScheduledSession", "Slot"]
+    kept = apply_filters(monitor, rows, selections={"part.kind": "Slot"})
+    assert [row.part.kind for row in kept if row.part] == ["Slot"]
+
+
+def test_search_matches_the_monitors_summary_field_when_given_the_monitor() -> None:
+    monitor = kind_monitor(summary_field="part.kind")
+    rows = expand(monitor, [kinded()])
+    assert len(search_incidents(rows, "scheduledsession", monitor)) == 1
+    # Without the monitor the summary field is not in the haystack.
+    assert search_incidents(rows, "scheduledsession") == []
+
+
+def test_search_without_a_term_keeps_every_row() -> None:
+    monitor = kind_monitor()
+    rows = expand(monitor, [kinded()])
+    assert search_incidents(rows, "   ", monitor) == rows
+
+
+def test_a_risk_column_shades_a_high_share_red() -> None:
+    col = Col("part.orphan_percent", "Share", ColKind.RISK)
+    assert cell_tone(col, kinded(), 90.0, 7) is Tone.RED
+    assert cell_tone(col, kinded(), 1.0, 7) is Tone.GREEN
+    assert cell_tone(col, kinded(), None, 7) is Tone.GREY
+    assert format_cell(col, 90) == 90.0
+    assert format_cell(col, None) is None
+
+
+def test_a_risk_column_gets_a_rag_background() -> None:
+    monitor = kind_monitor(
+        columns=(
+            Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+            Col("part.orphan_percent", "Share", ColKind.RISK),
+        )
+    )
+    assert rag_columns(monitor) == ["Share"]

@@ -28,6 +28,7 @@ from stewards.api.repository import (
     _fetch_monitor_trends,
     _fetch_summary,
     _fetch_trend,
+    _fetch_trend_points,
 )
 from stewards.config import Settings
 
@@ -285,3 +286,139 @@ def test_contact_queue_failure_is_typed(client: StewardsClient) -> None:
     respx.get(f"{BASE}/contact-queue").mock(return_value=httpx.Response(500))
     with pytest.raises(ApiUnavailable):
         _fetch_contact_queue(client)
+
+
+# --- a trend endpoint a deployment has not built ------------------------------------------
+
+ORPHAN_TREND = f"{BASE}/monitors/dataset_orphaned_children/trend"
+
+
+@respx.mock
+def test_trend_points_returns_the_series(client: StewardsClient) -> None:
+    respx.get(f"{BASE}/monitors/single_feed_stall/trend").mock(
+        return_value=httpx.Response(200, json=load_sample("single_feed_stall_trend"))
+    )
+    points = _fetch_trend_points("single_feed_stall", client=client)
+    assert len(points) == 30
+    assert points[-1].date == date(2026, 8, 21)
+
+
+@pytest.mark.parametrize("status", [404, 401, 500])
+@respx.mock
+def test_a_trend_endpoint_that_is_not_live_is_an_empty_series_not_an_error(
+    client: StewardsClient, status: int
+) -> None:
+    """A monitor page must lose its chart, never its incidents. The overview already did
+    this per monitor; this is the same tolerance for the monitor's own page."""
+    respx.get(ORPHAN_TREND).mock(return_value=httpx.Response(status))
+    assert _fetch_trend_points("dataset_orphaned_children", client=client) == ()
+
+
+@respx.mock
+def test_a_trend_timeout_is_an_empty_series(client: StewardsClient) -> None:
+    respx.get(ORPHAN_TREND).mock(side_effect=httpx.ReadTimeout("slow"))
+    assert _fetch_trend_points("dataset_orphaned_children", client=client) == ()
+
+
+@respx.mock
+def test_a_malformed_trend_is_an_empty_series_rather_than_a_broken_page(
+    client: StewardsClient,
+) -> None:
+    respx.get(ORPHAN_TREND).mock(
+        return_value=httpx.Response(200, json={"data": [{"date": "2026-08-21"}], "meta": {}})
+    )
+    assert _fetch_trend_points("dataset_orphaned_children", client=client) == ()
+
+
+# --- the orphan payload's own shape --------------------------------------------------------
+
+ORPHAN_INCIDENTS = f"{BASE}/monitors/dataset_orphaned_children/incidents"
+
+
+@respx.mock
+def test_the_orphan_payload_parses_with_no_incident_age(client: StewardsClient) -> None:
+    """This monitor measures a snapshot, so it reports neither field."""
+    respx.get(ORPHAN_INCIDENTS).mock(
+        return_value=httpx.Response(
+            200, json=load_sample("dataset_orphaned_children_incidents")
+        )
+    )
+    page = _fetch_incidents("dataset_orphaned_children", client)
+    assert len(page.data) == 7
+    assert all(i.days_open is None for i in page.data)
+    assert all(i.first_detected is None for i in page.data)
+    assert page.meta.snapshot_date == date(2026, 8, 21)
+
+
+@respx.mock
+def test_measurements_beside_the_shared_fields_are_folded_into_detail(
+    client: StewardsClient,
+) -> None:
+    """`extra="ignore"` would drop them, and the table would read empty with no error."""
+    payload = {
+        "data": [
+            {
+                "monitor_id": "dataset_orphaned_children",
+                "publisher_id": "pub_x",
+                "publisher_name": "Publisher X",
+                "past_threshold": True,
+                "status": "open",
+                "orphan_count": 41,
+                "dataset_name": "X Sessions",
+                "detail": {"by_kind": []},
+            }
+        ],
+        "meta": {"snapshot_date": "2026-08-21", "generated_at": "2026-08-21T06:12:04Z"},
+    }
+    respx.get(ORPHAN_INCIDENTS).mock(return_value=httpx.Response(200, json=payload))
+    incident = _fetch_incidents("dataset_orphaned_children", client).data[0]
+    assert incident.detail["orphan_count"] == 41
+    assert incident.detail["dataset_name"] == "X Sessions"
+    assert incident.detail["by_kind"] == []
+    # A declared field stays where it belongs rather than being folded in twice.
+    assert "monitor_id" not in incident.detail
+    assert incident.monitor_id == "dataset_orphaned_children"
+
+
+@respx.mock
+def test_a_nested_detail_value_wins_over_a_top_level_one_of_the_same_name(
+    client: StewardsClient,
+) -> None:
+    payload = {
+        "data": [
+            {
+                "monitor_id": "dataset_orphaned_children",
+                "publisher_id": "pub_x",
+                "publisher_name": "Publisher X",
+                "past_threshold": False,
+                "status": "open",
+                "orphan_count": 1,
+                "detail": {"orphan_count": 99},
+            }
+        ],
+        "meta": {"snapshot_date": "2026-08-21", "generated_at": "2026-08-21T06:12:04Z"},
+    }
+    respx.get(ORPHAN_INCIDENTS).mock(return_value=httpx.Response(200, json=payload))
+    incident = _fetch_incidents("dataset_orphaned_children", client).data[0]
+    assert incident.detail["orphan_count"] == 99
+
+
+@respx.mock
+def test_a_payload_with_nothing_but_the_required_fields_still_parses(
+    client: StewardsClient,
+) -> None:
+    """The fold must not invent a `detail` key where the payload carries no extras."""
+    payload = {
+        "data": [
+            {
+                "monitor_id": "dataset_orphaned_children",
+                "publisher_id": "pub_x",
+                "publisher_name": "Publisher X",
+                "past_threshold": False,
+                "status": "open",
+            }
+        ],
+        "meta": {"snapshot_date": "2026-08-21", "generated_at": "2026-08-21T06:12:04Z"},
+    }
+    respx.get(ORPHAN_INCIDENTS).mock(return_value=httpx.Response(200, json=payload))
+    assert _fetch_incidents("dataset_orphaned_children", client).data[0].detail == {}

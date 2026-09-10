@@ -62,6 +62,15 @@ def test_detail_column_paths() -> None:
     assert not Col("days_open", "Days", ColKind.DAYS).is_detail
 
 
+def test_breakdown_column_paths() -> None:
+    """A `part.` column reads the row a breakdown exploded into, not the incident."""
+    col = Col("part.orphan_count", "Orphans", ColKind.NUMBER)
+    assert col.is_part
+    assert not col.is_detail
+    assert not Col("detail.orphan_count", "Orphans", ColKind.NUMBER).is_part
+    assert not Col("days_open", "Days", ColKind.DAYS).is_part
+
+
 def test_a_monitor_with_no_columns_is_rejected() -> None:
     with pytest.raises(ValueError, match="declares no columns"):
         Monitor(

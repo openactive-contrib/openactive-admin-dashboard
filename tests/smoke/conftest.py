@@ -14,6 +14,10 @@ from stewards.api import client as client_module
 
 BASE = "https://api.test/api/v1"
 
+#: Every registered monitor serves incidents; only these two serve a trend.
+MONITOR_IDS = ("single_feed_stall", "feed_ingestion_error", "dataset_orphaned_children")
+TREND_IDS = ("single_feed_stall", "feed_ingestion_error")
+
 
 @pytest.fixture(autouse=True)
 def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
@@ -32,12 +36,19 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         mock.get(f"{BASE}/contact-queue").mock(
             return_value=httpx.Response(200, json=load_sample("contact_queue"))
         )
-        for monitor_id in ("single_feed_stall", "feed_ingestion_error"):
+        for monitor_id in MONITOR_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/incidents").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_incidents"))
             )
+        for monitor_id in TREND_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/trend").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_trend"))
+            )
+        # This deployment has not built the orphan trend endpoint, so it 404s — the state
+        # the live admin API is actually in. Every page must survive it.
+        for monitor_id in set(MONITOR_IDS) - set(TREND_IDS):
+            mock.get(f"{BASE}/monitors/{monitor_id}/trend").mock(
+                return_value=httpx.Response(404)
             )
         yield
 

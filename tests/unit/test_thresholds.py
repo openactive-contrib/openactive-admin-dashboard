@@ -9,10 +9,13 @@ from __future__ import annotations
 import pytest
 
 from stewards.monitors.thresholds import (
+    RISK_AMBER,
+    RISK_RED,
     Tone,
     days_label,
     days_tone,
     is_past_threshold,
+    risk_tone,
     score_tone,
     status_label,
     status_tone,
@@ -115,3 +118,45 @@ def test_empty_status_is_not_blank() -> None:
 )
 def test_score_tone(score: float | None, expected: Tone) -> None:
     assert score_tone(score) is expected
+
+
+# --- a share where high is bad -------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("share", "expected"),
+    [
+        (None, Tone.GREY),
+        (0.0, Tone.GREEN),
+        (19.9, Tone.GREEN),
+        (RISK_AMBER, Tone.AMBER),
+        (49.9, Tone.AMBER),
+        (RISK_RED, Tone.RED),
+        (100.0, Tone.RED),
+    ],
+)
+def test_risk_tone_shades_a_high_share_red(share: float | None, expected: Tone) -> None:
+    assert risk_tone(share) is expected
+
+
+def test_risk_tone_worsens_as_the_share_rises_and_score_tone_improves() -> None:
+    """The two scales point opposite ways. Their band edges differ deliberately: a fifth of
+    a dataset orphaned already wants attention, where a four-fifths quality score is fine.
+    What must hold is the direction — a rising share never shades better, and a rising score
+    never shades worse.
+    """
+    severity = {Tone.GREEN: 0, Tone.AMBER: 1, Tone.RED: 2}
+    steps = [float(v) for v in range(0, 101, 5)]
+    risk = [severity[risk_tone(v)] for v in steps]
+    score = [severity[score_tone(v)] for v in steps]
+    assert risk == sorted(risk), "a larger broken share shaded better"
+    assert score == sorted(score, reverse=True), "a larger quality score shaded worse"
+    assert (risk[0], risk[-1]) == (0, 2)
+    assert (score[0], score[-1]) == (2, 0)
+
+
+def test_risk_and_score_disagree_at_the_extremes() -> None:
+    assert risk_tone(100.0) is Tone.RED
+    assert score_tone(100.0) is Tone.GREEN
+    assert risk_tone(0.0) is Tone.GREEN
+    assert score_tone(0.0) is Tone.RED

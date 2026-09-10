@@ -14,7 +14,7 @@ from stewards.monitors.registry import (
     Monitor,
     Severity,
 )
-from stewards.monitors.transforms import resolve_field
+from stewards.monitors.transforms import expand, resolve_field
 
 APP_ROOT = Path(__file__).resolve().parents[2] / "src" / "stewards"
 SAMPLE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
@@ -65,16 +65,30 @@ def test_sample_payload_exists(monitor: Monitor) -> None:
 def test_every_column_field_resolves_against_the_payload(monitor: Monitor) -> None:
     page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
     assert page.data, f"{monitor.id} sample payload has no incidents"
-    for incident in page.data:
+    rows = expand(monitor, page.data)
+    assert rows, f"{monitor.id} sample payload expands to no rows"
+    for row in rows:
         for col in monitor.columns:
-            resolve_field(monitor, incident, col.field)  # must not raise
+            resolve_field(monitor, row, col.field)  # must not raise
+
+
+def test_every_declared_column_reports_a_value_somewhere(monitor: Monitor) -> None:
+    """A column no payload row can fill is a typo in the field path, not a sparse column."""
+    rows = expand(
+        monitor, IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents")).data
+    )
+    for col in monitor.columns:
+        assert any(resolve_field(monitor, row, col.field) is not None for row in rows), (
+            f"{monitor.id} column {col.field!r} resolves to None on every payload row"
+        )
 
 
 def test_declared_filters_resolve_and_are_labelled(monitor: Monitor) -> None:
     page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    rows = expand(monitor, page.data)
     for spec in monitor.filters:
         assert spec.label
-        assert any(resolve_field(monitor, i, spec.field) is not None for i in page.data)
+        assert any(resolve_field(monitor, row, spec.field) is not None for row in rows)
 
 
 def test_detail_model_validates_every_payload_detail(monitor: Monitor) -> None:

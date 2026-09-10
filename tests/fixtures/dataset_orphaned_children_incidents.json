@@ -1,0 +1,285 @@
+{
+  "data": [
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_loughborough-university",
+      "publisher_name": "Loughborough University",
+      "dataset_url": "https://loughboroughuniversity-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": "Loughborough University Sessions and Facilities",
+      "child_count": 478429,
+      "checked_count": 472666,
+      "orphan_count": 432823,
+      "orphan_share": 0.9046755108908532,
+      "missing_parent_count": 59,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "Slot",
+            "child_count": 472666,
+            "checked_count": 472666,
+            "orphan_count": 432823,
+            "missing_parent_count": 59
+          },
+          {
+            "kind": "ScheduledSession",
+            "child_count": 5763,
+            "checked_count": 0,
+            "orphan_count": 0,
+            "missing_parent_count": 0
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://loughboroughuniversity-openactive.legendonlineservices.co.uk/api/facility-uses/664-1",
+            "child_count": 10852
+          },
+          {
+            "missing_id": "https://loughboroughuniversity-openactive.legendonlineservices.co.uk/api/facility-uses/686-1",
+            "child_count": 10852
+          },
+          {
+            "missing_id": "https://loughboroughuniversity-openactive.legendonlineservices.co.uk/api/facility-uses/687-1",
+            "child_count": 10852
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_played",
+      "publisher_name": "Played",
+      "dataset_url": "https://openactive.played.co/openactive/",
+      "dataset_name": "Played Sessions and Facilities",
+      "child_count": 230660,
+      "checked_count": 230660,
+      "orphan_count": 91748,
+      "orphan_share": 0.39776294112546606,
+      "missing_parent_count": 862,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "Slot",
+            "child_count": 198790,
+            "checked_count": 198790,
+            "orphan_count": 79744,
+            "missing_parent_count": 77
+          },
+          {
+            "kind": "ScheduledSession",
+            "child_count": 31870,
+            "checked_count": 31870,
+            "orphan_count": 12004,
+            "missing_parent_count": 785
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://openactive.played.co/api/identifiers/facility-uses/df9ac607-cd56-477b-a9e6-21be8283496e",
+            "child_count": 12213
+          },
+          {
+            "missing_id": "https://openactive.played.co/api/identifiers/facility-uses/46cbceb3-096f-4fc8-8af7-788fe0edecea",
+            "child_count": 5737
+          },
+          {
+            "missing_id": "https://openactive.played.co/api/identifiers/facility-uses/17067dd8-543a-4f78-90d4-b5b6326dfe93",
+            "child_count": 5682
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_schools-plus-ltd",
+      "publisher_name": "Schools Plus Ltd",
+      "dataset_url": "http://www.schools-plus.co.uk/OpenActive.php",
+      "dataset_name": "Schools Plus Ltd Facilities",
+      "child_count": 48204,
+      "checked_count": 48204,
+      "orphan_count": 48204,
+      "orphan_share": 1,
+      "missing_parent_count": 158,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "Slot",
+            "child_count": 48204,
+            "checked_count": 48204,
+            "orphan_count": 48204,
+            "missing_parent_count": 158
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://api.schools-plus.co.uk/api/oa/facility-use/6503",
+            "child_count": 840
+          },
+          {
+            "missing_id": "https://api.schools-plus.co.uk/api/oa/facility-use/6507",
+            "child_count": 840
+          },
+          {
+            "missing_id": "https://api.schools-plus.co.uk/api/oa/facility-use/6508",
+            "child_count": 840
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_unknown",
+      "publisher_name": "",
+      "dataset_url": "https://chelmsfordcitysports.leisurecloud.net/OpenActive/",
+      "dataset_name": "chelmsfordcitysports.leisurecloud.net",
+      "child_count": 18894,
+      "checked_count": 18894,
+      "orphan_count": 17227,
+      "orphan_share": 0.9117709325711866,
+      "missing_parent_count": 67,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "Slot",
+            "child_count": 17216,
+            "checked_count": 17216,
+            "orphan_count": 17216,
+            "missing_parent_count": 56
+          },
+          {
+            "kind": "ScheduledSession",
+            "child_count": 1678,
+            "checked_count": 1678,
+            "orphan_count": 11,
+            "missing_parent_count": 11
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://chelmsfordcitysports.leisurecloud.net/OpenActive/api/facility-uses/RPROGREVIEW30",
+            "child_count": 808
+          },
+          {
+            "missing_id": "https://chelmsfordcitysports.leisurecloud.net/OpenActive/api/facility-uses/RQUICKINDUCTION",
+            "child_count": 808
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_brimhams-active",
+      "publisher_name": "Brimhams Active",
+      "dataset_url": "https://brimhamsactive.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Brimhams Active Sessions and Facilities",
+      "child_count": 4462,
+      "checked_count": 4462,
+      "orphan_count": 51,
+      "orphan_share": 0.011429852084267144,
+      "missing_parent_count": 43,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "ScheduledSession",
+            "child_count": 2017,
+            "checked_count": 2017,
+            "orphan_count": 51,
+            "missing_parent_count": 43
+          },
+          {
+            "kind": "Slot",
+            "child_count": 2445,
+            "checked_count": 2445,
+            "orphan_count": 0,
+            "missing_parent_count": 0
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://brimhamsactive.gs-signature.cloud/OpenActive/api/session-series/KP3CLBB06301224",
+            "child_count": 3
+          },
+          {
+            "missing_id": "https://brimhamsactive.gs-signature.cloud/OpenActive/api/session-series/HG2CLBH02030900",
+            "child_count": 2
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_liberty-leisure",
+      "publisher_name": "Liberty Leisure",
+      "dataset_url": "https://lleisure.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Liberty Leisure Sessions and Facilities",
+      "child_count": 8639,
+      "checked_count": 8639,
+      "orphan_count": 1,
+      "orphan_share": 0.00011575413821044102,
+      "missing_parent_count": 1,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "detail": {
+        "by_kind": [
+          {
+            "kind": "Slot",
+            "child_count": 7758,
+            "checked_count": 7758,
+            "orphan_count": 1,
+            "missing_parent_count": 1
+          },
+          {
+            "kind": "ScheduledSession",
+            "child_count": 881,
+            "checked_count": 881,
+            "orphan_count": 0,
+            "missing_parent_count": 0
+          }
+        ],
+        "missing_parents": [
+          {
+            "missing_id": "https://lleisure.gs-signature.cloud/OpenActive/api/facility-uses/STAPAD007",
+            "child_count": 1
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_orphaned_children",
+      "publisher_id": "pub_conwy",
+      "publisher_name": "Conwy",
+      "dataset_url": "https://conwy.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Conwy Sessions and Facilities",
+      "child_count": 13227,
+      "checked_count": 13227,
+      "orphan_count": 2,
+      "orphan_share": 0.00015120586678763135,
+      "missing_parent_count": 1,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 7
+  }
+}

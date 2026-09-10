@@ -83,3 +83,23 @@ def score_tone(score: float | None) -> Tone:
     if score >= 60:
         return Tone.AMBER
     return Tone.RED
+
+
+#: Where a risk share stops being noise, and where it becomes the dataset's whole story.
+RISK_AMBER = 20.0
+RISK_RED = 50.0
+
+
+def risk_tone(share: float | None) -> Tone:
+    """The mirror of `score_tone`, for a percentage where high is bad.
+
+    A share of something broken cannot be shaded on the score scale: 100% orphaned would
+    render green. Red from half the items, amber from a fifth.
+    """
+    if share is None:
+        return Tone.GREY
+    if share >= RISK_RED:
+        return Tone.RED
+    if share >= RISK_AMBER:
+        return Tone.AMBER
+    return Tone.GREEN

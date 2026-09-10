@@ -34,6 +34,12 @@
           8,
           9
         ]
+      },
+      {
+        "monitor_id": "dataset_orphaned_children",
+        "count": 590056,
+        "past_threshold_count": 0,
+        "sparkline": []
       }
     ],
     "publishers_with_issues_delta": 3,
@@ -43,7 +49,7 @@
   "meta": {
     "snapshot_date": "2026-08-21",
     "generated_at": "2026-08-21T06:12:04Z",
-    "total": 2,
+    "total": 3,
     "page": 1,
     "page_size": 100
   }

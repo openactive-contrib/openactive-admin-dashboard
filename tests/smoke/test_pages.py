@@ -18,9 +18,22 @@ PAGES = [
     "01_contact_queue.py",
     "10_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
+    "22_dataset_orphaned_children.py",
 ]
 
-MONITOR_PAGES = ["10_single_feed_stalls.py", "12_feed_ingestion_errors.py"]
+MONITOR_PAGES = [
+    "10_single_feed_stalls.py",
+    "12_feed_ingestion_errors.py",
+    "22_dataset_orphaned_children.py",
+]
+
+#: Page filename -> registry id, so the counts a page must render are read from the monitor
+#: rather than hard-coded per page.
+MONITOR_IDS = {
+    "10_single_feed_stalls.py": "single_feed_stall",
+    "12_feed_ingestion_errors.py": "feed_ingestion_error",
+    "22_dataset_orphaned_children.py": "dataset_orphaned_children",
+}
 
 
 def run(name: str) -> AppTest:
@@ -59,10 +72,14 @@ def test_every_page_states_the_snapshot(name: str) -> None:
 
 @pytest.mark.parametrize("name", MONITOR_PAGES)
 def test_monitor_page_has_three_metrics_a_chart_and_one_table(name: str) -> None:
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor(MONITOR_IDS[name])
     app = run(name)
+    # One table: the row-detail tables render only once a row is selected.
     assert len(app.dataframe) == 1
-    assert len(app.toggle) == 1
-    assert len(app.selectbox) == 2
+    assert len(app.toggle) == (1 if monitor.has_threshold_filter else 0)
+    assert len(app.selectbox) == len(monitor.filters)
     assert len(app.text_input) == 1
 
 
@@ -128,12 +145,22 @@ def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
 
 
 def test_each_tile_says_which_way_its_series_is_moving() -> None:
-    """The state chip is derived from the daily series, so the card states the movement."""
+    """A tile judged on a daily series states the movement; one judged on a benchmark says so.
+
+    A monitor with no history has no movement to report, and inventing one is the whole
+    thing `monitors.gauge` exists to avoid — so its card names the benchmark instead.
+    """
     from stewards.monitors.registry import MONITOR_REGISTRY
+    from stewards.monitors.tile_viz import Sparkline
 
     app = run("00_overview.py")
     captions = [caption.value for caption in app.caption]
-    assert sum("snapshots" in caption for caption in captions) == len(MONITOR_REGISTRY)
+    text = " ".join(captions) + " ".join(m.value for m in app.markdown)
+    series_tiles = [m for m in MONITOR_REGISTRY if isinstance(m.viz, Sparkline)]
+    assert sum("snapshots" in caption for caption in captions) == len(series_tiles)
+    for monitor in MONITOR_REGISTRY:
+        if not isinstance(monitor.viz, Sparkline):
+            assert "benchmark" in text
 
 
 def test_overview_banner_names_the_threshold() -> None:

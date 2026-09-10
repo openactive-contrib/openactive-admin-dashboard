@@ -11,9 +11,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from stewards.api.models import MonitorCount, Summary, TrendPoint
+from stewards.monitors.gauge import assess_benchmark, gauge_caption
 from stewards.monitors.health import Health, HealthState, Movement, assess_monitor
 from stewards.monitors.registry import MONITOR_REGISTRY, Monitor, Severity
 from stewards.monitors.thresholds import Tone
+from stewards.monitors.tile_viz import Gauge
 from stewards.monitors.transforms import EMPTY
 
 #: Trend series by monitor id, as the overview loads them. A monitor missing from the
@@ -73,6 +75,10 @@ def monitor_health(
     """
     if counts.count is None:
         return Health(HealthState.UNKNOWN, Movement.UNKNOWN, NOT_REPORTED)
+    if isinstance(monitor.viz, Gauge):
+        # A monitor with no series has no trend to judge, so its declared benchmark decides
+        # the state. One reference for both the chip and the meter, by construction.
+        return assess_benchmark(counts.count, monitor.viz)
     values, past = series_from_trend(trend) if trend else series_from_counts(counts)
     return assess_monitor(values, past, monitor.health)
 
@@ -106,6 +112,9 @@ def tile_note(monitor: Monitor, count: int | None, past_threshold_count: int | N
         return NOT_REPORTED
     if count <= 0:
         return "no open incidents in this snapshot"
+    if isinstance(monitor.viz, Gauge):
+        # The contact threshold counts days, which this monitor's incidents do not have.
+        return gauge_caption(count, monitor.viz)
     if past_threshold_count is None:
         return f"{monitor.threshold_days}-day threshold count not reported"
     if past_threshold_count > 0:
@@ -127,6 +136,19 @@ def format_delta(change: int | None) -> str | None:
     if change == 0:
         return "0"
     return f"+{change:,}" if change > 0 else f"{MINUS}{abs(change):,}"
+
+
+#: Above this a count is abbreviated: the sidebar pill has room for a figure, not a total.
+BADGE_COMPACT_FROM = 10_000
+
+
+def format_badge(count: int) -> str:
+    """A count for the sidebar pill. Abbreviated at scale, exact below it."""
+    if count < BADGE_COMPACT_FROM:
+        return str(count)
+    if count < 1_000_000:
+        return f"{count // 1_000}k"
+    return f"{count / 1_000_000:.1f}M"
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +174,7 @@ def nav_badges(summary: Summary, trends: Trends | None = None) -> dict[str, NavB
         if counts is None or counts.count is None or counts.count <= 0:
             continue
         health = monitor_health(monitor, counts, (trends or {}).get(monitor.id, ()))
-        badges[monitor.id] = NavBadge(str(counts.count), tile_state(monitor, health))
+        badges[monitor.id] = NavBadge(format_badge(counts.count), tile_state(monitor, health))
     return badges
 
 
