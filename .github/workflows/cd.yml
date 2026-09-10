@@ -165,7 +165,7 @@ jobs:
       # only green once Streamlit itself answers.
       - name: Wait for the health endpoint
         run: |
-          url="https://${AZURE_WEBAPP_NAME}.azurewebsites.net/_stcore/health"
+          url="https://${AZURE_WEBAPP_NAME}-hdb3fpcvcmgygydn.azurewebsites.net/_stcore/health"
           for attempt in $(seq 1 30); do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)
             if [ "$code" = "200" ]; then
@@ -185,5 +185,5 @@ jobs:
             echo
             echo "- release: \`${{ needs.build.outputs.version }}\`"
             echo "- image: \`${{ needs.build.outputs.image }}\`"
-            echo "- app: https://${AZURE_WEBAPP_NAME}.azurewebsites.net"
+            echo "- app: https://${AZURE_WEBAPP_NAME}-hdb3fpcvcmgygydn.azurewebsites.net"
           } >> "$GITHUB_STEP_SUMMARY"
