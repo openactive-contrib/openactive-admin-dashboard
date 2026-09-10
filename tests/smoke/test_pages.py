@@ -16,13 +16,15 @@ VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 PAGES = [
     "00_overview.py",
     "01_contact_queue.py",
-    "10_single_feed_stalls.py",
+    "10_dataset_stalls.py",
+    "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
     "22_dataset_orphaned_children.py",
 ]
 
 MONITOR_PAGES = [
-    "10_single_feed_stalls.py",
+    "10_dataset_stalls.py",
+    "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
     "22_dataset_orphaned_children.py",
 ]
@@ -30,7 +32,8 @@ MONITOR_PAGES = [
 #: Page filename -> registry id, so the counts a page must render are read from the monitor
 #: rather than hard-coded per page.
 MONITOR_IDS = {
-    "10_single_feed_stalls.py": "single_feed_stall",
+    "10_dataset_stalls.py": "dataset_stall",
+    "11_single_feed_stalls.py": "single_feed_stall",
     "12_feed_ingestion_errors.py": "feed_ingestion_error",
     "22_dataset_orphaned_children.py": "dataset_orphaned_children",
 }
@@ -86,14 +89,14 @@ def test_monitor_page_has_three_metrics_a_chart_and_one_table(name: str) -> None
 def test_monitor_page_table_carries_every_declared_column() -> None:
     from stewards.monitors.registry import get_monitor
 
-    app = run("10_single_feed_stalls.py")
+    app = run("11_single_feed_stalls.py")
     frame = app.dataframe[0].value
     assert list(frame.columns) == [c.label for c in get_monitor("single_feed_stall").columns]
     assert len(frame) == 23
 
 
 def test_threshold_toggle_narrows_the_table() -> None:
-    app = run("10_single_feed_stalls.py")
+    app = run("11_single_feed_stalls.py")
     assert len(app.dataframe[0].value) == 23
     app.toggle[0].set_value(True).run()
     assert len(app.dataframe[0].value) == 7

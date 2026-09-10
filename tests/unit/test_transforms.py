@@ -19,6 +19,7 @@ from stewards.monitors.registry import (
     FilterSpec,
     Group,
     Monitor,
+    RowDetail,
     RowSpec,
     Severity,
 )
@@ -29,6 +30,9 @@ from stewards.monitors.transforms import (
     Row,
     apply_filters,
     cell_tone,
+    detail_caption,
+    detail_frame,
+    detail_items,
     expand,
     field_total,
     filter_options,
@@ -381,6 +385,7 @@ def kind_monitor(**overrides: object) -> Monitor:
 
 class _ByKindDetail(DetailModel):
     by_kind: tuple[OrphanKind, ...] = ()
+    total: int | None = None
 
 
 def kinded(**overrides: object) -> Incident:
@@ -587,3 +592,98 @@ def test_a_risk_column_gets_a_rag_background() -> None:
         )
     )
     assert rag_columns(monitor) == ["Share"]
+
+
+# --- the row-detail table, declared per monitor --------------------------------------------
+
+
+def detail_monitor(**overrides: object) -> Monitor:
+    base: dict[str, object] = {
+        "id": "kinds",
+        "name": "Kinds",
+        "group": Group.CONTENT,
+        "severity": Severity.MEDIUM,
+        "blurb": "A" * 90,
+        "unit": "things",
+        "columns": (Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),),
+        "detail_model": _ByKindDetail,
+        "row_detail": RowDetail(
+            field="detail.by_kind",
+            title="By kind",
+            caption="Every kind, of {count} counted.",
+            count_field="detail.total",
+            columns=(
+                Col("part.kind", "Kind", ColKind.TEXT, primary=True),
+                Col("part.orphan_count", "Count", ColKind.NUMBER),
+            ),
+        ),
+    }
+    return Monitor(**(base | overrides))  # type: ignore[arg-type]
+
+
+def test_detail_items_reads_the_declared_list() -> None:
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    rows = detail_items(monitor, kinded(), spec)
+    assert [row.part.kind for row in rows if row.part] == ["Slot", "ScheduledSession"]
+    # Every item keeps its incident, so the table can name the publisher it belongs to.
+    assert {id(row.incident) for row in rows} == {id(rows[0].incident)}
+
+
+@pytest.mark.parametrize("detail", [{}, {"by_kind": []}, {"by_kind": None}])
+def test_detail_items_of_an_absent_list_is_empty(detail: object) -> None:
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    assert detail_items(monitor, kinded(detail=detail), spec) == []
+
+
+def test_the_detail_frame_uses_the_specs_own_columns_and_kinds() -> None:
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    frame = detail_frame(monitor, detail_items(monitor, kinded(), spec), spec)
+    assert list(frame.columns) == ["Kind", "Count"]
+    assert list(frame["Kind"]) == ["Slot", "ScheduledSession"]
+    assert list(frame["Count"]) == [5, 2]
+
+
+def test_an_empty_detail_frame_still_carries_the_declared_columns() -> None:
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    frame = detail_frame(monitor, [], spec)
+    assert frame.empty
+    assert list(frame.columns) == ["Kind", "Count"]
+
+
+def test_the_caption_fills_the_count_from_the_declared_field() -> None:
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    assert detail_caption(monitor, kinded(detail={"total": 1234}), spec) == (
+        "Every kind, of 1,234 counted."
+    )
+
+
+def test_a_caption_whose_count_the_api_did_not_report_reads_em_dash() -> None:
+    """Never a fabricated zero, as everywhere else a count may be absent."""
+    monitor = detail_monitor()
+    spec = monitor.row_detail
+    assert spec is not None
+    assert detail_caption(monitor, kinded(), spec) == f"Every kind, of {EMPTY} counted."
+
+
+def test_a_caption_with_no_count_field_is_used_verbatim() -> None:
+    monitor = detail_monitor(
+        row_detail=RowDetail(
+            field="detail.by_kind",
+            title="By kind",
+            caption="Every kind.",
+            columns=(Col("part.kind", "Kind", ColKind.TEXT, primary=True),),
+        )
+    )
+    spec = monitor.row_detail
+    assert spec is not None
+    assert detail_caption(monitor, kinded(), spec) == "Every kind."

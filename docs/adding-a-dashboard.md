@@ -57,10 +57,13 @@ Settle these before writing anything. Every one of them is a field on the regist
 | Unit noun | `unit` | The noun under the tile count, e.g. `feeds at zero`. |
 | Columns | `columns` | The table, in order. See the column kinds below. |
 | Detail fields | `detail_model` | The typed view of `Incident.detail`. Omit for a monitor with no extra fields. |
-| Contact threshold | `threshold_days` | Days before an incident is contact-due. Default 7. `days_open == threshold_days` **is** past threshold. |
+| Contact threshold | `threshold_days` | Days before an incident is contact-due. Default 7. `days_open == threshold_days` **is** past threshold. A monitor measuring a snapshot rather than an ageing fault reports no `days_open` at all; the `DAYS` column then reads em dash and carries no tone. |
 | Health policy | `health` | Which way is bad, and how fast counts as bad, for the home-page card state. The default reads a rising incident count as deterioration; a monitor whose figure is a volume declares `HealthPolicy(direction=Direction.DOWN_IS_BAD, clear_level=None)`. See "Card state" below. |
 | Card visualisation | `viz` | `Sparkline()` (default) draws the monitor's own daily series. `Gauge(benchmark=…)` draws this snapshot's figure against a fixed reference, for a monitor the batch reports no history for. See "Card state" below. |
 | Table rows | `rows` | `None` (default) is one table row per incident. `RowSpec("detail.<list field>", ItemModel)` explodes each incident into one row per item of that list, addressable as `part.<name>`. |
+| Row detail table | `row_detail` | `RowDetail(field, title, caption, columns)` shows a second table under the incident table for the selected row, read from a detail list with `part.<name>` columns. Add `count_field` for a caption saying `{count}` where the API reports only the worst few items. |
+| Incident noun | `entity` | What one incident *is*, in publisher-facing copy: `"feed"` (default) or `"dataset"`. It picks the noun in the email's sentences and the subject's fallback. |
+| Email identity | `email_fields` | `(label, field)` pairs naming the incident in the publisher email. The default names a feed; a dataset-level monitor names its dataset. |
 | Table order | `sort_field` | The field the table is ordered by, descending, then publisher name. Defaults to `days_open`, which suits a monitor whose incidents age; one that measures a volume orders by the volume, e.g. `part.orphan_count`. |
 | Headline KPI | `kpi_sum_field` | `None` (default) makes the first KPI a count of incidents. Set it to make the KPI the **sum** of that field — the headline figure for a monitor that measures a quantity rather than counting faults. |
 | Filters | `filters` | One selectbox per `FilterSpec`; options are the distinct values in the snapshot. A `part.<name>` field filters the breakdown rows. |
@@ -367,10 +370,23 @@ observation ("this feed has been failing the <monitor name> check for N days. Fi
 <date>.").
 
 For publisher-facing copy specific to the check, add an entry to `_OBSERVATIONS` keyed by
-monitor id, and, if the sentence should cite a detail date rather than `first_detected`, an
-`_EVIDENCE_FIELDS` entry naming the detail attribute. Both are per-monitor lookups with a
-default, so this is additive. The drafted message is a golden-file test — update
-`tests/unit/test_email_draft.py` alongside it.
+monitor id, and, if the sentence should cite a detail date or figure rather than
+`first_detected`, an `_EVIDENCE_FIELDS` entry naming the detail attribute. Both are
+per-monitor lookups with a default, so this is additive. The drafted message is a golden-file
+test — update `tests/unit/test_email_draft.py` alongside it.
+
+Everything else in the message comes off the registry entry, so a monitor whose incident is
+not a feed does not need new code:
+
+- `entity` picks the noun. A dataset-level monitor sets `entity="dataset"`, and the sentences
+  read "this dataset has stopped publishing" rather than calling a whole dataset a feed.
+- `email_fields` is the identifying block. The default `Feed` / `Feed type` / `Endpoint` suits
+  a feed-level monitor; a dataset-level one declares `Dataset` / `Endpoint` off its own detail
+  fields instead of leaving three em dashes in a publisher's inbox.
+- The subject names whatever `summary_field` resolves to, falling back to
+  `OpenActive <entity>`.
+- `First detected` is omitted where the monitor reports no age — see the `Incident` fields
+  below. An invented date in a publisher email is worse than an absent one.
 
 ## 7. The home-page card and the sidebar badge
 

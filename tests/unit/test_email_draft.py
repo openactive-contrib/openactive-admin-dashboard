@@ -124,7 +124,7 @@ def test_subject_line_falls_back_when_the_feed_is_unnamed() -> None:
 # --- a monitor that reports a snapshot rather than an ageing fault -------------------------
 
 ORPHAN_GOLDEN = """\
-Subject: OpenActive data check: OpenActive feed — orphaned children
+Subject: OpenActive data check: Played Sessions and Facilities — orphaned children
 
 Hello Played team,
 
@@ -134,15 +134,14 @@ feed does not contain: ScheduledSessions whose superEvent is missing from the Se
 feed, or Slots without their FacilityUse. A consumer cannot display these items at all, \
 because the parent carries the name, location and activity.
 
-Feed: —
-Feed type: —
-Endpoint: —
+Dataset: Played Sessions and Facilities
+Endpoint: https://openactive.played.co/openactive/
 First detected: — (this monitor reports a snapshot, not an age)
 
-Could you confirm whether the export that populates this feed is still running,
+Could you confirm whether the export that populates this dataset is still running,
 and let us know by 2026-08-26 if you need help investigating.
 
-No action is needed on our side once the feed resumes; the check clears itself
+No action is needed on our side once the dataset resumes; the check clears itself
 on the next daily snapshot.
 
 Thank you,
@@ -159,6 +158,7 @@ def orphan_incident(**overrides: object) -> Incident:
             "status": "open",
             "orphan_count": 91748,
             "dataset_name": "Played Sessions and Facilities",
+            "dataset_url": "https://openactive.played.co/openactive/",
             "detail": {"by_kind": []},
         }
         | overrides
@@ -197,3 +197,97 @@ def test_the_orphan_draft_falls_back_when_the_count_is_absent() -> None:
     monitor = get_monitor("dataset_orphaned_children")
     draft = draft_email(monitor, orphan_incident(detail={}, orphan_count=None), SNAPSHOT)
     assert f"In our snapshot of 2026-08-21, {EMPTY} items" in draft
+
+
+# --- a monitor whose incident is a whole dataset -------------------------------------------
+
+DATASET_STALL_GOLDEN = """\
+Subject: OpenActive data check: Shirley High School Facilities — dataset-wide stalls
+
+Hello Shirley High School team,
+
+We monitor the OpenActive feeds you publish as part of the open data service.
+In our snapshot of 2026-08-21, every feed in this dataset has stopped publishing new or \
+updated items, and has been silent for 9 days. The last change we recorded on any of them \
+was 2026-09-01. Nothing new is reaching the services that consume your data.
+
+Dataset: Shirley High School Facilities
+Feeds: 2
+Endpoint: https://shirleyhighschool.bookteq.com/api/open-active
+First detected: 2026-09-01 (9 days open)
+
+Could you confirm whether the export that populates this dataset is still running,
+and let us know by 2026-08-26 if you need help investigating.
+
+No action is needed on our side once the dataset resumes; the check clears itself
+on the next daily snapshot.
+
+Thank you,
+The ODI data stewards team"""
+
+
+def dataset_stall_incident(**overrides: object) -> Incident:
+    return Incident.model_validate(
+        {
+            "monitor_id": "dataset_stall",
+            "publisher_id": "pub_shirley-high-school",
+            "publisher_name": "Shirley High School",
+            "dataset_url": "https://shirleyhighschool.bookteq.com/api/open-active",
+            "dataset_name": "Shirley High School Facilities",
+            "feed_count": 2,
+            "first_detected": "2026-09-01",
+            "days_open": 9,
+            "past_threshold": True,
+            "status": "open",
+            "detail": {"last_modified": "2026-09-01", "feeds": []},
+        }
+        | overrides
+    )
+
+
+def test_dataset_stall_draft_matches_the_golden_copy() -> None:
+    monitor = get_monitor("dataset_stall")
+    assert draft_email(monitor, dataset_stall_incident(), SNAPSHOT) == DATASET_STALL_GOLDEN
+
+
+def test_the_dataset_draft_never_calls_a_dataset_a_feed() -> None:
+    """A publisher told "this feed has stopped" would go looking for the wrong thing."""
+    monitor = get_monitor("dataset_stall")
+    draft = draft_email(monitor, dataset_stall_incident(), SNAPSHOT)
+    assert "this dataset" in draft
+    assert "this feed" not in draft
+    assert "Feed type:" not in draft
+
+
+def test_the_subject_names_the_dataset_rather_than_a_missing_feed_name() -> None:
+    monitor = get_monitor("dataset_stall")
+    assert "Shirley High School Facilities" in subject_line(monitor, dataset_stall_incident())
+    # The incident carries no feed name at all, so the old fallback would have read
+    # "OpenActive feed" for every dataset in the fleet.
+    assert dataset_stall_incident().feed_name is None
+    assert "OpenActive feed —" not in subject_line(monitor, dataset_stall_incident())
+
+
+def test_the_subject_falls_back_to_the_monitors_own_noun() -> None:
+    monitor = get_monitor("dataset_stall")
+    bare = dataset_stall_incident(dataset_name=None, detail={})
+    assert subject_line(monitor, bare) == (
+        "OpenActive data check: OpenActive dataset — dataset-wide stalls"
+    )
+
+
+def test_an_identifying_field_the_api_did_not_send_reads_em_dash() -> None:
+    monitor = get_monitor("dataset_stall")
+    draft = draft_email(monitor, dataset_stall_incident(feed_count=None), SNAPSHOT)
+    assert f"Feeds: {EMPTY}" in draft
+    assert "Dataset: Shirley High School Facilities" in draft
+
+
+def test_the_stall_draft_still_names_a_feed() -> None:
+    """The default entity and identifying block, unchanged for the feed-level monitors."""
+    monitor = get_monitor("single_feed_stall")
+    assert monitor.entity == "feed"
+    draft = draft_email(monitor, stall_incident(), SNAPSHOT)
+    assert "this feed" in draft
+    assert "Feed type: ScheduledSession" in draft
+    assert "Dataset:" not in draft

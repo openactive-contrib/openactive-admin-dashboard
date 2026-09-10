@@ -10,11 +10,16 @@ from datetime import date, timedelta
 
 from stewards.api.models import Incident
 from stewards.monitors.registry import Monitor
-from stewards.monitors.transforms import EMPTY, parse_detail
+from stewards.monitors.transforms import EMPTY, parse_detail, resolve_field
 
 REPLY_WINDOW_DAYS = 5
 
 _OBSERVATIONS = {
+    "dataset_stall": (
+        "every feed in this dataset has stopped publishing new or updated items, and has "
+        "been silent for {days} days. The last change we recorded on any of them was "
+        "{evidence}. Nothing new is reaching the services that consume your data."
+    ),
     "dataset_orphaned_children": (
         "{evidence} items in this dataset reference a parent that the feed does not "
         "contain: ScheduledSessions whose superEvent is missing from the SessionSeries "
@@ -33,13 +38,15 @@ _OBSERVATIONS = {
 }
 
 _DEFAULT_OBSERVATION = (
-    "this feed has been failing the {monitor} check for {days} days. First detected {evidence}."
+    "this {entity} has been failing the {monitor} check for {days} days. "
+    "First detected {evidence}."
 )
 
 _EVIDENCE_FIELDS = {
     "single_feed_stall": "last_modified",
     "feed_ingestion_error": "last_completed",
     "dataset_orphaned_children": "orphan_count",
+    "dataset_stall": "last_modified",
 }
 
 
@@ -74,8 +81,19 @@ def _first_detected(incident: Incident) -> str:
 
 
 def subject_line(monitor: Monitor, incident: Incident) -> str:
-    feed = incident.feed_name or "OpenActive feed"
-    return f"OpenActive data check: {feed} — {monitor.name.lower()}"
+    """Names whatever the monitor says identifies one of its incidents."""
+    named = resolve_field(monitor, incident, monitor.summary_field)
+    subject = str(named) if named not in (None, "") else f"OpenActive {monitor.entity}"
+    return f"OpenActive data check: {subject} — {monitor.name.lower()}"
+
+
+def _identifying_lines(monitor: Monitor, incident: Incident) -> list[str]:
+    """The block naming what we are writing about, as the monitor declares it."""
+    lines = []
+    for label, path in monitor.email_fields:
+        value = resolve_field(monitor, incident, path)
+        lines.append(f"{label}: {value if value not in (None, '') else EMPTY}")
+    return lines
 
 
 def draft_email(
@@ -91,6 +109,7 @@ def draft_email(
         days=incident.days_open,
         evidence=_evidence(monitor, incident),
         monitor=monitor.name.lower(),
+        entity=monitor.entity,
     )
     reply_by = (snapshot_date + timedelta(days=REPLY_WINDOW_DAYS)).isoformat()
 
@@ -103,15 +122,15 @@ def draft_email(
             "We monitor the OpenActive feeds you publish as part of the open data service.",
             f"In our snapshot of {snapshot_date.isoformat()}, {observation}",
             "",
-            f"Feed: {incident.feed_name or EMPTY}",
-            f"Feed type: {incident.feed_type or EMPTY}",
-            f"Endpoint: {incident.feed_url or EMPTY}",
+            *_identifying_lines(monitor, incident),
             f"First detected: {_first_detected(incident)}",
             "",
-            "Could you confirm whether the export that populates this feed is still running,",
+            f"Could you confirm whether the export that populates this {monitor.entity} is "
+            "still running,",
             f"and let us know by {reply_by} if you need help investigating.",
             "",
-            "No action is needed on our side once the feed resumes; the check clears itself",
+            f"No action is needed on our side once the {monitor.entity} resumes; the check "
+            "clears itself",
             "on the next daily snapshot.",
             "",
             "Thank you,",

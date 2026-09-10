@@ -289,6 +289,7 @@ def test_an_all_clear_snapshot_reads_green(payload) -> None:
 
 def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) -> None:
     assert sidebar_counts(summary.data) == {
+        "dataset_stall": 4,
         "single_feed_stall": 23,
         "feed_ingestion_error": 9,
         "dataset_orphaned_children": 590056,

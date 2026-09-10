@@ -15,10 +15,9 @@ custom JS components).
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
-**Only part of the backing API exists.** `single_feed_stall` and `feed_ingestion_error` read
-the live interim admin API (`/admin/single-feed-stall-incidents` and
-`/admin/single-feed-stall-trend`, `/admin/feed-ingestion-error-incidents` and
-`/admin/feed-ingestion-error-trend`, `?as_of=` plus `?token=`), and `/admin/summary` is live
+**Only part of the backing API exists.** `dataset_stall`, `single_feed_stall` and
+`feed_ingestion_error` read the live interim admin API (`/admin/<slug>-incidents` and
+`/admin/<slug>-trend`, `?as_of=` plus `?token=`), and `/admin/summary` is live
 too — it sends `null` for the counts its batch
 does not compute yet, which the overview shows as "not reported" (see the `/summary`
 contract below). `dataset_orphaned_children` reads
@@ -62,7 +61,8 @@ src/stewards/
   api/errors.py              ApiUnavailable | ApiUnauthorized | ApiNotFound | ApiContractError
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
-  monitors/registry.py       Monitor / Col / ColKind / RowSpec / Group / Severity + MONITOR_REGISTRY
+  monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
+                             + MONITOR_REGISTRY (registry order is card and sidebar order)
   monitors/tile_viz.py       Sparkline | Gauge — what a monitor's overview card draws
   monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score/risk tones
   monitors/health.py         trend arithmetic -> CRITICAL/WARNING/HEALTHY, per monitor
@@ -103,7 +103,8 @@ tests/
    sample payloads + one test module. If a new monitor forces an edit to `transforms.py` or
    `incident_table.py`, generalise the component instead of special-casing.
 5. **Read-only.** No mute, assign, re-crawl, or send-email actions. A copyable email
-   draft is the only output. CSV export was removed from the header on request — do not
+   draft is the only output; what it says about an incident comes off the registry entry
+   (`entity`, `email_fields`, `summary_field`), never a monitor id in the renderer. CSV export was removed from the header on request — do not
    reintroduce a download button without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,

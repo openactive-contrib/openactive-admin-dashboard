@@ -18,7 +18,7 @@ from typing import Any
 import pandas as pd
 
 from stewards.api.models import DetailModel, Incident
-from stewards.monitors.registry import PART_PREFIX, RAG_KINDS, Col, ColKind, Monitor
+from stewards.monitors.registry import PART_PREFIX, RAG_KINDS, Col, ColKind, Monitor, RowDetail
 from stewards.monitors.thresholds import (
     Tone,
     days_label,
@@ -191,6 +191,33 @@ def tone_frame(monitor: Monitor, rows: Sequence[RowLike]) -> pd.DataFrame:
         for row in rows
     ]
     return pd.DataFrame(records, columns=labels).fillna("")
+
+
+def detail_items(monitor: Monitor, incident: Incident, spec: RowDetail) -> list[Row]:
+    """The selected row's detail list, as rows its own columns can be read against."""
+    items = resolve_field(monitor, incident, spec.field) or ()
+    return [Row(incident, item) for item in items]
+
+
+def detail_frame(monitor: Monitor, rows: Sequence[Row], spec: RowDetail) -> pd.DataFrame:
+    """The row-detail table, formatted by the same column kinds as the main table."""
+    labels = [col.label for col in spec.columns]
+    records = [
+        {
+            col.label: format_cell(col, resolve_field(monitor, row, col.field))
+            for col in spec.columns
+        }
+        for row in rows
+    ]
+    return pd.DataFrame(records, columns=labels)
+
+
+def detail_caption(monitor: Monitor, incident: Incident, spec: RowDetail) -> str:
+    """The caption above that table, with `{count}` filled from the declared count field."""
+    if spec.count_field is None:
+        return spec.caption
+    total = resolve_field(monitor, incident, spec.count_field)
+    return spec.caption.format(count=f"{total:,}" if isinstance(total, int) else EMPTY)
 
 
 def rag_columns(monitor: Monitor) -> list[str]:

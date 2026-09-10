@@ -54,6 +54,23 @@ class FeedIngestionErrorDetail(DetailModel):
     last_completed: date | None = None
 
 
+class DatasetStallFeed(DetailModel):
+    """One feed inside a stalled dataset, and when it last published."""
+
+    feed_id: str | None = None
+    feed_name: str | None = None
+    last_published: date | None = None
+    consecutive_days: int | None = None
+
+
+class DatasetStallDetail(DetailModel):
+    last_modified: date | None = None
+    dataset_name: str | None = None
+    dataset_url: str | None = None
+    feed_count: int | None = None
+    feeds: tuple[DatasetStallFeed, ...] = ()
+
+
 class OrphanKind(DetailModel):
     """One `by_kind` breakdown row: the orphans of a single child type in one dataset."""
 

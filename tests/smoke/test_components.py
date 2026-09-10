@@ -554,32 +554,46 @@ def test_selecting_an_orphan_row_offers_the_email_draft_and_the_missing_parents(
 # --- the missing-parents table a selected row opens ---------------------------------------
 
 
-def _missing_parents_script() -> None:
+def _row_detail_script(monitor_id: str, fixture: str) -> None:
     from fixture_loader import load_sample
     from stewards.api.models import IncidentPage
-    from stewards.components.monitor_page import render_missing_parents
+    from stewards.components.monitor_page import render_row_detail
     from stewards.monitors.registry import get_monitor
 
-    page = IncidentPage.model_validate(load_sample("dataset_orphaned_children_incidents"))
-    render_missing_parents(get_monitor("dataset_orphaned_children"), page.data[0])
+    page = IncidentPage.model_validate(load_sample(fixture))
+    render_row_detail(get_monitor(monitor_id), page.data[0])
 
 
 def test_the_missing_parents_table_names_the_parents_and_their_children() -> None:
-    app = run(_missing_parents_script)
+    app = run(
+        _row_detail_script, "dataset_orphaned_children", "dataset_orphaned_children_incidents"
+    )
     frame = app.dataframe[0].value
     assert list(frame.columns) == ["Missing parent id", "Children affected"]
     assert len(frame) == 3
     # Worst first, as the API reports them.
     assert list(frame["Children affected"]) == sorted(frame["Children affected"], reverse=True)
     assert all("facility-uses" in value for value in frame["Missing parent id"])
-    assert any("59" in caption.value for caption in app.caption)
+    # The caption states the true total, not merely how many rows it could show.
+    assert any("59 it counted" in caption.value for caption in app.caption)
 
 
-def _missing_parents_absent_script() -> None:
+def test_the_frozen_feeds_table_lists_every_feed_and_when_it_last_published() -> None:
+    """The same renderer, a different monitor, no component change — that is the point."""
+    app = run(_row_detail_script, "dataset_stall", "dataset_stall_incidents")
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == ["Feed", "Last published", "Days silent", "Feed id"]
+    assert list(frame["Feed"]) == ["slots", "facility-uses"]
+    # A feed that never published inside the window has no date and no silence to count.
+    assert list(frame["Last published"]) == ["2026-09-01", "—"]
+    assert list(frame["Days silent"]) == ["9d", "—"]
+
+
+def _row_detail_absent_script() -> None:
     import streamlit as st
 
     from stewards.api.models import Incident
-    from stewards.components.monitor_page import render_missing_parents
+    from stewards.components.monitor_page import render_row_detail
     from stewards.monitors.registry import get_monitor
 
     incident = Incident.model_validate(
@@ -589,17 +603,19 @@ def _missing_parents_absent_script() -> None:
             "publisher_name": "Publisher X",
             "past_threshold": False,
             "status": "open",
-            "detail": {"missing_parents": []},
+            "detail": {"missing_parents": [], "feeds": []},
         }
     )
-    render_missing_parents(get_monitor("dataset_orphaned_children"), incident)
-    render_missing_parents(get_monitor("single_feed_stall"), incident)
+    # An empty list, and a monitor that declares no row detail at all.
+    render_row_detail(get_monitor("dataset_orphaned_children"), incident)
+    render_row_detail(get_monitor("dataset_stall"), incident)
+    render_row_detail(get_monitor("single_feed_stall"), incident)
     st.write("done")
 
 
-def test_a_row_with_no_missing_parents_renders_no_table_at_all() -> None:
-    """And neither does a monitor whose detail model has no such field — no id branching."""
-    app = run(_missing_parents_absent_script)
+def test_a_row_with_nothing_to_show_renders_no_table_at_all() -> None:
+    """And neither does a monitor that declares no row detail — no id branching anywhere."""
+    app = run(_row_detail_absent_script)
     assert not app.dataframe
     assert not app.expander
 
