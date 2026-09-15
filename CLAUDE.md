@@ -15,8 +15,9 @@ custom JS components).
 tests — is `docs/adding-a-dashboard.md`.** `.claude/skills/add-monitor/SKILL.md` is the
 agent entry point and points at that doc; keep the procedure in the doc, not in the skill.
 
-**Only part of the backing API exists.** `dataset_stall`, `single_feed_stall` and
-`feed_ingestion_error` read the live interim admin API (`/admin/<slug>-incidents` and
+**Only part of the backing API exists.** `dataset_stall`, `single_feed_stall`,
+`feed_ingestion_error` and `dataset_future_decline` read the live interim admin API
+(`/admin/<slug>-incidents` and
 `/admin/<slug>-trend`, `?as_of=` plus `?token=`), and `/admin/summary` is live
 too — it sends `null` for the counts its batch
 does not compute yet, which the overview shows as "not reported" (see the `/summary`

@@ -20,6 +20,7 @@ PAGES = [
     "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
     "22_dataset_orphaned_children.py",
+    "23_dataset_future_decline.py",
 ]
 
 MONITOR_PAGES = [
@@ -27,6 +28,7 @@ MONITOR_PAGES = [
     "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
     "22_dataset_orphaned_children.py",
+    "23_dataset_future_decline.py",
 ]
 
 #: Page filename -> registry id, so the counts a page must render are read from the monitor
@@ -36,6 +38,7 @@ MONITOR_IDS = {
     "11_single_feed_stalls.py": "single_feed_stall",
     "12_feed_ingestion_errors.py": "feed_ingestion_error",
     "22_dataset_orphaned_children.py": "dataset_orphaned_children",
+    "23_dataset_future_decline.py": "dataset_future_decline",
 }
 
 

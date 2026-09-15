@@ -14,14 +14,20 @@ from stewards.api import client as client_module
 
 BASE = "https://api.test/api/v1"
 
-#: Every registered monitor serves incidents; only these two serve a trend.
+#: Every registered monitor serves incidents; the orphan monitor alone serves no trend.
 MONITOR_IDS = (
     "dataset_stall",
     "single_feed_stall",
     "feed_ingestion_error",
     "dataset_orphaned_children",
+    "dataset_future_decline",
 )
-TREND_IDS = ("dataset_stall", "single_feed_stall", "feed_ingestion_error")
+TREND_IDS = (
+    "dataset_stall",
+    "single_feed_stall",
+    "feed_ingestion_error",
+    "dataset_future_decline",
+)
 
 
 @pytest.fixture(autouse=True)

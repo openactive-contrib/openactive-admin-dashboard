@@ -1,0 +1,450 @@
+{
+  "data": [
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_better-better-admin",
+      "publisher_name": "Better (better-admin)",
+      "dataset_url": "https://better-admin.org.uk/api/openactive/better",
+      "dataset_name": "Better Sessions and Facilities",
+      "feed_count": 1,
+      "first_detected": "2026-08-12",
+      "days_open": 9,
+      "consecutive_days": 9,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        206069,
+        202140,
+        198974,
+        196018,
+        193009,
+        190167,
+        187137,
+        183814,
+        180114,
+        177186
+      ],
+      "detail": {
+        "reason": "monotonic_decline",
+        "window_days": 5,
+        "start_total": 190167,
+        "current_total": 177186,
+        "drop": 12981,
+        "drop_percent": 6.83,
+        "feeds": [
+          {
+            "feed_id": "better-admin-org-uk-api-openactive-better-scheduled-sessions",
+            "feed_name": "scheduled-sessions",
+            "reason": "monotonic_decline",
+            "start_future": 190167,
+            "current_future": 177186,
+            "drop": 12981,
+            "drop_percent": 6.83,
+            "consecutive_declining_days": 9,
+            "largest_daily_drop_percent": 2.01,
+            "updated_in_window": 332,
+            "deletes_in_window": 16131
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_gll",
+      "publisher_name": "GLL",
+      "dataset_url": "http://data.better.org.uk/",
+      "dataset_name": "Better activities",
+      "feed_count": 1,
+      "first_detected": "2026-08-14",
+      "days_open": 7,
+      "consecutive_days": 7,
+      "past_threshold": true,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        124830,
+        123218,
+        124076,
+        126171,
+        124555,
+        123585,
+        122119,
+        120317,
+        118680,
+        118157
+      ],
+      "detail": {
+        "reason": "monotonic_decline",
+        "window_days": 5,
+        "start_total": 123585,
+        "current_total": 118157,
+        "drop": 5428,
+        "drop_percent": 4.39,
+        "feeds": [
+          {
+            "feed_id": "better-org-uk-odi-sessions-json",
+            "feed_name": "sessions.json",
+            "reason": "monotonic_decline",
+            "start_future": 123585,
+            "current_future": 118157,
+            "drop": 5428,
+            "drop_percent": 4.39,
+            "consecutive_declining_days": 7,
+            "largest_daily_drop_percent": 1.48,
+            "updated_in_window": 44773,
+            "deletes_in_window": 821
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_brimhams-active",
+      "publisher_name": "Brimhams Active",
+      "dataset_url": "https://brimhamsactive.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Brimhams Active Sessions and Facilities",
+      "feed_count": 1,
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        1668,
+        1690,
+        1580,
+        1461,
+        1326,
+        1244,
+        1147,
+        1100,
+        1080,
+        956
+      ],
+      "detail": {
+        "reason": "both",
+        "window_days": 5,
+        "start_total": 1244,
+        "current_total": 956,
+        "drop": 288,
+        "drop_percent": 23.15,
+        "feeds": [
+          {
+            "feed_id": "opendata-leisurecloud-live-api-feeds-BrimhamsActive-live-scheduled-sessions",
+            "feed_name": "BrimhamsActive-live-scheduled-sessions",
+            "reason": "both",
+            "start_future": 1244,
+            "current_future": 956,
+            "drop": 288,
+            "drop_percent": 23.15,
+            "consecutive_declining_days": 4,
+            "largest_daily_drop_percent": 11.48,
+            "updated_in_window": 3721,
+            "deletes_in_window": 673
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_places-leisure",
+      "publisher_name": "Places Leisure",
+      "dataset_url": "https://placesleisure.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Places Leisure Sessions and Facilities",
+      "feed_count": 1,
+      "first_detected": "2026-08-19",
+      "days_open": 2,
+      "consecutive_days": 2,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        2287,
+        1684,
+        864,
+        666,
+        555,
+        502,
+        448,
+        417,
+        340,
+        359
+      ],
+      "detail": {
+        "reason": "sharp_drop",
+        "window_days": 5,
+        "start_total": 502,
+        "current_total": 359,
+        "drop": 143,
+        "drop_percent": 28.49,
+        "feeds": [
+          {
+            "feed_id": "opendata-leisurecloud-live-api-feeds-PlacesLeisure-live-session-series",
+            "feed_name": "PlacesLeisure-live-session-series",
+            "reason": "sharp_drop",
+            "start_future": 502,
+            "current_future": 359,
+            "drop": 143,
+            "drop_percent": 28.49,
+            "consecutive_declining_days": 2,
+            "largest_daily_drop_percent": 18.47,
+            "updated_in_window": 427,
+            "deletes_in_window": 238
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_england-netball",
+      "publisher_name": "England Netball",
+      "dataset_url": "https://data.englandnetball.co.uk/",
+      "dataset_name": "England Netball Sessions - Open Data",
+      "feed_count": 1,
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        null,
+        null,
+        3718,
+        3731,
+        3669,
+        3612,
+        3588,
+        null,
+        null,
+        3522
+      ],
+      "detail": {
+        "reason": "monotonic_decline",
+        "window_days": 5,
+        "start_total": 3612,
+        "current_total": 3522,
+        "drop": 90,
+        "drop_percent": 2.49,
+        "feeds": [
+          {
+            "feed_id": "data-englandnetball-co-uk-sessions",
+            "feed_name": "sessions",
+            "reason": "monotonic_decline",
+            "start_future": 3612,
+            "current_future": 3522,
+            "drop": 90,
+            "drop_percent": 2.49,
+            "consecutive_declining_days": 4,
+            "largest_daily_drop_percent": 1.84,
+            "updated_in_window": 42,
+            "deletes_in_window": 0
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_bookwhen",
+      "publisher_name": "Bookwhen",
+      "dataset_url": "https://api.bookwhen.com/openactive/",
+      "dataset_name": "Bookwhen Courses, Sessions, and Events",
+      "feed_count": 2,
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        201,
+        194,
+        188,
+        180,
+        173,
+        166,
+        158,
+        150,
+        143,
+        137
+      ],
+      "detail": {
+        "reason": "both",
+        "window_days": 5,
+        "start_total": 166,
+        "current_total": 137,
+        "drop": 29,
+        "drop_percent": 17.47,
+        "feeds": [
+          {
+            "feed_id": "api-bookwhen-com-openactive-sessionseries",
+            "feed_name": "sessionseries",
+            "reason": "sharp_drop",
+            "start_future": 69,
+            "current_future": 54,
+            "drop": 15,
+            "drop_percent": 21.74,
+            "consecutive_declining_days": 1,
+            "largest_daily_drop_percent": 14.29,
+            "updated_in_window": 59,
+            "deletes_in_window": 0
+          },
+          {
+            "feed_id": "api-bookwhen-com-openactive-courseinstances",
+            "feed_name": "courseinstances",
+            "reason": "monotonic_decline",
+            "start_future": 97,
+            "current_future": 83,
+            "drop": 14,
+            "drop_percent": 14.43,
+            "consecutive_declining_days": 4,
+            "largest_daily_drop_percent": 9.78,
+            "updated_in_window": 16,
+            "deletes_in_window": 0
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_our-parks",
+      "publisher_name": "Our Parks",
+      "dataset_url": "https://api.ourparks.org.uk/openactive/",
+      "dataset_name": "Our Parks Events",
+      "feed_count": 1,
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        812,
+        803,
+        795,
+        788,
+        780,
+        771,
+        764,
+        757,
+        752,
+        747
+      ],
+      "detail": {
+        "reason": "monotonic_decline",
+        "window_days": 5,
+        "start_total": 771,
+        "current_total": 747,
+        "drop": 24,
+        "drop_percent": 3.11,
+        "feeds": [
+          {
+            "feed_id": "api-ourparks-org-uk-openactive-events",
+            "feed_name": "events",
+            "reason": "monotonic_decline",
+            "start_future": 771,
+            "current_future": 747,
+            "drop": 24,
+            "drop_percent": 3.11,
+            "consecutive_declining_days": 4,
+            "largest_daily_drop_percent": 1.82,
+            "updated_in_window": 3,
+            "deletes_in_window": 5
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_led-community-leisure",
+      "publisher_name": "LED Community Leisure Ltd",
+      "dataset_url": "https://led.gs-signature.cloud/OpenActive/",
+      "dataset_name": "LED Community Leisure Ltd Sessions and Facilities",
+      "feed_count": 1,
+      "first_detected": "2026-08-17",
+      "days_open": 4,
+      "consecutive_days": 4,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        96,
+        93,
+        90,
+        86,
+        81,
+        76,
+        74,
+        71,
+        69,
+        67
+      ],
+      "detail": {
+        "reason": "sharp_drop",
+        "window_days": 5,
+        "start_total": 76,
+        "current_total": 67,
+        "drop": 9,
+        "drop_percent": 11.84,
+        "feeds": [
+          {
+            "feed_id": "opendata-leisurecloud-live-api-feeds-LEDCommunityLeisureLtd-live-session-series",
+            "feed_name": "LEDCommunityLeisureLtd-live-session-series",
+            "reason": "sharp_drop",
+            "start_future": 76,
+            "current_future": 67,
+            "drop": 9,
+            "drop_percent": 11.84,
+            "consecutive_declining_days": 4,
+            "largest_daily_drop_percent": 19.74,
+            "updated_in_window": null,
+            "deletes_in_window": null
+          }
+        ]
+      }
+    },
+    {
+      "monitor_id": "dataset_future_decline",
+      "publisher_id": "pub_open-sessions",
+      "publisher_name": "Open Sessions",
+      "dataset_url": "https://opensessions.io/api/openactive/",
+      "dataset_name": "Open Sessions Sessions and Events",
+      "feed_count": 1,
+      "first_detected": "2026-08-18",
+      "days_open": 3,
+      "consecutive_days": 3,
+      "past_threshold": false,
+      "status": "open",
+      "last_contacted": null,
+      "trend": [
+        178,
+        171,
+        166,
+        158,
+        150,
+        143,
+        138,
+        131,
+        126,
+        121
+      ],
+      "detail": {
+        "reason": "sharp_drop",
+        "window_days": 5,
+        "start_total": 143,
+        "current_total": 121,
+        "drop": 22,
+        "drop_percent": 15.38
+      }
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "total": 9,
+    "page": 1,
+    "page_size": 500
+  }
+}

@@ -293,6 +293,7 @@ def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) ->
         "single_feed_stall": 23,
         "feed_ingestion_error": 9,
         "dataset_orphaned_children": 590056,
+        "dataset_future_decline": 9,
     }
 
 

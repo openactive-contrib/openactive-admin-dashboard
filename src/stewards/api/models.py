@@ -120,6 +120,92 @@ class OrphanedChildrenDetail(DetailModel):
         return None if self.orphan_share is None else 100.0 * self.orphan_share
 
 
+#: How the batch describes why a dataset or feed was flagged, in the copy the table shows.
+FUTURE_DECLINE_REASONS = {
+    "monotonic_decline": "Monotonic decline",
+    "sharp_drop": "Sharp drop",
+    "both": "Both",
+}
+
+
+class FutureDeclineWindow(DetailModel):
+    """What a declining dataset and one of its feeds both report for the window.
+
+    The two levels name their figures alike so a dataset the batch reported without a feed
+    breakdown still fills the same columns from its own totals.
+    """
+
+    reason: str | None = None
+    drop: int | None = None
+    drop_percent: float | None = None
+
+    #: Item counts the crawl saw in the window. The batch reports these per feed; a
+    #: dataset-level row has none, and the delta below is then absent rather than zero.
+    updated_in_window: int | None = None
+    deletes_in_window: int | None = None
+
+    @property
+    def reason_label(self) -> str | None:
+        """The reason token as prose. An unrecognised token still reads, de-slugged."""
+        if not self.reason:
+            return None
+        deslugged = self.reason.replace("_", " ").capitalize()
+        return FUTURE_DECLINE_REASONS.get(self.reason, deslugged)
+
+    @property
+    def delta_in_window(self) -> int | None:
+        """Items updated minus items deleted over the window.
+
+        Negative is the finding: the feed removed more than it refreshed, which is what
+        pulls a dataset's future count down. None rather than zero where either figure is
+        missing, because an unreported count is not a balanced one.
+        """
+        if self.updated_in_window is None or self.deletes_in_window is None:
+            return None
+        return self.updated_in_window - self.deletes_in_window
+
+    @property
+    def deficit_in_window(self) -> int | None:
+        """`delta_in_window` the other way up, so descending order is worst first.
+
+        The table sorts on this rather than on the delta itself: the row a steward wants at
+        the top is the one deleting hardest, which is the *most negative* delta.
+        """
+        delta = self.delta_in_window
+        return None if delta is None else -delta
+
+
+class FutureDeclineFeed(FutureDeclineWindow):
+    """One feed inside a declining dataset, and what the window did to it."""
+
+    feed_id: str | None = None
+    feed_name: str | None = None
+    start_future: int | None = None
+    current_future: int | None = None
+    consecutive_declining_days: int | None = None
+    largest_daily_drop_percent: float | None = None
+
+
+class FutureDeclineDetail(FutureDeclineWindow):
+    dataset_name: str | None = None
+    dataset_url: str | None = None
+    feed_count: int | None = None
+    window_days: int | None = None
+    start_total: int | None = None
+    current_total: int | None = None
+    feeds: tuple[FutureDeclineFeed, ...] = ()
+
+    #: The dataset's own totals under the names its feeds use, so a dataset reported
+    #: without a breakdown fills the same two columns instead of leaving them blank.
+    @property
+    def start_future(self) -> int | None:
+        return self.start_total
+
+    @property
+    def current_future(self) -> int | None:
+        return self.current_total
+
+
 class Incident(ApiModel):
     monitor_id: str
     publisher_id: str

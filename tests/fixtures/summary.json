@@ -54,6 +54,20 @@
         "count": 590056,
         "past_threshold_count": 0,
         "sparkline": []
+      },
+      {
+        "monitor_id": "dataset_future_decline",
+        "count": 9,
+        "past_threshold_count": 2,
+        "sparkline": [
+          10,
+          11,
+          10,
+          9,
+          10,
+          11,
+          9
+        ]
       }
     ],
     "publishers_with_issues_delta": 3,
@@ -63,7 +77,7 @@
   "meta": {
     "snapshot_date": "2026-08-21",
     "generated_at": "2026-08-21T06:12:04Z",
-    "total": 4,
+    "total": 5,
     "page": 1,
     "page_size": 100
   }

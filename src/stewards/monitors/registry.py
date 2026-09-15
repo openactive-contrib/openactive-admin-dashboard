@@ -14,6 +14,8 @@ from stewards.api.models import (
     DatasetStallDetail,
     DetailModel,
     FeedIngestionErrorDetail,
+    FutureDeclineDetail,
+    FutureDeclineFeed,
     OrphanedChildrenDetail,
     OrphanKind,
     StallDetail,
@@ -441,12 +443,96 @@ DATASET_ORPHANED_CHILDREN = Monitor(
 )
 
 
+DATASET_FUTURE_DECLINE = Monitor(
+    id="dataset_future_decline",
+    name="Future opportunity decline",
+    group=Group.CONTENT,
+    severity=Severity.HIGH,
+    blurb=(
+        "Datasets whose count of opportunities starting in the future has fallen every day "
+        "of the last 5 snapshots, or has dropped sharply within that window. The feed rows "
+        "carry what the window did to each feed: how many items it updated, how many it "
+        "deleted, and the difference between the two, which is what a falling future count "
+        "usually comes down to. A dataset that has stopped publishing altogether is "
+        "reported as a stall rather than a decline."
+    ),
+    unit="datasets declining",
+    detail_model=FutureDeclineDetail,
+    # The question is which feed is pulling the dataset down, so each dataset becomes one
+    # row per feed rather than one row hiding its feeds in a cell.
+    rows=RowSpec("detail.feeds", FutureDeclineFeed),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("detail.dataset_name", "Dataset", ColKind.TEXT),
+        Col("part.feed_name", "Feed", ColKind.MONO),
+        Col("part.reason_label", "Reason", ColKind.TEXT),
+        Col(
+            "part.current_future",
+            "Future now",
+            ColKind.NUMBER,
+            help="Opportunities starting after the snapshot date, at the end of the window",
+        ),
+        Col(
+            "part.drop_percent",
+            "Drop",
+            ColKind.RISK,
+            help="Share of the window's starting future count that has gone",
+        ),
+        Col(
+            "part.updated_in_window",
+            "Updated",
+            ColKind.NUMBER,
+            help="Items the crawl saw created or updated during the window",
+        ),
+        Col(
+            "part.deletes_in_window",
+            "Deletes",
+            ColKind.NUMBER,
+            help="Items the feed deleted during the window",
+        ),
+        Col(
+            "part.delta_in_window",
+            "Delta",
+            ColKind.NUMBER,
+            help="Updated minus deletes. Negative means it removed more than it refreshed",
+        ),
+        Col("days_open", "Days declining", ColKind.DAYS),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The dataset's future count over the recent snapshots; a gap is omitted",
+        ),
+        Col("detail.dataset_url", "Dataset feed", ColKind.LINK, help="Opens the dataset feed"),
+    ),
+    filters=(FilterSpec("part.reason_label", "Reason"),),
+    # Descending on the deficit is ascending on the delta: the feed deleting hardest relative
+    # to what it refreshed is the one a steward is looking for, and it is the most negative
+    # delta, not the largest one.
+    sort_field="part.deficit_in_window",
+    threshold_help=(
+        "Show only the datasets the API has flagged past its own contact threshold."
+    ),
+    summary_field="detail.dataset_name",
+    entity="dataset",
+    email_fields=(
+        ("Dataset", "detail.dataset_name"),
+        ("Feeds", "detail.feed_count"),
+        ("Endpoint", "detail.dataset_url"),
+    ),
+    query="monitor_dataset_future_decline_v1",
+    page="views/23_dataset_future_decline.py",
+    kpi_labels=("datasets declining", "publishers affected", "past threshold"),
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
     SINGLE_FEED_STALL,
     FEED_INGESTION_ERROR,
     DATASET_ORPHANED_CHILDREN,
+    DATASET_FUTURE_DECLINE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}
