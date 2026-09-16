@@ -87,9 +87,9 @@ class OrphanKind(DetailModel):
         None rather than zero when nothing was checked: a kind the crawl did not reach has
         no share to report, and a zero would read as "none orphaned".
         """
-        if not self.checked_count or self.orphan_count is None:
+        if not self.child_count or self.orphan_count is None:
             return None
-        return 100.0 * self.orphan_count / self.checked_count
+        return 100.0 * self.orphan_count / self.child_count
 
 
 class MissingParent(DetailModel):

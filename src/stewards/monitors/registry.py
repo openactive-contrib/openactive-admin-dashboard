@@ -398,10 +398,10 @@ DATASET_ORPHANED_CHILDREN = Monitor(
         Col("part.kind", "Child type", ColKind.TEXT),
         Col("part.orphan_count", "Orphans", ColKind.NUMBER),
         Col(
-            "part.checked_count",
-            "Children checked",
+            "part.child_count",
+            "Child Count",
             ColKind.NUMBER,
-            help="Children of this type the crawl resolved a parent for, or failed to",
+            help="Number of children of this type the crawl reached in the dataset",
         ),
         Col("part.orphan_percent", "Share orphaned", ColKind.RISK),
         Col(
