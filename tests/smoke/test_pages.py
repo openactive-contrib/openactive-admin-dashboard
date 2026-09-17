@@ -21,8 +21,11 @@ PAGES = [
     "12_feed_ingestion_errors.py",
     "22_dataset_orphaned_children.py",
     "23_dataset_future_decline.py",
+    "30_feed_quality.py",
 ]
 
+#: Pages rendered by `components.monitor_page` — the incident shape. The quality page has a
+#: shape of its own and is asserted separately below.
 MONITOR_PAGES = [
     "10_dataset_stalls.py",
     "11_single_feed_stalls.py",
@@ -30,6 +33,8 @@ MONITOR_PAGES = [
     "22_dataset_orphaned_children.py",
     "23_dataset_future_decline.py",
 ]
+
+QUALITY_PAGES = ["30_feed_quality.py"]
 
 #: Page filename -> registry id, so the counts a page must render are read from the monitor
 #: rather than hard-coded per page.
@@ -39,6 +44,7 @@ MONITOR_IDS = {
     "12_feed_ingestion_errors.py": "feed_ingestion_error",
     "22_dataset_orphaned_children.py": "dataset_orphaned_children",
     "23_dataset_future_decline.py": "dataset_future_decline",
+    "30_feed_quality.py": "feed_quality",
 }
 
 
@@ -128,6 +134,39 @@ def test_selectbox_filter_narrows_the_table() -> None:
     assert len(app.dataframe[0].value) == 2
 
 
+@pytest.mark.parametrize("name", QUALITY_PAGES)
+def test_quality_page_has_five_figures_four_charts_and_one_table(name: str) -> None:
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor(MONITOR_IDS[name])
+    app = run(name)
+    assert len(app.dataframe) == 1
+    assert len(app.get("vega_lite_chart")) == 4
+    assert len(app.selectbox) == len(monitor.filters)
+    assert len(app.toggle) == 1  # "issues only" stands where the threshold toggle would
+    assert len(app.text_input) == 1
+
+
+def test_quality_table_carries_every_declared_column_grouped_by_dataset() -> None:
+    from stewards.monitors.registry import get_monitor
+
+    app = run("30_feed_quality.py")
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == [c.label for c in get_monitor("feed_quality").columns]
+    assert len(frame) == 15
+    # A dataset's feeds are consecutive: no dataset name reappears after another intervenes.
+    datasets = list(frame["Dataset"])
+    assert len(list(dict.fromkeys(datasets))) == len({*datasets})
+
+
+def test_quality_issues_toggle_narrows_the_table() -> None:
+    app = run("30_feed_quality.py")
+    assert len(app.dataframe[0].value) == 15
+    app.toggle[0].set_value(True).run()
+    assert not app.exception
+    assert len(app.dataframe[0].value) == 5
+
+
 def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
 
@@ -141,13 +180,16 @@ def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
 
 def test_each_tile_carries_a_state_chip_and_a_sparkline() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
+    from stewards.monitors.tile_viz import Facts
 
     app = run("00_overview.py")
     markdown = " ".join(m.value for m in app.markdown)
     assert markdown.count("-badge[") >= len(MONITOR_REGISTRY)
     assert "CRITICAL" in markdown
-    # One sparkline per tile, drawn as an Altair chart.
-    assert len(app.get("vega_lite_chart")) == len(MONITOR_REGISTRY)
+    # One chart per tile — except a card whose figures are its visualisation, which draws
+    # none at all rather than an empty axis.
+    charted = [m for m in MONITOR_REGISTRY if not isinstance(m.viz, Facts)]
+    assert len(app.get("vega_lite_chart")) == len(charted)
 
 
 def test_each_tile_says_which_way_its_series_is_moving() -> None:
@@ -164,9 +206,7 @@ def test_each_tile_says_which_way_its_series_is_moving() -> None:
     text = " ".join(captions) + " ".join(m.value for m in app.markdown)
     series_tiles = [m for m in MONITOR_REGISTRY if isinstance(m.viz, Sparkline)]
     assert sum("snapshots" in caption for caption in captions) == len(series_tiles)
-    for monitor in MONITOR_REGISTRY:
-        if not isinstance(monitor.viz, Sparkline):
-            assert "benchmark" in text
+    assert "benchmark" in text  # the gauge card names its reference instead of a movement
 
 
 def test_overview_banner_names_the_threshold() -> None:

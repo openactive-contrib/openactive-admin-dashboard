@@ -14,7 +14,7 @@ from stewards.api import client as client_module
 
 BASE = "https://api.test/api/v1"
 
-#: Every registered monitor serves incidents; the orphan monitor alone serves no trend.
+#: Every incident-backed monitor serves incidents; the orphan monitor alone serves no trend.
 MONITOR_IDS = (
     "dataset_stall",
     "single_feed_stall",
@@ -22,6 +22,9 @@ MONITOR_IDS = (
     "dataset_orphaned_children",
     "dataset_future_decline",
 )
+
+#: Monitors backed by a quality snapshot instead: one read, no incidents and no trend.
+QUALITY_IDS = ("feed_quality",)
 TREND_IDS = (
     "dataset_stall",
     "single_feed_stall",
@@ -60,6 +63,10 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         for monitor_id in set(MONITOR_IDS) - set(TREND_IDS):
             mock.get(f"{BASE}/monitors/{monitor_id}/trend").mock(
                 return_value=httpx.Response(404)
+            )
+        for monitor_id in QUALITY_IDS:
+            mock.get(f"{BASE}/monitors/{monitor_id}/quality").mock(
+                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_quality"))
             )
         yield
 

@@ -2,7 +2,7 @@
 title: Adding a dashboard
 tags: [contributing, monitors, dashboard]
 owner: Data Infrastructure
-updated: 2026-09-02
+updated: 2026-09-16
 sensitivity: internal
 ---
 
@@ -32,6 +32,7 @@ data. The complete file list, for any new monitor:
 | `src/stewards/api/sample_data/<id>_trend.json` | new: 30-snapshot series for the chart |
 | `src/stewards/api/sample_data/summary.json` | append a `MonitorCount` for the new id — this is what makes the home-page card and the sidebar badge real |
 | `tests/unit/test_<id>.py` | happy path, empty input, threshold boundary |
+| *(a quality monitor instead)* | `<id>_quality.json` in place of the two payloads above, and no `summary.json` entry — see "Two backing reads" |
 | `src/stewards/api/models.py` *(only if the monitor has `detail` fields)* | a `DetailModel` subclass |
 | `src/stewards/monitors/email_draft.py` *(optional)* | a check-specific observation sentence |
 
@@ -43,12 +44,53 @@ or any other shared module, that is a signal the shared code is not general enou
 Generalise the component instead of special-casing the monitor. That rule is what keeps
 eight dashboards from becoming eight one-off pages.
 
+## Two backing reads
+
+Most monitors report **incidents**, and everything below assumes that shape. One other shape
+exists, declared as `source=Source.QUALITY` on the registry entry: a **quality snapshot** —
+one row per feed carrying this snapshot's measurements, a fleet-wide `summary` block beside
+the rows, and no history at all.
+
+The two are not interchangeable. A quality row has no `first_detected`, no `days_open` and no
+`past_threshold`, and folding it into an `Incident` would mean inventing all three. So a
+quality monitor swaps the parts of the app that depend on an incident ageing, and keeps
+everything else:
+
+| | `Source.INCIDENTS` (default) | `Source.QUALITY` |
+|---|---|---|
+| Read | `incidents` + `trend` | `quality` (one request; see §2) |
+| Shaping | `monitors/transforms.py` | `monitors/quality.py` |
+| Page | `components/monitor_page.py` | `components/quality_page.py` |
+| Above the table | 3 KPIs, then the trend chart | 5 figures off the `summary` block, then 4 summary charts |
+| Table | incidents, worst-first on `sort_field` | feeds, grouped by dataset, datasets ordered by `sort_field` |
+| Threshold toggle | "Past threshold only" | "Issues only" — nothing ages, so nothing passes a threshold |
+| Row selection | the publisher email draft | the feed's own assessment: issues, missing required fields, coverage per field |
+| Contact queue | included | never: it has no incidents to contact anyone about |
+| Card | `Sparkline` or `Gauge` off `/summary` | `Facts` — the monitor supplies the card, verdict included |
+| Sample payload | `<id>_incidents.json`, `<id>_trend.json` | `<id>_quality.json` |
+
+What is unchanged is everything the registry already drove: `columns` and `ColKind` format
+and RAG-shade the table exactly as they do an incident table, `filters` become the same
+selectboxes, `thresholds.py` supplies every tone, and the card's verdict is a `Health`, so
+the chip, the tone and the sidebar pill run through the code every other monitor uses. A
+column path on a quality row is a plain attribute name — `score`, `dataset_score` — because
+every figure a quality row reports is on the row; there is no `detail.` or `part.` prefix to
+learn.
+
+`tests/unit/test_registry.py` is parametrised over both kinds and skips whichever checks do
+not apply, keyed off the declared source, so the next monitor of either shape is validated
+for free.
+
+The rest of this page is the incident procedure. Where a step differs for a quality monitor
+it says so.
+
 ## 1. Decide the monitor's shape
 
 Settle these before writing anything. Every one of them is a field on the registry entry.
 
 | Decision | Field | Notes |
 |---|---|---|
+| Backing read | `source` | `Source.INCIDENTS` (default) or `Source.QUALITY`. See "Two backing reads" above; it decides which read, which shaping module and which page renderer the monitor gets. |
 | Machine id | `id` | snake_case. **It is the API path segment**: `/monitors/<id>/incidents`. It also names the sample payloads and keys the sidebar badge. |
 | Display name | `name` | Sentence case, e.g. `Zero future opportunities`. Used on the page, the tile and the sidebar. |
 | Group | `group` | `Group.AVAILABILITY`, `Group.CONTENT` or `Group.COVERAGE`. Sets the sidebar section and the page breadcrumb (`"<group> monitor"`). |
@@ -140,6 +182,7 @@ speaks is `STEWARDS_API_STYLE`; no page or component ever builds a URL.
 | fleet summary | `GET /api/v1/summary` | `GET /admin/summary?as_of=<date>` |
 | incidents | `GET /api/v1/monitors/<id>/incidents?page=1&page_size=500` | `GET /admin/<id-with-hyphens>-incidents?as_of=<date>&page=1&page_size=500` |
 | trend | `GET /api/v1/monitors/<id>/trend?days=30` | `GET /admin/<id-with-hyphens>-trend?as_of=<date>` (singular, and it picks its own window) |
+| quality snapshot | `GET /api/v1/monitors/<id>/quality` | `GET /admin/<id-with-hyphens>?as_of=<date>` (no suffix: the snapshot is the resource) |
 | contact queue | `GET /api/v1/contact-queue` | `GET /admin/contact-queue?as_of=<date>` |
 
 So under `admin`, `single_feed_stall` reads `/admin/single-feed-stall-incidents`: the path
@@ -163,6 +206,8 @@ logged: every error message names the path, which carries no query string.
 | incidents | the monitor page table | `fetch_incidents(id)` |
 | trend | the monitor page chart | `fetch_trend(id)` |
 | trend, every monitor | the home-page card states and the sidebar badge tones | `fetch_monitor_trends(ids)` |
+| quality snapshot | a quality monitor's whole page | `fetch_quality(id)` |
+| quality summary, every quality monitor | their home-page cards and sidebar badges | `fetch_quality_summaries(ids)` |
 | contact queue | the cross-monitor queue | `fetch_contact_queue()` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
@@ -252,6 +297,56 @@ The card's **state** is judged on the monitor's daily series, so the overview re
 is not deployed yet is judged on the `sparkline` in this entry instead — seven points are
 enough for a verdict, thirty are better — and one missing trend endpoint costs that
 monitor's history, not the page.
+
+### The quality snapshot
+
+For a `Source.QUALITY` monitor only. One request, no paging: the `summary` block describes
+the same fleet as `data`, and a second page would leave the two disagreeing.
+
+```json
+{
+  "data": [
+    {
+      "feed_id": "…", "feed_url": "…", "feed_type": "Slot", "feed_version": "V2.0",
+      "is_regular": true, "dataset_url": "…", "dataset_name": "…",
+      "publisher_id": "pub_x", "publisher_name": "X",
+      "status": "OK", "grade": "Gold", "score": 92.7,
+      "num_future_opportunity_items": 3477,
+      "completeness": {"location": 100, "activities": null},
+      "warnings": [], "errors": [],
+      "missing_required_fields": {"FacilityUse": ["activity"]},
+      "last_assessed": "2026-08-21T01:56:24Z"
+    }
+  ],
+  "summary": {
+    "total_feeds": 460, "feeds_scored": 258, "feeds_ok": 346,
+    "feeds_with_warnings": 37, "feeds_with_errors": 77, "datasets_with_errors": 37,
+    "average_score": 74.0, "median_score": 92.7,
+    "score_buckets": [{"lower": 80, "upper": 100, "feed_count": 137}],
+    "completeness": {"location": {"average": 95.1, "feeds_reporting": 263}},
+    "status_breakdown": [{"value": "OK", "feed_count": 346, "dataset_count": 158}],
+    "grade_breakdown": [{"value": "Gold", "feed_count": 149, "dataset_count": 124}]
+  },
+  "meta": {"snapshot_date": "2026-08-21", "generated_at": "…", "total": 460}
+}
+```
+
+Every field is optional and every one may be `null`, for the reason `/summary` gives: a
+figure the batch did not compute is not a zero. An unreported figure renders as em dash with
+no tone, an unreported collection renders as nothing rather than raising, and a feed the
+assessment could not score sorts after every scored one rather than as a zero. `status` is
+`OK`, `WARNING` or `ERROR`; the vocabulary is case-insensitive, so these sit beside the
+incident tokens in `monitors/thresholds.py` without a second code path.
+
+Which figures reach the page:
+
+- `summary` alone fills the five KPIs, the four charts and the whole of the overview card.
+  The table never moves them: they describe the fleet the batch assessed, and a filter
+  narrowing the rows must not appear to change what was assessed.
+- `data` fills the table. `monitors/quality.py` derives what the API does not send: the feed's
+  short name from the last segment of `feed_url`, the dataset's mean score (which orders the
+  table and keeps a dataset's feeds together), the mean of the reported completeness fields,
+  and the issue count.
 
 ### Contact queue
 
@@ -515,6 +610,16 @@ that date, and mixed snapshot dates would make the app contradict itself on scre
 These payloads are also the happy-path contract fixtures for the tests — one copy of each
 shape. Test-only variants (empty, malformed, paginated) belong in `tests/fixtures/`.
 
+### A quality monitor's payload
+
+One file, `tests/fixtures/<id>_quality.json`, in the envelope above, with `meta.snapshot_date`
+at `2026-08-21` like every other fixture. Cover the shapes the page has to survive: every
+`status` token, every grade including the null one, a feed with no score, one with a null
+completeness field, one carrying an error, one carrying a warning, one with a missing
+required field, and a dataset with more than one feed — without it nothing proves the
+grouping works. There is no trend file and no `/summary` entry: the card comes from the
+snapshot's own `summary` block.
+
 ## 9. Switching to the real API
 
 Nothing in the app changes. Point `STEWARDS_API_BASE_URL` at the API, set
@@ -557,6 +662,10 @@ validates every payload `detail`, and the payload's `monitor_id` matches the reg
 `tests/smoke/test_pages.py` also asserts, over the whole registry, that every monitor page
 lives under `views/` and that the overview renders a card and a sparkline per monitor.
 
+For a quality monitor the same module covers the other half of the registry: the sample
+snapshot exists, every column and filter field resolves against it, the sort field reports a
+value, and the entry states no contact threshold.
+
 ### What you must add
 
 A `tests/unit/test_<id>.py` module. Every pure function gets a happy path, an empty-input
@@ -568,6 +677,12 @@ case and one boundary case:
 - an empty payload yields an empty frame with the declared columns, not an exception;
 - `monitor_kpis` counts incidents, distinct publishers and past-threshold rows;
 - the monitor appears in the home-page cards and, if it has queue rows, in the queue union.
+
+For a quality monitor, read that list as: the rows a snapshot expands to, an empty snapshot
+yielding an empty frame, a dataset's feeds staying consecutive and ordered, an unscored feed
+sorting after a zero-scored one rather than with it, a null summary figure rendering em dash
+with no tone, and each chart returning `None` rather than an empty axis when it has nothing
+to draw.
 
 ### Existing tests you must update
 

@@ -49,6 +49,11 @@ _STATUS_TONES = {
     # The admin API reports every incident as simply `open`: it tracks detection, not the
     # contact conversation, so the token carries no workflow state and stays grey.
     "open": Tone.GREY,
+    # The quality assessment reports the state of the feed itself rather than of a contact
+    # conversation, and sends its tokens upper case — see the case folding below.
+    "ok": Tone.GREEN,
+    "warning": Tone.AMBER,
+    "error": Tone.RED,
 }
 
 _STATUS_LABELS = {
@@ -62,16 +67,26 @@ _STATUS_LABELS = {
     "on_target": "On target",
     "new": "New",
     "open": "Open",
+    "ok": "OK",
+    "warning": "Warning",
+    "error": "Error",
 }
+
+
+def _token(status: str) -> str:
+    """The vocabulary is case-insensitive: the admin API sends `open`, the quality
+    assessment sends `OK`, and both name a status this module already knows."""
+    return status.strip().lower()
 
 
 def status_label(status: str) -> str:
     """Human label for an API status token, falling back to a de-slugged form."""
-    return _STATUS_LABELS.get(status, status.replace("_", " ").capitalize() or "Unknown")
+    fallback = status.replace("_", " ").capitalize() or "Unknown"
+    return _STATUS_LABELS.get(_token(status), fallback)
 
 
 def status_tone(status: str) -> Tone:
-    return _STATUS_TONES.get(status, Tone.GREY)
+    return _STATUS_TONES.get(_token(status), Tone.GREY)
 
 
 def score_tone(score: float | None) -> Tone:

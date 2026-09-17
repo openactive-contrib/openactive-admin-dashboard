@@ -17,7 +17,14 @@ from pydantic import BaseModel, ValidationError
 from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
 from stewards.api.errors import ApiContractError, ApiError
-from stewards.api.models import IncidentPage, SummaryResponse, TrendPoint, TrendResponse
+from stewards.api.models import (
+    FeedQualityResponse,
+    FeedQualitySummary,
+    IncidentPage,
+    SummaryResponse,
+    TrendPoint,
+    TrendResponse,
+)
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +140,42 @@ def _fetch_monitor_trends(
     return trends
 
 
+def _fetch_quality(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> FeedQualityResponse:
+    """One monitor's whole quality snapshot: its feed rows and its fleet summary block.
+
+    No paging loop: this read answers with the fleet in one response, and the summary block
+    beside the rows describes that same fleet — a second page would leave the two disagreeing.
+    """
+    client = client or get_client()
+    endpoint = endpoints.quality(client.style, monitor_id, as_of=as_of or date.today())
+    return _parse(
+        FeedQualityResponse, client.get(endpoint.path, endpoint.params), endpoint.path
+    )
+
+
+def _fetch_quality_summaries(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, FeedQualitySummary]:
+    """Each quality monitor's summary block, for its overview card.
+
+    Tolerant in the same way as `_fetch_monitor_trends`: a monitor whose quality endpoint
+    this deployment has not built yet is left out of the mapping, and its card says the
+    figures were not reported rather than costing the whole overview.
+    """
+    summaries: dict[str, FeedQualitySummary] = {}
+    for monitor_id in monitor_ids:
+        try:
+            response = _fetch_quality(monitor_id, client=client, as_of=as_of)
+            summaries[monitor_id] = response.summary
+        except ApiError as exc:
+            log.info("No quality snapshot for %s: %s", monitor_id, exc)
+    return summaries
+
+
 def _fetch_contact_queue(
     client: StewardsClient | None = None, as_of: date | None = None
 ) -> IncidentPage:
@@ -159,6 +202,16 @@ def fetch_trend_points(monitor_id: str, days: int = 30) -> tuple[TrendPoint, ...
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_monitor_trends(monitor_ids: tuple[str, ...]) -> dict[str, tuple[TrendPoint, ...]]:
     return _fetch_monitor_trends(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading quality snapshot…")
+def fetch_quality(monitor_id: str) -> FeedQualityResponse:
+    return _fetch_quality(monitor_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_quality_summaries(monitor_ids: tuple[str, ...]) -> dict[str, FeedQualitySummary]:
+    return _fetch_quality_summaries(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading contact queue…")

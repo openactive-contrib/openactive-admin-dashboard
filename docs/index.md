@@ -17,6 +17,8 @@ say what to do about it.
 
 - [Single-feed stalls]({% link single-feed-stalls-runbook.md %}) — a feed whose `modified`
   timestamp stops advancing while the endpoint still returns 200.
+- [Feed data quality]({% link feed-quality-runbook.md %}) — the nightly assessment of every
+  feed: status, score, grade and how complete the recommended fields are.
 
 Figures in the dashboard come from a daily BigQuery batch, so every page there states the
 snapshot date it was built from.

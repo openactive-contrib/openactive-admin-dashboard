@@ -21,6 +21,7 @@ from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
     _fetch_contact_queue,
     _fetch_incidents,
+    _fetch_quality,
     _fetch_summary,
     _fetch_trend,
 )
@@ -221,3 +222,34 @@ def test_an_endpoint_that_is_not_deployed_yet_surfaces_as_not_found(
         _fetch_incidents("feed_ingestion_error", client, as_of=AS_OF)
     with pytest.raises(ApiNotFound):
         _fetch_contact_queue(client, as_of=AS_OF)
+
+
+# --- the quality snapshot -----------------------------------------------------------------
+
+QUALITY = f"{BASE}/admin/feed-quality"
+
+
+@respx.mock
+def test_the_quality_snapshot_comes_from_the_monitor_slug_with_no_suffix(
+    client: StewardsClient, payload
+) -> None:
+    """`/admin/feed-quality`, not `…-incidents`: the snapshot is the whole resource."""
+    route = respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=payload("feed_quality_quality"))
+    )
+    response = _fetch_quality("feed_quality", client, as_of=AS_OF)
+
+    assert len(response.data) == 15
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers
+
+
+@respx.mock
+def test_a_quality_endpoint_this_deployment_has_not_built_raises_not_found(
+    client: StewardsClient,
+) -> None:
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _fetch_quality("feed_quality", client, as_of=AS_OF)

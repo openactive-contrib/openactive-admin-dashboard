@@ -24,7 +24,10 @@ does not compute yet, which the overview shows as "not reported" (see the `/summ
 contract below). `dataset_orphaned_children` reads
 `/admin/dataset-orphaned-children-incidents`, which is live, but has **no history at all**:
 its `/summary` sparkline is empty and its trend endpoint 404s, so its card is judged on a
-declared benchmark rather than on a series (see "Monitor card states"). The app also
+declared benchmark rather than on a series (see "Monitor card states"). `feed_quality` is the
+one monitor **not** backed by incidents: it reads the live `/admin/feed-quality`, a snapshot
+of every feed's nightly quality assessment with a fleet-wide `summary` block beside the rows
+and no history at all (see "The two backing reads"). The app also
 requests `/admin/contact-queue`; that is not deployed yet, so it 404s and that page renders
 the typed "endpoint is not live" state rather than failing. A missing **trend** costs only
 the chart: `repository.fetch_trend_points` swallows the error, so the monitor's own page
@@ -63,19 +66,22 @@ src/stewards/
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
   monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
-                             + MONITOR_REGISTRY (registry order is card and sidebar order)
-  monitors/tile_viz.py       Sparkline | Gauge — what a monitor's overview card draws
+                             / Source + MONITOR_REGISTRY (registry order is card and
+                             sidebar order)
+  monitors/tile_viz.py       Sparkline | Gauge | Facts — what a monitor's overview card draws
   monitors/thresholds.py     Tone, days_tone, is_past_threshold, status/score/risk tones
   monitors/health.py         trend arithmetic -> CRITICAL/WARNING/HEALTHY, per monitor
   monitors/gauge.py          the same verdict from a fixed benchmark, for a monitor with no series
   monitors/transforms.py     incidents -> Rows -> DataFrame, tone frame, KPIs, filters
+  monitors/quality.py        the other backing read: a fleet quality snapshot -> rows,
+                             dataset grouping, figures, card and summary charts
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/contact_queue.py  the cross-monitor union, shaped
   monitors/trend.py          30-snapshot series
   monitors/email_draft.py    the publisher email draft
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, monitor_page,
-                             overview_page, contact_queue_page
+                             quality_page, overview_page, contact_queue_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/
@@ -135,12 +141,35 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 | `STEWARDS_DOCS_URL` | Runbooks site the sidebar links out to, default the project's GitHub Pages URL |
 | `STEWARDS_DISABLE_AUTH` | Skip the auth gate; honoured **only** when `STEWARDS_ENV=dev` |
 
+## The two backing reads
+
+`Monitor.source` says which read backs a monitor, and therefore which shaping module and
+which page renderer it gets. `Source.INCIDENTS` (the default) is a list of faults that age —
+`api/repository.fetch_incidents` + `fetch_trend_points`, `monitors/transforms.py`,
+`components/monitor_page.py`. `Source.QUALITY` is a snapshot of the whole fleet with a
+`summary` block beside its rows and no history — `fetch_quality`, `monitors/quality.py`,
+`components/quality_page.py`.
+
+They are not interchangeable: a quality row has no `first_detected`, `days_open` or
+`past_threshold`, and folding it into an `Incident` would mean inventing all three. So a
+quality monitor has no trend, no contact threshold, no email draft and no place in the
+contact queue, and its page puts five figures off the `summary` block and four summary charts
+where the KPIs and the trend chart would be. Everything the registry already drove is
+unchanged: `columns` and `ColKind` format and RAG-shade the table identically, `filters`
+become the same selectboxes, and the card's verdict is a `Health`, so the chip, the tone and
+the sidebar pill run through untouched code. A quality column path is a plain attribute name
+(`score`, `dataset_score`) — there is no `detail.` or `part.` prefix on a quality row.
+`tests/unit/test_registry.py` is parametrised over both kinds and skips the checks that do
+not apply, keyed off the declared source. `docs/adding-a-dashboard.md` "Two backing reads" is
+the full account.
+
 ## Monitor card states
 
 A card's visualisation is declared per monitor — `Monitor.viz` is a `Sparkline` (the
-default) or a `Gauge` — and `components.overview_page.tile_chart` dispatches on it. Adding a
-third is one variant in `monitors/tile_viz.py`, one builder returning `alt.Chart | None`, and
-one `case`; switching a card between them is one line in its registry entry.
+default), a `Gauge` or `Facts` — and `components.overview_page.tile_chart` dispatches on it.
+Adding another is one variant in `monitors/tile_viz.py`, one builder returning
+`alt.Chart | None`, and one `case`; switching a card between them is one line in its registry
+entry.
 
 `CRITICAL` / `WARNING` / `HEALTHY` / `NO DATA` on an overview card is computed from the
 monitor's own daily series, not configured: `monitors/health.py` runs a Theil-Sen slope
@@ -153,7 +182,15 @@ whose trend endpoint is not deployed. Which way is bad is per monitor: `Monitor.
 `Direction.DOWN_IS_BAD` — every rule runs on the oriented series, so there is no second code
 path for it.
 
-A monitor with **no series at all** is the one exception: `viz=Gauge(benchmark=…)` makes
+A monitor whose figure `/summary` does not describe at all is the other exception:
+`viz=Facts()` says the card draws no chart and reads no count, and the monitor hands the whole
+card over ready-made as an `overview.TileCard` — headline, a few supporting figures, the note,
+the sidebar pill and the verdict. `feed_quality` is the one that does this today, and
+`monitors.quality.assess_quality` produces its `Health` from the fleet average score on the
+same bands `thresholds.score_tone` shades the Score column with, so the card and the table
+cannot tell different stories.
+
+A monitor with **no series at all** is the other exception: `viz=Gauge(benchmark=…)` makes
 `monitors/gauge.assess_benchmark` produce the verdict from that benchmark instead, returning
 the same `Health` type so the chip, tone and sidebar pill run through unchanged code. Its
 `movement` is always unknown and its `points` zero, so the card claims no trend it cannot
@@ -188,7 +225,8 @@ zero. `monitors.overview.format_delta` owns the sign convention.
   asserted to be a mirror of itself rather than a second code path.
 - `tests/unit/test_registry.py` parametrises over the whole registry, so every future
   monitor is validated for free — ids, page module, sample payload, resolvable column and
-  filter fields, detail model.
+  filter fields, detail model. It covers both backing reads, skipping whichever checks do
+  not apply to the monitor's declared `source`.
 - Smoke tests use `AppTest`. `AppTest.from_function` re-executes the function's own source,
   so such a script must import everything it uses and annotate its parameters with builtins
   only (`exc: object`) — a quoted annotation gets unquoted again by ruff's UP037 fix.
@@ -216,9 +254,9 @@ uv run mypy src
   outside the app and set their own conventions.
 - Cache API reads with `@st.cache_data(ttl=3600)` at the repository layer only; the wrapped
   `_fetch_*` function stays cache-free so tests call it directly.
-- No page or component builds a URL. `api/endpoints.py` maps each of the four logical reads
-  onto a path and query per shape; both shapes route all four, and an endpoint a deployment
-  has not built yet answers 404, which becomes `ApiNotFound` on the page that needs it.
+- No page or component builds a URL. `api/endpoints.py` maps each logical read onto a path
+  and query per shape; both shapes route every read, and an endpoint a deployment has not
+  built yet answers 404, which becomes `ApiNotFound` on the page that needs it.
 - Filtering, searching and sorting happen locally over the cached snapshot, not as API query
   params, so the controls respond without a refetch and stay unit-testable.
 - The full brand palette lives in `components/theme.py`; `.streamlit/config.toml` mirrors it

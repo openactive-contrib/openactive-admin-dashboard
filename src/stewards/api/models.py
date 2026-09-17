@@ -25,23 +25,26 @@ class Meta(ApiModel):
     page_size: int = 0
 
 
-class DetailModel(ApiModel):
-    """Base for monitor-specific `detail` payloads."""
+class NullTolerantModel(ApiModel):
+    """An API model where an explicit null falls back to the field's own default.
+
+    The batch sends null for a figure it did not compute, and these models declare a
+    collection as an empty tuple rather than as optional. Without this, one null list
+    raises where an absent key would simply have defaulted — and the whole point is that a
+    field the API has not started sending yet renders as em dash instead of taking the page
+    down.
+    """
 
     @model_validator(mode="before")
     @classmethod
     def _drop_nulls(cls, payload: Any) -> Any:
-        """Let an explicit null fall back to the field's default.
-
-        The batch sends null for a figure it did not compute, and a detail model declares a
-        collection as an empty tuple rather than as optional. Without this, one null list
-        raises where an absent key would simply have defaulted — and the whole point of a
-        detail model is that a field the API has not started sending yet renders as em dash
-        instead of taking the page down.
-        """
         if not isinstance(payload, dict):
             return payload
         return {k: v for k, v in payload.items() if v is not None}
+
+
+class DetailModel(NullTolerantModel):
+    """Base for monitor-specific `detail` payloads."""
 
 
 class StallDetail(DetailModel):
@@ -311,4 +314,128 @@ class TrendPoint(ApiModel):
 
 class TrendResponse(ApiModel):
     data: tuple[TrendPoint, ...]
+    meta: Meta
+
+
+# --- feed quality -------------------------------------------------------------------------
+#
+# The quality endpoint is not an incident feed: it reports one row per feed with this
+# snapshot's measurements, plus a fleet-wide `summary` block beside them, and it has no
+# history at all. It therefore gets its own response models rather than being folded into
+# `Incident`, which would mean inventing a `first_detected` and a `past_threshold` the batch
+# never reported.
+
+
+class CompletenessStat(NullTolerantModel):
+    """Fleet-wide average for one recommended field, and how many feeds reported it."""
+
+    average: float | None = None
+    feeds_reporting: int | None = None
+
+
+#: A true en dash, for the score band labels. Written as an escape so the source stays
+#: unambiguously ASCII, as `monitors.overview.MINUS` does for its sign.
+EN_DASH = "\u2013"
+
+
+class ScoreBucket(NullTolerantModel):
+    """One column of the score histogram: the band `[lower, upper)` and the feeds in it."""
+
+    lower: float = 0.0
+    upper: float = 0.0
+    feed_count: int = 0
+
+    @property
+    def label(self) -> str:
+        return f"{self.lower:.0f}{EN_DASH}{self.upper:.0f}"
+
+
+class QualityBreakdown(NullTolerantModel):
+    """How many feeds and datasets carry one value of a categorical field."""
+
+    value: str = ""
+    feed_count: int = 0
+    dataset_count: int = 0
+    share: float | None = None
+
+
+class FeedQualitySummary(NullTolerantModel):
+    """The fleet-wide block the quality endpoint sends beside its rows.
+
+    Every figure is optional for the same reason as `/summary`: a batch that does not
+    compute one sends null, and null is not zero.
+    """
+
+    total_feeds: int | None = None
+    total_datasets: int | None = None
+    total_publishers: int | None = None
+    regular_feeds: int | None = None
+    irregular_feeds: int | None = None
+    regularity_unknown: int | None = None
+    feeds_ok: int | None = None
+    feeds_with_warnings: int | None = None
+    feeds_with_errors: int | None = None
+    feeds_status_unknown: int | None = None
+    datasets_with_errors: int | None = None
+    feeds_with_future_data: int | None = None
+    datasets_with_future_data: int | None = None
+    total_future_opportunity_items: int | None = None
+    feeds_scored: int | None = None
+    average_score: float | None = None
+    median_score: float | None = None
+    min_score: float | None = None
+    max_score: float | None = None
+    score_buckets: tuple[ScoreBucket, ...] = ()
+
+    #: Recommended field -> its fleet-wide average. The set of fields is the batch's to
+    #: decide, so it stays a mapping rather than becoming nine declared attributes.
+    completeness: dict[str, CompletenessStat] = Field(default_factory=dict)
+
+    status_breakdown: tuple[QualityBreakdown, ...] = ()
+    grade_breakdown: tuple[QualityBreakdown, ...] = ()
+    feed_type_breakdown: tuple[QualityBreakdown, ...] = ()
+    feed_version_breakdown: tuple[QualityBreakdown, ...] = ()
+    oldest_assessment: datetime | None = None
+    newest_assessment: datetime | None = None
+
+
+class FeedQualityFeed(NullTolerantModel):
+    """One feed's quality assessment in this snapshot."""
+
+    feed_id: str = ""
+    feed_url: str = ""
+    feed_type: str = ""
+    feed_version: str = ""
+    is_regular: bool | None = None
+    dataset_url: str = ""
+    dataset_name: str = ""
+    publisher_id: str = ""
+    publisher_name: str = ""
+
+    #: `OK`, `WARNING` or `ERROR` from this API; `monitors.thresholds` tones it.
+    status: str = ""
+
+    grade: str | None = None
+
+    #: The 0-100 quality score, absent for a feed the batch could not score.
+    score: float | None = None
+
+    num_future_opportunity_items: int | None = None
+
+    #: Recommended field -> the share of this feed's items carrying it, 0-100. A field the
+    #: assessment did not reach is null, which is not the same as zero coverage.
+    completeness: dict[str, float | None] = Field(default_factory=dict)
+
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+
+    #: Opportunity type -> the required fields missing from it.
+    missing_required_fields: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+
+    last_assessed: datetime | None = None
+
+
+class FeedQualityResponse(ApiModel):
+    data: tuple[FeedQualityFeed, ...] = ()
+    summary: FeedQualitySummary = Field(default_factory=FeedQualitySummary)
     meta: Meta

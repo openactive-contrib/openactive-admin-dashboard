@@ -6,7 +6,7 @@ on the stewards service, which exposes one pair of per-monitor paths derived fro
 monitor id (`/admin/single-feed-stall-incidents` and `/admin/single-feed-stall-trend`),
 and takes the snapshot it should answer for as `as_of`.
 
-Both shapes route all four reads. An endpoint a deployment has not built yet answers 404,
+Both shapes route every read. An endpoint a deployment has not built yet answers 404,
 which the client turns into `ApiNotFound` and the page renders as "registered in the
 dashboard but its endpoint is not live in this deployment".
 
@@ -77,6 +77,21 @@ def trend(style: Style, monitor_id: str, *, as_of: date, days: int = 30) -> Endp
             f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}-trend", {"as_of": as_of.isoformat()}
         )
     return Endpoint(f"/monitors/{monitor_id}/trend", {"days": days})
+
+
+def quality(style: Style, monitor_id: str, *, as_of: date) -> Endpoint:
+    """A monitor's quality snapshot: one row per feed, plus a fleet-wide summary block.
+
+    The read a monitor declares instead of `incidents` when its batch reports measurements
+    for the whole fleet rather than faults that age. The admin API answers it at the
+    monitor's own slug with no suffix, because the snapshot *is* the resource — there is no
+    incident list and no trend beside it.
+    """
+    if style is Style.ADMIN:
+        return Endpoint(
+            f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}", {"as_of": as_of.isoformat()}
+        )
+    return Endpoint(f"/monitors/{monitor_id}/quality")
 
 
 def summary(style: Style, *, as_of: date) -> Endpoint:

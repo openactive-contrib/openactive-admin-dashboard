@@ -667,3 +667,129 @@ def test_a_selected_row_opens_its_email_draft_and_its_missing_parents() -> None:
     frame = app.dataframe[0].value
     assert list(frame.columns) == ["Missing parent id", "Children affected"]
     assert len(frame) == 3
+
+
+# --- the quality page ---------------------------------------------------------------------
+
+
+def _quality_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.quality_page import render_quality_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_quality
+    repository.fetch_quality = boom  # type: ignore[assignment]
+    try:
+        render_quality_page(get_monitor("feed_quality"))
+    finally:
+        repository.fetch_quality = original
+        st.cache_data.clear()
+
+
+def test_a_quality_page_whose_endpoint_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_quality_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _quality_row_detail_script() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import FeedQualityResponse
+    from stewards.components.quality_page import render_row_detail
+    from stewards.monitors import quality
+    from stewards.monitors.registry import get_monitor
+
+    payload = FeedQualityResponse.model_validate(load_sample("feed_quality_quality"))
+    rows = quality.build_rows(payload.data)
+    flagged = next(row for row in rows if row.issue_count and row.missing_required_fields)
+    render_row_detail(get_monitor("feed_quality"), flagged)
+
+
+def test_selecting_a_flagged_feed_shows_its_issues_and_its_field_coverage() -> None:
+    app = run(_quality_row_detail_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Error" in markdown or "Warning" in markdown
+    assert "Missing required fields" in markdown
+    assert list(app.dataframe[0].value.columns) == ["Field", "Coverage"]
+
+
+def _quality_clean_row_script() -> None:
+    from stewards.api.models import FeedQualityFeed
+    from stewards.components.quality_page import render_row_detail
+    from stewards.monitors import quality
+    from stewards.monitors.registry import get_monitor
+
+    clean = FeedQualityFeed.model_validate(
+        {
+            "feed_id": "clean",
+            "feed_url": "https://example.test/api/feeds/slots",
+            "publisher_name": "Example",
+            "dataset_name": "Example Sessions",
+            "status": "OK",
+            "completeness": {},
+        }
+    )
+    render_row_detail(get_monitor("feed_quality"), quality.build_rows((clean,))[0])
+
+
+def test_a_clean_feed_with_no_coverage_figures_renders_a_caption_not_a_table() -> None:
+    app = run(_quality_clean_row_script)
+    assert any("No errors or warnings" in m.value for m in app.markdown)
+    assert not app.dataframe
+    assert any("reports no field completeness" in c.value for c in app.caption)
+
+
+def _quality_charts_without_figures_script() -> None:
+    from stewards.api.models import FeedQualitySummary
+    from stewards.components.quality_page import render_summary_charts
+    from stewards.monitors.registry import get_monitor
+
+    render_summary_charts(get_monitor("feed_quality"), FeedQualitySummary())
+
+
+def test_a_snapshot_with_no_summary_block_captions_each_chart_instead_of_drawing_one() -> None:
+    app = run(_quality_charts_without_figures_script)
+    assert not app.get("vega_lite_chart")
+    assert sum("does not report the figures" in c.value for c in app.caption) == 4
+
+
+def _unreported_facts_script() -> None:
+    from stewards.api.models import FeedQualitySummary
+    from stewards.components.overview_page import render_facts, tile_chart
+    from stewards.monitors.overview import Tile
+    from stewards.monitors.quality import tile_card
+    from stewards.monitors.registry import get_monitor
+    from stewards.monitors.thresholds import Tone
+
+    monitor = get_monitor("feed_quality")
+    card = tile_card(FeedQualitySummary())
+    tile = Tile(
+        monitor=monitor,
+        count=None,
+        past_threshold_count=None,
+        health=card.health,
+        state=Tone.GREY,
+        state_label=card.health.label,
+        note=card.note,
+        sparkline=(),
+        card=card,
+    )
+    render_facts(tile)
+    # A facts card draws no chart even where its figures did not load.
+    assert tile_chart(tile) is None
+
+
+def test_a_card_whose_figures_were_not_reported_renders_them_without_a_tone() -> None:
+    app = run(_unreported_facts_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Errors" in markdown
+    assert "—" in markdown
+    assert "red[" not in markdown

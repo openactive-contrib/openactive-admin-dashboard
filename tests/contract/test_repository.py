@@ -20,12 +20,19 @@ from stewards.api.errors import (
     ApiUnauthorized,
     ApiUnavailable,
 )
-from stewards.api.models import IncidentPage, SummaryResponse, TrendResponse
+from stewards.api.models import (
+    FeedQualityResponse,
+    IncidentPage,
+    SummaryResponse,
+    TrendResponse,
+)
 from stewards.api.repository import (
     PAGE_SIZE,
     _fetch_contact_queue,
     _fetch_incidents,
     _fetch_monitor_trends,
+    _fetch_quality,
+    _fetch_quality_summaries,
     _fetch_summary,
     _fetch_trend,
     _fetch_trend_points,
@@ -422,3 +429,62 @@ def test_a_payload_with_nothing_but_the_required_fields_still_parses(
     }
     respx.get(ORPHAN_INCIDENTS).mock(return_value=httpx.Response(200, json=payload))
     assert _fetch_incidents("dataset_orphaned_children", client).data[0].detail == {}
+
+
+# --- quality -------------------------------------------------------------------------------
+
+QUALITY = f"{BASE}/monitors/feed_quality/quality"
+
+
+@respx.mock
+def test_quality_returns_rows_and_the_summary_block(client: StewardsClient) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    response = _fetch_quality("feed_quality", client)
+    assert isinstance(response, FeedQualityResponse)
+    assert response.meta.snapshot_date == date(2026, 8, 21)
+    assert len(response.data) == 15
+    assert response.summary.total_feeds == 15
+    assert response.summary.completeness["location"].feeds_reporting
+
+
+@respx.mock
+def test_quality_rejects_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
+    respx.get(QUALITY).mock(return_value=httpx.Response(200, json={"data": []}))
+    with pytest.raises(ApiContractError):
+        _fetch_quality("feed_quality", client)
+
+
+@respx.mock
+def test_quality_tolerates_a_snapshot_with_no_summary_block(client: StewardsClient) -> None:
+    """A batch that sends only rows still renders: the figures read em dash, not zero."""
+    meta = load_sample("feed_quality_quality")["meta"]
+    respx.get(QUALITY).mock(return_value=httpx.Response(200, json={"data": [], "meta": meta}))
+    response = _fetch_quality("feed_quality", client)
+    assert response.data == ()
+    assert response.summary.average_score is None
+
+
+@respx.mock
+def test_quality_summaries_skip_a_monitor_whose_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    """The overview must survive an endpoint this deployment has not built, as it does for
+    a missing trend."""
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    assert _fetch_quality_summaries(("feed_quality",), client) == {}
+
+
+@respx.mock
+def test_quality_summaries_return_one_entry_per_monitor(client: StewardsClient) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    summaries = _fetch_quality_summaries(("feed_quality",), client)
+    assert set(summaries) == {"feed_quality"}
+    assert summaries["feed_quality"].feeds_with_errors == 3
+
+
+def test_quality_summaries_of_nothing_is_an_empty_mapping(client: StewardsClient) -> None:
+    assert _fetch_quality_summaries((), client) == {}

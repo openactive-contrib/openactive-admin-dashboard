@@ -21,7 +21,7 @@ from stewards.api.models import (
     StallDetail,
 )
 from stewards.monitors.health import Direction, HealthPolicy
-from stewards.monitors.tile_viz import Gauge, Sparkline, TileViz
+from stewards.monitors.tile_viz import Facts, Gauge, Sparkline, TileViz
 
 
 class Group(StrEnum):
@@ -29,6 +29,19 @@ class Group(StrEnum):
     AVAILABILITY = "Availability"
     CONTENT = "Content"
     COVERAGE = "Coverage & quality"
+
+
+class Source(StrEnum):
+    """Which logical read backs a monitor, and therefore which page renders it.
+
+    `INCIDENTS` is a list of faults that age — the shape every shared component assumes.
+    `QUALITY` is a snapshot of the whole fleet with a summary block beside it and no
+    history, which cannot be folded into an incident without inventing the age and the
+    threshold flag the batch never reported. See `monitors.quality`.
+    """
+
+    INCIDENTS = "incidents"
+    QUALITY = "quality"
 
 
 class Severity(StrEnum):
@@ -140,6 +153,12 @@ class Monitor:
     blurb: str
     unit: str
     columns: tuple[Col, ...]
+
+    #: Which read backs this monitor. `QUALITY` swaps the incident machinery — ageing,
+    #: contact threshold, trend, email draft — for the fleet snapshot `monitors.quality`
+    #: shapes, and routes the page to `components.quality_page`.
+    source: Source = Source.INCIDENTS
+
     key_cols: tuple[str, ...] = ("publisher_id", "feed_id")
     detail_model: type[DetailModel] = DetailModel
     summary_field: str = "feed_name"
@@ -201,10 +220,16 @@ class Monitor:
 
     @property
     def meta_chips(self) -> tuple[str, ...]:
+        """The chips under the blurb. A monitor whose rows do not age states no threshold."""
+        threshold = (
+            (f"contact after {self.threshold_days}d",)
+            if self.source is Source.INCIDENTS
+            else ()
+        )
         return (
             f"monitor.{self.id}",
             f"severity: {self.severity.value}",
-            f"contact after {self.threshold_days}d",
+            *threshold,
             self.schedule,
         )
 
@@ -526,6 +551,75 @@ DATASET_FUTURE_DECLINE = Monitor(
 )
 
 
+FEED_QUALITY = Monitor(
+    id="feed_quality",
+    name="Feed data quality",
+    group=Group.COVERAGE,
+    severity=Severity.MEDIUM,
+    # Not an incident list: the batch assesses every feed in the fleet each night and
+    # reports the assessment, not a fault that has been open for N days.
+    source=Source.QUALITY,
+    blurb=(
+        "The nightly quality assessment of every feed in the fleet: the status the crawl "
+        "recorded, the quality score and grade where the assessment could produce one, how "
+        "complete the recommended fields are, and how many future opportunities the feed "
+        "carries. Rows are grouped by dataset and the datasets are ordered by their mean "
+        "score, so a publisher's feeds are read together. The batch reports this snapshot "
+        "only: there is no quality history behind it, so nothing on this page describes a "
+        "trend."
+    ),
+    unit="average quality score",
+    # The card is a summary rather than a count, and the monitor supplies its own figures
+    # and verdict. See `monitors.quality.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("dataset_name", "Dataset", ColKind.TEXT),
+        Col("feed_name", "Feed", ColKind.MONO),
+        Col("feed_type", "Type", ColKind.TEXT),
+        Col("feed_version", "Version", ColKind.TEXT),
+        Col("status", "Status", ColKind.STATUS),
+        Col("grade", "Grade", ColKind.TEXT),
+        Col(
+            "score",
+            "Score",
+            ColKind.SCORE,
+            help="The assessment's 0-100 quality score; blank where it could not score",
+        ),
+        Col(
+            "completeness_percent",
+            "Completeness",
+            ColKind.PERCENT,
+            help="Mean coverage of the recommended fields this assessment reported",
+        ),
+        Col("future_items", "Future items", ColKind.NUMBER),
+        Col(
+            "issue_count",
+            "Issues",
+            ColKind.NUMBER,
+            help="Errors plus warnings; select a row to read them",
+        ),
+        Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+    ),
+    filters=(
+        FilterSpec("status", "Status"),
+        FilterSpec("grade", "Grade"),
+        FilterSpec("feed_type", "Feed type"),
+        FilterSpec("feed_version", "Version"),
+    ),
+    # Datasets worst-last, and a dataset's own feeds kept together beneath it.
+    sort_field="dataset_score",
+    # Nothing here ages, so there is no contact threshold to filter on; the page offers an
+    # "issues only" toggle in its place.
+    has_threshold_filter=False,
+    summary_field="feed_name",
+    schedule="nightly assessment",
+    query="monitor_feed_quality_v1",
+    page="views/30_feed_quality.py",
+    kpi_labels=("average quality score", "feeds scored", "feeds with errors"),
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
@@ -533,6 +627,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     FEED_INGESTION_ERROR,
     DATASET_ORPHANED_CHILDREN,
     DATASET_FUTURE_DECLINE,
+    FEED_QUALITY,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}
@@ -545,8 +640,9 @@ def get_monitor(monitor_id: str) -> Monitor:
         raise KeyError(f"unknown monitor {monitor_id!r}") from exc
 
 
-def monitor_ids() -> tuple[str, ...]:
-    return tuple(_BY_ID)
+def monitor_ids(source: Source | None = None) -> tuple[str, ...]:
+    """Registered ids, in registry order; narrowed to one backing read where asked."""
+    return tuple(m.id for m in MONITOR_REGISTRY if source is None or m.source is source)
 
 
 def monitors_in_group(group: Group) -> Iterator[Monitor]:

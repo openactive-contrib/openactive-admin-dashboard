@@ -81,6 +81,23 @@ def test_admin_trend_is_singular_and_takes_the_snapshot_not_a_window() -> None:
     assert endpoint.params == {"as_of": "2026-09-02"}
 
 
+# --- quality ------------------------------------------------------------------------------
+
+
+def test_contract_quality_hangs_off_the_monitor() -> None:
+    endpoint = endpoints.quality(Style.CONTRACT, "feed_quality", as_of=AS_OF)
+    assert endpoint.path == "/monitors/feed_quality/quality"
+    assert endpoint.params == {}
+
+
+def test_admin_quality_is_the_monitor_slug_itself() -> None:
+    """The snapshot is the resource: there is no incident list or trend beside it, so the
+    admin path carries no suffix."""
+    endpoint = endpoints.quality(Style.ADMIN, "feed_quality", as_of=AS_OF)
+    assert endpoint.path == "/admin/feed-quality"
+    assert endpoint.params == {"as_of": "2026-09-02"}
+
+
 # --- endpoints a shape does not have ------------------------------------------------------
 
 
@@ -100,10 +117,11 @@ def test_admin_summary_and_queue_sit_under_admin_and_name_the_snapshot() -> None
     )
 
 
-def test_every_style_routes_all_four_reads() -> None:
+def test_every_style_routes_every_read() -> None:
     """A shape that cannot answer one of these silently loses a page."""
     for style in Style:
         assert endpoints.incidents(style, "single_feed_stall", as_of=AS_OF).path
         assert endpoints.trend(style, "single_feed_stall", as_of=AS_OF).path
+        assert endpoints.quality(style, "feed_quality", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
         assert endpoints.contact_queue(style, as_of=AS_OF).path
