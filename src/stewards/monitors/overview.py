@@ -22,6 +22,40 @@ from stewards.monitors.transforms import EMPTY
 #: mapping is judged on the sparkline `/summary` carries instead.
 Trends = Mapping[str, Sequence[TrendPoint]]
 
+
+@dataclass(frozen=True, slots=True)
+class Fact:
+    """One supporting figure on a card. `tone=None` leaves it in body ink."""
+
+    label: str
+    value: str
+    tone: Tone | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TileCard:
+    """A card supplied by the monitor itself, for a figure `/summary` cannot express.
+
+    A quality snapshot has no single open count and no daily series, so neither the count
+    nor the trend arithmetic has anything to say about it. Such a monitor hands its card
+    over ready-made — including the verdict, already a `Health`, so the chip, the tone and
+    the sidebar pill are still produced by exactly the code every other monitor uses. See
+    `tile_viz.Facts` and `monitors.quality.tile_card`.
+    """
+
+    value: str
+    unit: str
+    health: Health
+    facts: tuple[Fact, ...] = ()
+    note: str = ""
+
+    #: What the sidebar pill counts, where the monitor has a figure worth a pill at all.
+    badge: int | None = None
+
+
+#: Ready-made cards by monitor id, as the overview loads them.
+Cards = Mapping[str, TileCard]
+
 NOT_REPORTED = "count not reported in this snapshot"
 
 #: Points below which a card says nothing about its trend, as with the tile sparkline.
@@ -159,17 +193,27 @@ class NavBadge:
     tone: Tone
 
 
-def nav_badges(summary: Summary, trends: Trends | None = None) -> dict[str, NavBadge]:
+def nav_badges(
+    summary: Summary, trends: Trends | None = None, cards: Cards | None = None
+) -> dict[str, NavBadge]:
     """Badge per sidebar item, keyed by monitor id plus `contact_queue`.
 
     A monitor with nothing open gets no badge, so the sidebar shows only what needs
     attention. Tone comes from the same assessment as the tile, over the same series, so the
-    sidebar and the overview never disagree.
+    sidebar and the overview never disagree — including for a monitor that supplies its own
+    card, which supplies the verdict with it.
     """
     badges: dict[str, NavBadge] = {}
     if summary.past_threshold is not None and summary.past_threshold > 0:
         badges["contact_queue"] = NavBadge(str(summary.past_threshold), Tone.RED)
     for monitor in MONITOR_REGISTRY:
+        card = (cards or {}).get(monitor.id)
+        if card is not None:
+            if card.badge:
+                badges[monitor.id] = NavBadge(
+                    format_badge(card.badge), tile_state(monitor, card.health)
+                )
+            continue
         counts = summary.count_for(monitor.id)
         if counts is None or counts.count is None or counts.count <= 0:
             continue
@@ -189,9 +233,22 @@ class Tile:
     note: str
     sparkline: tuple[float, ...]
 
+    #: Set where the monitor supplied its own card. Its figures then stand in for the count
+    #: and the chart, which `/summary` reports nothing for.
+    card: TileCard | None = None
+
     @property
     def value(self) -> str:
-        return format_count(self.count)
+        return self.card.value if self.card is not None else format_count(self.count)
+
+    @property
+    def unit(self) -> str:
+        return self.card.unit if self.card is not None else self.monitor.unit
+
+    @property
+    def facts(self) -> tuple[Fact, ...]:
+        """The figures under the headline, for a card that summarises rather than counts."""
+        return self.card.facts if self.card is not None else ()
 
     @property
     def trend_note(self) -> str:
@@ -200,19 +257,40 @@ class Tile:
         Empty for a monitor with no history at all — a single point says nothing the count
         line above it has not already said, and the card is better without the row.
         """
+        if self.card is not None:
+            return ""
         return self.health.headline if self.health.points >= MIN_TREND_POINTS else ""
 
 
-def build_tiles(summary: Summary, trends: Trends | None = None) -> tuple[Tile, ...]:
+def build_tiles(
+    summary: Summary, trends: Trends | None = None, cards: Cards | None = None
+) -> tuple[Tile, ...]:
     """One tile per registered monitor, in registry order.
 
     A monitor the API does not yet report is shown at zero rather than hidden, so a registry
     entry landing before its API endpoint is visible instead of silently missing. `trends`
     supplies the daily series the state is judged on; without it each monitor is judged on
-    the sparkline in `/summary`.
+    the sparkline in `/summary`. `cards` carries the ready-made card of a monitor whose
+    figure `/summary` does not describe at all — see `TileCard`.
     """
     tiles = []
     for monitor in MONITOR_REGISTRY:
+        card = (cards or {}).get(monitor.id)
+        if card is not None:
+            tiles.append(
+                Tile(
+                    monitor=monitor,
+                    count=None,
+                    past_threshold_count=None,
+                    health=card.health,
+                    state=tile_state(monitor, card.health),
+                    state_label=tile_label(monitor, card.health),
+                    note=card.note,
+                    sparkline=(),
+                    card=card,
+                )
+            )
+            continue
         counts = counts_for(summary, monitor)
         health = monitor_health(monitor, counts, (trends or {}).get(monitor.id, ()))
         # Nulls are dropped rather than drawn as zeros, as on an incident's row sparkline.

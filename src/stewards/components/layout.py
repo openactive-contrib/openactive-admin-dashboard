@@ -50,8 +50,12 @@ def render_error_header(crumb: str, title: str) -> None:
         _render_titles(crumb, title)
 
 
-def render_footer(query: str, *, note: str = "") -> None:
-    st.caption(f"Read-only view. Actions available: draft publisher email. {note}".strip())
+def render_footer(
+    query: str, *, note: str = "", actions: str = "draft publisher email"
+) -> None:
+    """The provenance line. `actions` names what this page offers, because a page with no
+    email draft behind its rows must not claim one."""
+    st.caption(f"Read-only view. Actions available: {actions}. {note}".strip())
     if query:
         st.caption(f"`{query}`")
 

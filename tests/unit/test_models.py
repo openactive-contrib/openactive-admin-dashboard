@@ -161,14 +161,14 @@ def test_a_real_value_is_untouched() -> None:
 
 
 @pytest.mark.parametrize(
-    ("orphans", "checked", "expected"),
+    ("orphans", "children", "expected"),
     [(0, 100, 0.0), (50, 100, 50.0), (100, 100, 100.0), (5, 0, None), (None, 10, None)],
 )
-def test_a_breakdown_reports_its_share_of_what_was_checked(
-    orphans: int | None, checked: int, expected: float | None
+def test_a_breakdown_reports_its_share_of_the_children_it_holds(
+    orphans: int | None, children: int, expected: float | None
 ) -> None:
-    """Zero checked is not zero orphaned: there is no share, rather than a share of 0%."""
-    kind = OrphanKind(orphan_count=orphans, checked_count=checked)
+    """No children is not zero orphaned: there is no share, rather than a share of 0%."""
+    kind = OrphanKind(orphan_count=orphans, child_count=children)
     if expected is None:
         assert kind.orphan_percent is None
     else:

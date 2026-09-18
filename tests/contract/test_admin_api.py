@@ -20,12 +20,16 @@ from stewards.api.endpoints import Style
 from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
     _fetch_contact_queue,
+    _fetch_coverage,
     _fetch_incidents,
+    _fetch_quality,
+    _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
 )
 from stewards.config import Settings
-from stewards.monitors.registry import SINGLE_FEED_STALL
+from stewards.monitors import coverage
+from stewards.monitors.registry import ACTIVE_PLACES_COVERAGE, SINGLE_FEED_STALL
 from stewards.monitors.transforms import to_dataframe
 
 BASE = "http://localhost:5268"
@@ -221,3 +225,100 @@ def test_an_endpoint_that_is_not_deployed_yet_surfaces_as_not_found(
         _fetch_incidents("feed_ingestion_error", client, as_of=AS_OF)
     with pytest.raises(ApiNotFound):
         _fetch_contact_queue(client, as_of=AS_OF)
+
+
+# --- the quality snapshot -----------------------------------------------------------------
+
+QUALITY = f"{BASE}/admin/feed-quality"
+
+
+@respx.mock
+def test_the_quality_snapshot_comes_from_the_monitor_slug_with_no_suffix(
+    client: StewardsClient, payload
+) -> None:
+    """`/admin/feed-quality`, not `…-incidents`: the snapshot is the whole resource."""
+    route = respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=payload("feed_quality_quality"))
+    )
+    response = _fetch_quality("feed_quality", client, as_of=AS_OF)
+
+    assert len(response.data) == 15
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers
+
+
+@respx.mock
+def test_a_quality_endpoint_this_deployment_has_not_built_raises_not_found(
+    client: StewardsClient,
+) -> None:
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _fetch_quality("feed_quality", client, as_of=AS_OF)
+
+
+# --- the coverage snapshot and its rows ----------------------------------------------------
+
+COVERAGE = f"{BASE}/admin/active-places-coverage"
+MAPPINGS = f"{BASE}/admin/active-places-site-mappings"
+ROWS_ID = "active_places_site_mappings"
+
+
+@respx.mock
+def test_the_coverage_snapshot_comes_from_the_monitor_slug_with_no_suffix(
+    client: StewardsClient, payload
+) -> None:
+    """`/admin/active-places-coverage`: as with a quality snapshot, the figures are the
+    resource, and the rows behind them are a path of their own."""
+    route = respx.get(COVERAGE).mock(
+        return_value=httpx.Response(200, json=payload("active_places_coverage_coverage"))
+    )
+    response = _fetch_coverage("active_places_coverage", client, as_of=AS_OF)
+
+    assert response.data.headline.coverage_pct == 26.4
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers
+
+
+@respx.mock
+def test_the_site_mappings_come_from_their_own_admin_path(
+    client: StewardsClient, payload
+) -> None:
+    """Derived from the registry's `rows_id`, not from the monitor id: the rows resource is
+    named `…-site-mappings`, which no suffix rule would produce."""
+    route = respx.get(MAPPINGS).mock(
+        return_value=httpx.Response(200, json=payload("active_places_coverage_mappings"))
+    )
+    response = _fetch_site_mappings("active_places_coverage", ROWS_ID, client, as_of=AS_OF)
+
+    assert response.data
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["page"] == "1"
+    assert request.url.params["token"] == "test-token"
+
+
+@respx.mock
+def test_a_coverage_endpoint_this_deployment_has_not_built_raises_not_found(
+    client: StewardsClient,
+) -> None:
+    respx.get(COVERAGE).mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _fetch_coverage("active_places_coverage", client, as_of=AS_OF)
+
+
+@respx.mock
+def test_the_real_mapping_payload_fills_every_column_the_registry_declares(
+    client: StewardsClient, payload
+) -> None:
+    """The live rows, through the models and the shaping, into the declared table."""
+    respx.get(MAPPINGS).mock(
+        return_value=httpx.Response(200, json=payload("active_places_coverage_mappings"))
+    )
+    response = _fetch_site_mappings("active_places_coverage", ROWS_ID, client, as_of=AS_OF)
+    frame = coverage.to_dataframe(ACTIVE_PLACES_COVERAGE, coverage.build_rows(response.data))
+    assert list(frame.columns) == [c.label for c in ACTIVE_PLACES_COVERAGE.columns]
+    assert len(frame) == len(response.data)

@@ -2,7 +2,8 @@
 
 One variant per shape of evidence. A monitor with a daily series gets `Sparkline`; a monitor
 that has only this snapshot's number gets `Gauge`, which reads it against a fixed benchmark
-instead of against its own history. Switching a card is one line in the registry entry.
+instead of against its own history; a monitor whose snapshot is a set of figures rather than
+one number gets `Facts`. Switching a card is one line in the registry entry.
 
 Pure declarations: the arithmetic lives in `monitors.gauge` and `monitors.trend`, and the
 colours are chosen by the component that draws them.
@@ -39,6 +40,18 @@ class Gauge:
             raise ValueError("warn_ratio must not exceed critical_ratio")
 
 
+@dataclass(frozen=True, slots=True)
+class Facts:
+    """A headline figure and a few supporting ones, for a monitor whose card summarises.
+
+    A quality snapshot has no single count worth a card: "73 average score" alone says
+    nothing about how many feeds carry an error. The card therefore draws no chart and the
+    monitor supplies the figures itself, as an `overview.TileCard` — including its own
+    `Health`, so the chip, the tone and the sidebar pill still run through the code every
+    other monitor uses.
+    """
+
+
 #: Every variant a monitor may declare. Adding one is a dataclass here, a builder beside
 #: `monitors.gauge.gauge_chart`, and one `case` in `components.overview_page.tile_chart`.
-TileViz = Sparkline | Gauge
+TileViz = Sparkline | Gauge | Facts

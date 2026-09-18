@@ -13,10 +13,11 @@ from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.auth.google import render_identity_footer, require_login
 from stewards.components import nav
+from stewards.components.overview_page import tile_cards
 from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
 from stewards.monitors.overview import NavBadge, nav_badges
-from stewards.monitors.registry import monitor_ids
+from stewards.monitors.registry import Source, monitor_ids
 
 st.set_page_config(
     page_title="OpenActive Admin Dashboard",
@@ -28,15 +29,19 @@ st.set_page_config(
 def _nav_badges() -> dict[str, NavBadge]:
     """Sidebar count pills. An unavailable summary yields no pills, not a broken sidebar.
 
-    The pill tone is the monitor's health, so it is read from the same trend series the
-    overview cards use — both reads are cached for the day, so this costs one request per
-    monitor per hour, not one per rerun.
+    The pill tone is the monitor's health, so it is read from the same series — or the same
+    ready-made card — the overview tiles use. Every read is cached for the day, so this costs
+    one request per monitor per hour, not one per rerun.
     """
     try:
         summary = repository.fetch_summary().data
     except ApiError:
         return {}
-    return nav_badges(summary, repository.fetch_monitor_trends(monitor_ids()))
+    return nav_badges(
+        summary,
+        repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
+        tile_cards(),
+    )
 
 
 def main() -> None:

@@ -667,3 +667,273 @@ def test_a_selected_row_opens_its_email_draft_and_its_missing_parents() -> None:
     frame = app.dataframe[0].value
     assert list(frame.columns) == ["Missing parent id", "Children affected"]
     assert len(frame) == 3
+
+
+# --- the quality page ---------------------------------------------------------------------
+
+
+def _quality_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.quality_page import render_quality_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_quality
+    repository.fetch_quality = boom  # type: ignore[assignment]
+    try:
+        render_quality_page(get_monitor("feed_quality"))
+    finally:
+        repository.fetch_quality = original
+        st.cache_data.clear()
+
+
+def test_a_quality_page_whose_endpoint_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_quality_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _quality_row_detail_script() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import FeedQualityResponse
+    from stewards.components.quality_page import render_row_detail
+    from stewards.monitors import quality
+    from stewards.monitors.registry import get_monitor
+
+    payload = FeedQualityResponse.model_validate(load_sample("feed_quality_quality"))
+    rows = quality.build_rows(payload.data)
+    flagged = next(row for row in rows if row.issue_count and row.missing_required_fields)
+    render_row_detail(get_monitor("feed_quality"), flagged)
+
+
+def test_selecting_a_flagged_feed_shows_its_issues_and_its_field_coverage() -> None:
+    app = run(_quality_row_detail_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Error" in markdown or "Warning" in markdown
+    assert "Missing required fields" in markdown
+    assert list(app.dataframe[0].value.columns) == ["Field", "Coverage"]
+
+
+def _quality_clean_row_script() -> None:
+    from stewards.api.models import FeedQualityFeed
+    from stewards.components.quality_page import render_row_detail
+    from stewards.monitors import quality
+    from stewards.monitors.registry import get_monitor
+
+    clean = FeedQualityFeed.model_validate(
+        {
+            "feed_id": "clean",
+            "feed_url": "https://example.test/api/feeds/slots",
+            "publisher_name": "Example",
+            "dataset_name": "Example Sessions",
+            "status": "OK",
+            "completeness": {},
+        }
+    )
+    render_row_detail(get_monitor("feed_quality"), quality.build_rows((clean,))[0])
+
+
+def test_a_clean_feed_with_no_coverage_figures_renders_a_caption_not_a_table() -> None:
+    app = run(_quality_clean_row_script)
+    assert any("No errors or warnings" in m.value for m in app.markdown)
+    assert not app.dataframe
+    assert any("reports no field completeness" in c.value for c in app.caption)
+
+
+def _quality_charts_without_figures_script() -> None:
+    from stewards.api.models import FeedQualitySummary
+    from stewards.components.quality_page import render_summary_charts
+    from stewards.monitors.registry import get_monitor
+
+    render_summary_charts(get_monitor("feed_quality"), FeedQualitySummary())
+
+
+def test_a_snapshot_with_no_summary_block_captions_each_chart_instead_of_drawing_one() -> None:
+    app = run(_quality_charts_without_figures_script)
+    assert not app.get("vega_lite_chart")
+    assert sum("does not report the figures" in c.value for c in app.caption) == 4
+
+
+def _unreported_facts_script() -> None:
+    from stewards.api.models import FeedQualitySummary
+    from stewards.components.overview_page import render_facts, tile_chart
+    from stewards.monitors.overview import Tile
+    from stewards.monitors.quality import tile_card
+    from stewards.monitors.registry import get_monitor
+    from stewards.monitors.thresholds import Tone
+
+    monitor = get_monitor("feed_quality")
+    card = tile_card(FeedQualitySummary())
+    tile = Tile(
+        monitor=monitor,
+        count=None,
+        past_threshold_count=None,
+        health=card.health,
+        state=Tone.GREY,
+        state_label=card.health.label,
+        note=card.note,
+        sparkline=(),
+        card=card,
+    )
+    render_facts(tile)
+    # A facts card draws no chart even where its figures did not load.
+    assert tile_chart(tile) is None
+
+
+def test_a_card_whose_figures_were_not_reported_renders_them_without_a_tone() -> None:
+    app = run(_unreported_facts_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Errors" in markdown
+    assert "—" in markdown
+    assert "red[" not in markdown
+
+
+# --- the coverage page ---------------------------------------------------------------------
+
+
+def _coverage_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.coverage_page import render_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_coverage
+    repository.fetch_coverage = boom  # type: ignore[assignment]
+    try:
+        render_coverage_page(get_monitor("active_places_coverage"))
+    finally:
+        repository.fetch_coverage = original
+        st.cache_data.clear()
+
+
+def test_a_coverage_page_whose_endpoint_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_coverage_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _coverage_rows_missing_script() -> None:
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.api.models import CoverageResponse
+    from stewards.components.coverage_page import render_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def snapshot(*_args: object, **_kwargs: object) -> CoverageResponse:
+        return CoverageResponse.model_validate(load_sample("active_places_coverage_coverage"))
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no rows endpoint")
+
+    st.cache_data.clear()
+    coverage_read = repository.fetch_coverage
+    mappings_read = repository.fetch_site_mappings
+    repository.fetch_coverage = snapshot  # type: ignore[assignment]
+    repository.fetch_site_mappings = boom  # type: ignore[assignment]
+    try:
+        render_coverage_page(get_monitor("active_places_coverage"))
+    finally:
+        repository.fetch_coverage = coverage_read
+        repository.fetch_site_mappings = mappings_read
+        st.cache_data.clear()
+
+
+def test_a_rows_endpoint_that_is_not_live_costs_the_table_and_not_the_figures() -> None:
+    """The pairs are a second endpoint. One that is missing must leave the figures and the
+    chart standing, the way a missing trend leaves a monitor page its incidents."""
+    app = run(_coverage_rows_missing_script)
+    text = " ".join(m.value for m in app.markdown)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert "26.4%" in text
+    assert any("Snapshot" in m.value for m in app.markdown)
+    assert len(app.get("vega_lite_chart")) == 1
+    assert not app.dataframe
+
+
+def _coverage_no_region_script() -> None:
+    from stewards.api.models import CoverageHeadline, CoverageSnapshot
+    from stewards.components.coverage_page import render_summary_chart
+    from stewards.monitors.registry import get_monitor
+
+    render_summary_chart(
+        get_monitor("active_places_coverage"),
+        CoverageSnapshot(headline=CoverageHeadline(coverage_pct=26.4)),
+    )
+
+
+def test_a_snapshot_with_no_regional_breakdown_says_so_rather_than_drawing_an_empty_axis() -> (
+    None
+):
+    app = run(_coverage_no_region_script)
+    assert not app.get("vega_lite_chart")
+    assert any("does not report a regional breakdown" in c.value for c in app.caption)
+
+
+def _coverage_row_detail_script() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import SiteMappingPage
+    from stewards.components.coverage_page import render_row_detail
+    from stewards.monitors import coverage
+
+    payload = SiteMappingPage.model_validate(load_sample("active_places_coverage_mappings"))
+    rows = coverage.build_rows(payload.data)
+    named = next(row for row in rows if row.name_similarity_percent is not None)
+    render_row_detail(named)
+
+
+def test_selecting_a_pair_shows_the_openactive_side_and_the_matching_evidence() -> None:
+    app = run(_coverage_row_detail_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Matched by" in markdown
+    assert "Name similarity" in markdown
+    assert "Publishers" in markdown
+    assert "https://" in markdown or "http://" in markdown
+
+
+def _coverage_table_selection_script() -> None:
+    """`AppTest` cannot click a dataframe row, so the selection is the one thing stubbed:
+    everything below it — sorting, the frame, the panel — is the real code path."""
+    from fixture_loader import load_sample
+    from stewards.api.models import SiteMappingPage
+    from stewards.components import coverage_page
+    from stewards.monitors import coverage
+    from stewards.monitors.registry import get_monitor
+
+    payload = SiteMappingPage.model_validate(load_sample("active_places_coverage_mappings"))
+    original = coverage_page.render_table
+
+    def first_row(*args: object, **kwargs: object) -> int:
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        return 0
+
+    coverage_page.render_table = first_row  # type: ignore[assignment]
+    try:
+        coverage_page.render_table_section(
+            get_monitor("active_places_coverage"), coverage.build_rows(payload.data)
+        )
+    finally:
+        coverage_page.render_table = original
+
+
+def test_selecting_a_row_in_the_pairs_table_opens_that_pair() -> None:
+    app = run(_coverage_table_selection_script)
+    assert [node.label for node in app.get("expander")]
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Matched by" in markdown

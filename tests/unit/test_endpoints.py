@@ -81,6 +81,62 @@ def test_admin_trend_is_singular_and_takes_the_snapshot_not_a_window() -> None:
     assert endpoint.params == {"as_of": "2026-09-02"}
 
 
+# --- quality ------------------------------------------------------------------------------
+
+
+def test_contract_quality_hangs_off_the_monitor() -> None:
+    endpoint = endpoints.quality(Style.CONTRACT, "feed_quality", as_of=AS_OF)
+    assert endpoint.path == "/monitors/feed_quality/quality"
+    assert endpoint.params == {}
+
+
+def test_admin_quality_is_the_monitor_slug_itself() -> None:
+    """The snapshot is the resource: there is no incident list or trend beside it, so the
+    admin path carries no suffix."""
+    endpoint = endpoints.quality(Style.ADMIN, "feed_quality", as_of=AS_OF)
+    assert endpoint.path == "/admin/feed-quality"
+    assert endpoint.params == {"as_of": "2026-09-02"}
+
+
+# --- coverage -----------------------------------------------------------------------------
+
+
+def test_contract_coverage_hangs_off_the_monitor() -> None:
+    endpoint = endpoints.coverage(Style.CONTRACT, "active_places_coverage", as_of=AS_OF)
+    assert endpoint.path == "/monitors/active_places_coverage/coverage"
+    assert endpoint.params == {}
+
+
+def test_admin_coverage_is_the_monitor_slug_itself() -> None:
+    """As with a quality snapshot, the figures are the resource and carry no suffix."""
+    endpoint = endpoints.coverage(Style.ADMIN, "active_places_coverage", as_of=AS_OF)
+    assert endpoint.path == "/admin/active-places-coverage"
+    assert endpoint.params == {"as_of": "2026-09-02"}
+
+
+def test_contract_coverage_mappings_hang_off_the_monitor_and_page() -> None:
+    endpoint = endpoints.coverage_mappings(
+        Style.CONTRACT, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
+    )
+    assert endpoint.path == "/monitors/active_places_coverage/mappings"
+    assert endpoint.params == {"page": 1, "page_size": 1000}
+
+
+def test_admin_coverage_mappings_use_the_rows_id_not_the_monitor_id() -> None:
+    """The rows are their own resource; deriving a suffix from the monitor id would point
+    the read at a path that does not exist."""
+    endpoint = endpoints.coverage_mappings(
+        Style.ADMIN,
+        "active_places_coverage",
+        "active_places_site_mappings",
+        as_of=AS_OF,
+        page=3,
+        page_size=500,
+    )
+    assert endpoint.path == "/admin/active-places-site-mappings"
+    assert endpoint.params == {"as_of": "2026-09-02", "page": 3, "page_size": 500}
+
+
 # --- endpoints a shape does not have ------------------------------------------------------
 
 
@@ -100,10 +156,15 @@ def test_admin_summary_and_queue_sit_under_admin_and_name_the_snapshot() -> None
     )
 
 
-def test_every_style_routes_all_four_reads() -> None:
+def test_every_style_routes_every_read() -> None:
     """A shape that cannot answer one of these silently loses a page."""
     for style in Style:
         assert endpoints.incidents(style, "single_feed_stall", as_of=AS_OF).path
         assert endpoints.trend(style, "single_feed_stall", as_of=AS_OF).path
+        assert endpoints.quality(style, "feed_quality", as_of=AS_OF).path
+        assert endpoints.coverage(style, "active_places_coverage", as_of=AS_OF).path
+        assert endpoints.coverage_mappings(
+            style, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
+        ).path
         assert endpoints.summary(style, as_of=AS_OF).path
         assert endpoints.contact_queue(style, as_of=AS_OF).path

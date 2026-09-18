@@ -14,12 +14,14 @@ from stewards.api.models import (
     DatasetStallDetail,
     DetailModel,
     FeedIngestionErrorDetail,
+    FutureDeclineDetail,
+    FutureDeclineFeed,
     OrphanedChildrenDetail,
     OrphanKind,
     StallDetail,
 )
 from stewards.monitors.health import Direction, HealthPolicy
-from stewards.monitors.tile_viz import Gauge, Sparkline, TileViz
+from stewards.monitors.tile_viz import Facts, Gauge, Sparkline, TileViz
 
 
 class Group(StrEnum):
@@ -27,6 +29,24 @@ class Group(StrEnum):
     AVAILABILITY = "Availability"
     CONTENT = "Content"
     COVERAGE = "Coverage & quality"
+
+
+class Source(StrEnum):
+    """Which logical read backs a monitor, and therefore which page renders it.
+
+    `INCIDENTS` is a list of faults that age — the shape every shared component assumes.
+    `QUALITY` is a snapshot of the whole fleet with a summary block beside it and no
+    history, which cannot be folded into an incident without inventing the age and the
+    threshold flag the batch never reported. See `monitors.quality`.
+    `COVERAGE` is a snapshot of how much of an external estate the fleet reaches: figures
+    from one read and rows from a second, paginated one, and no history either. It is
+    neither of the others — its rows do not age, and its figures do not arrive beside them.
+    See `monitors.coverage`.
+    """
+
+    INCIDENTS = "incidents"
+    QUALITY = "quality"
+    COVERAGE = "coverage"
 
 
 class Severity(StrEnum):
@@ -68,6 +88,9 @@ class Col:
     kind: ColKind = ColKind.TEXT
     primary: bool = False
     help: str | None = None
+
+    #: What a `LINK` cell reads, where "feed" is the wrong noun for what it opens.
+    link_text: str | None = None
 
     @property
     def is_detail(self) -> bool:
@@ -138,6 +161,17 @@ class Monitor:
     blurb: str
     unit: str
     columns: tuple[Col, ...]
+
+    #: Which read backs this monitor. `QUALITY` swaps the incident machinery — ageing,
+    #: contact threshold, trend, email draft — for the fleet snapshot `monitors.quality`
+    #: shapes, and routes the page to `components.quality_page`; `COVERAGE` does the same
+    #: through `monitors.coverage` and `components.coverage_page`.
+    source: Source = Source.INCIDENTS
+
+    #: The row resource's own id, for a monitor whose rows are a second endpoint rather than
+    #: arriving beside its figures. Only a `COVERAGE` monitor declares one.
+    rows_id: str = ""
+
     key_cols: tuple[str, ...] = ("publisher_id", "feed_id")
     detail_model: type[DetailModel] = DetailModel
     summary_field: str = "feed_name"
@@ -199,10 +233,16 @@ class Monitor:
 
     @property
     def meta_chips(self) -> tuple[str, ...]:
+        """The chips under the blurb. A monitor whose rows do not age states no threshold."""
+        threshold = (
+            (f"contact after {self.threshold_days}d",)
+            if self.source is Source.INCIDENTS
+            else ()
+        )
         return (
             f"monitor.{self.id}",
             f"severity: {self.severity.value}",
-            f"contact after {self.threshold_days}d",
+            *threshold,
             self.schedule,
         )
 
@@ -396,10 +436,10 @@ DATASET_ORPHANED_CHILDREN = Monitor(
         Col("part.kind", "Child type", ColKind.TEXT),
         Col("part.orphan_count", "Orphans", ColKind.NUMBER),
         Col(
-            "part.checked_count",
-            "Children checked",
+            "part.child_count",
+            "Child Count",
             ColKind.NUMBER,
-            help="Children of this type the crawl resolved a parent for, or failed to",
+            help="Number of children of this type the crawl reached in the dataset",
         ),
         Col("part.orphan_percent", "Share orphaned", ColKind.RISK),
         Col(
@@ -441,12 +481,240 @@ DATASET_ORPHANED_CHILDREN = Monitor(
 )
 
 
+DATASET_FUTURE_DECLINE = Monitor(
+    id="dataset_future_decline",
+    name="Future opportunity decline",
+    group=Group.CONTENT,
+    severity=Severity.HIGH,
+    blurb=(
+        "Datasets whose count of opportunities starting in the future has fallen every day "
+        "of the last 5 snapshots, or has dropped sharply within that window. The feed rows "
+        "carry what the window did to each feed: how many items it updated, how many it "
+        "deleted, and the difference between the two, which is what a falling future count "
+        "usually comes down to. A dataset that has stopped publishing altogether is "
+        "reported as a stall rather than a decline."
+    ),
+    unit="datasets declining",
+    detail_model=FutureDeclineDetail,
+    # The question is which feed is pulling the dataset down, so each dataset becomes one
+    # row per feed rather than one row hiding its feeds in a cell.
+    rows=RowSpec("detail.feeds", FutureDeclineFeed),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("detail.dataset_name", "Dataset", ColKind.TEXT),
+        Col("part.feed_name", "Feed", ColKind.MONO),
+        Col("part.reason_label", "Reason", ColKind.TEXT),
+        Col(
+            "part.current_future",
+            "Future now",
+            ColKind.NUMBER,
+            help="Opportunities starting after the snapshot date, at the end of the window",
+        ),
+        Col(
+            "part.drop_percent",
+            "Drop",
+            ColKind.RISK,
+            help="Share of the window's starting future count that has gone",
+        ),
+        Col(
+            "part.updated_in_window",
+            "Updated",
+            ColKind.NUMBER,
+            help="Items the crawl saw created or updated during the window",
+        ),
+        Col(
+            "part.deletes_in_window",
+            "Deletes",
+            ColKind.NUMBER,
+            help="Items the feed deleted during the window",
+        ),
+        Col(
+            "part.delta_in_window",
+            "Delta",
+            ColKind.NUMBER,
+            help="Updated minus deletes. Negative means it removed more than it refreshed",
+        ),
+        Col("days_open", "Days declining", ColKind.DAYS),
+        Col(
+            "trend",
+            "Recent trend",
+            ColKind.SPARKLINE,
+            help="The dataset's future count over the recent snapshots; a gap is omitted",
+        ),
+        Col("detail.dataset_url", "Dataset feed", ColKind.LINK, help="Opens the dataset feed"),
+    ),
+    filters=(FilterSpec("part.reason_label", "Reason"),),
+    # Descending on the deficit is ascending on the delta: the feed deleting hardest relative
+    # to what it refreshed is the one a steward is looking for, and it is the most negative
+    # delta, not the largest one.
+    sort_field="part.deficit_in_window",
+    threshold_help=(
+        "Show only the datasets the API has flagged past its own contact threshold."
+    ),
+    summary_field="detail.dataset_name",
+    entity="dataset",
+    email_fields=(
+        ("Dataset", "detail.dataset_name"),
+        ("Feeds", "detail.feed_count"),
+        ("Endpoint", "detail.dataset_url"),
+    ),
+    query="monitor_dataset_future_decline_v1",
+    page="views/23_dataset_future_decline.py",
+    kpi_labels=("datasets declining", "publishers affected", "past threshold"),
+)
+
+
+FEED_QUALITY = Monitor(
+    id="feed_quality",
+    name="Feed data quality",
+    group=Group.COVERAGE,
+    severity=Severity.MEDIUM,
+    # Not an incident list: the batch assesses every feed in the fleet each night and
+    # reports the assessment, not a fault that has been open for N days.
+    source=Source.QUALITY,
+    blurb=(
+        "The nightly quality assessment of every feed in the fleet: the status the crawl "
+        "recorded, the quality score and grade where the assessment could produce one, how "
+        "complete the recommended fields are, and how many future opportunities the feed "
+        "carries. Rows are grouped by dataset and the datasets are ordered by their mean "
+        "score, so a publisher's feeds are read together. The batch reports this snapshot "
+        "only: there is no quality history behind it, so nothing on this page describes a "
+        "trend."
+    ),
+    unit="average quality score",
+    # The card is a summary rather than a count, and the monitor supplies its own figures
+    # and verdict. See `monitors.quality.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("dataset_name", "Dataset", ColKind.TEXT),
+        Col("feed_name", "Feed", ColKind.MONO),
+        Col("feed_type", "Type", ColKind.TEXT),
+        Col("feed_version", "Version", ColKind.TEXT),
+        Col("status", "Status", ColKind.STATUS),
+        Col("grade", "Grade", ColKind.TEXT),
+        Col(
+            "score",
+            "Score",
+            ColKind.SCORE,
+            help="The assessment's 0-100 quality score; blank where it could not score",
+        ),
+        Col(
+            "completeness_percent",
+            "Completeness",
+            ColKind.PERCENT,
+            help="Mean coverage of the recommended fields this assessment reported",
+        ),
+        Col("future_items", "Future items", ColKind.NUMBER),
+        Col(
+            "issue_count",
+            "Issues",
+            ColKind.NUMBER,
+            help="Errors plus warnings; select a row to read them",
+        ),
+        Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+    ),
+    filters=(
+        FilterSpec("status", "Status"),
+        FilterSpec("grade", "Grade"),
+        FilterSpec("feed_type", "Feed type"),
+        FilterSpec("feed_version", "Version"),
+    ),
+    # Datasets worst-last, and a dataset's own feeds kept together beneath it.
+    sort_field="dataset_score",
+    # Nothing here ages, so there is no contact threshold to filter on; the page offers an
+    # "issues only" toggle in its place.
+    has_threshold_filter=False,
+    summary_field="feed_name",
+    schedule="nightly assessment",
+    query="monitor_feed_quality_v1",
+    page="views/30_feed_quality.py",
+    kpi_labels=("average quality score", "feeds scored", "feeds with errors"),
+)
+
+
+ACTIVE_PLACES_COVERAGE = Monitor(
+    id="active_places_coverage",
+    name="Active Places coverage",
+    group=Group.COVERAGE,
+    # Context, not a queue: nothing here is a fault a publisher is contacted about, so the
+    # card stays grey. See `monitors.coverage.assess_coverage`.
+    severity=Severity.INFORMATIONAL,
+    # Neither an incident list nor a quality snapshot: the figures and the rows are two
+    # endpoints, and neither has history. See `monitors.coverage`.
+    source=Source.COVERAGE,
+    rows_id="active_places_site_mappings",
+    blurb=(
+        "How much of the Active Places estate appears in the OpenActive data. A site counts "
+        "as covered when an OpenActive venue sits within 200m of it, shares its postcode "
+        "within 1km, or carries a clearly matching name within 500m. England only, every "
+        "opportunity kind except Slot. The batch reports this snapshot only, so nothing "
+        "on this page describes a trend. Method and caveats: "
+        "[the Active Places reports]"
+        "(https://github.com/openactive-contrib/openactive-monitor/tree/main/jobs/"
+        "opportunity-insights/reports/active_places)."
+    ),
+    unit="of Active Places sites covered",
+    # The card is a set of figures rather than a count, and the monitor supplies it along
+    # with its verdict. See `monitors.coverage.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("site_name", "Active Places site", ColKind.TEXT, primary=True),
+        Col("local_authority_name", "Local authority", ColKind.TEXT),
+        Col("postcode", "Postcode", ColKind.MONO),
+        Col("ownership_type_group", "Ownership", ColKind.TEXT),
+        Col("venue_name", "OpenActive venue", ColKind.TEXT),
+        Col("publisher_names", "Publisher", ColKind.TEXT),
+        Col("kinds", "Kinds", ColKind.TEXT),
+        Col("opportunity_count", "Opportunities", ColKind.NUMBER),
+        Col(
+            "distance_metres",
+            "Distance (m)",
+            ColKind.NUMBER,
+            help="Between the Active Places site and the matched OpenActive venue",
+        ),
+        Col("match_label", "Matched by", ColKind.TEXT),
+        Col(
+            "name_similarity_percent",
+            "Name similarity",
+            ColKind.PERCENT,
+            help="Only the name channel reports one; blank where the match was spatial",
+        ),
+        Col(
+            "dataset_url",
+            "Dataset",
+            ColKind.LINK,
+            link_text="dataset \u2197",
+            help="Opens the OpenActive dataset the matched venue was published in",
+        ),
+    ),
+    filters=(
+        FilterSpec("match_label", "Matched by"),
+        FilterSpec("ownership_type_group", "Ownership"),
+        FilterSpec("local_authority_name", "Local authority"),
+    ),
+    # The biggest venues first: a pair carrying hundreds of opportunities is the one worth
+    # reading, and a site's own pairs stay together beneath it.
+    sort_field="opportunity_count",
+    # Nothing here ages, so there is no contact threshold to filter on; the page offers a
+    # "primary pairs only" toggle in its place.
+    has_threshold_filter=False,
+    summary_field="site_name",
+    schedule="daily · England, excluding Slot",
+    query="active_places_coverage_v1",
+    page="views/31_active_places_coverage.py",
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
     SINGLE_FEED_STALL,
     FEED_INGESTION_ERROR,
     DATASET_ORPHANED_CHILDREN,
+    DATASET_FUTURE_DECLINE,
+    FEED_QUALITY,
+    ACTIVE_PLACES_COVERAGE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}
@@ -459,8 +727,9 @@ def get_monitor(monitor_id: str) -> Monitor:
         raise KeyError(f"unknown monitor {monitor_id!r}") from exc
 
 
-def monitor_ids() -> tuple[str, ...]:
-    return tuple(_BY_ID)
+def monitor_ids(source: Source | None = None) -> tuple[str, ...]:
+    """Registered ids, in registry order; narrowed to one backing read where asked."""
+    return tuple(m.id for m in MONITOR_REGISTRY if source is None or m.source is source)
 
 
 def monitors_in_group(group: Group) -> Iterator[Monitor]:

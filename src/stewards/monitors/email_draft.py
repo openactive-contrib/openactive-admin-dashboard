@@ -26,6 +26,12 @@ _OBSERVATIONS = {
         "feed, or Slots without their FacilityUse. A consumer cannot display these items "
         "at all, because the parent carries the name, location and activity."
     ),
+    "dataset_future_decline": (
+        "we have recorded a falling count of opportunities starting in the future for "
+        "{days} days: {evidence} fewer items are visible to consumers now than at the start "
+        "of the window we compare against. A decline of this shape usually means items are "
+        "being deleted or allowed to expire faster than new ones are published."
+    ),
     "single_feed_stall": (
         "the feed still responds with HTTP 200, but the most recent modified timestamp "
         "has not advanced for {days} days. The last change we recorded was {evidence}."
@@ -47,6 +53,7 @@ _EVIDENCE_FIELDS = {
     "feed_ingestion_error": "last_completed",
     "dataset_orphaned_children": "orphan_count",
     "dataset_stall": "last_modified",
+    "dataset_future_decline": "drop",
 }
 
 

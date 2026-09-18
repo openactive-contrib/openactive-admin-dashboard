@@ -36,7 +36,7 @@ def column_config(columns: Sequence[Col]) -> dict[str, Any]:
                 )
             case ColKind.LINK:
                 config[col.label] = st.column_config.LinkColumn(
-                    col.label, display_text="feed ↗", help=col.help
+                    col.label, display_text=col.link_text or "feed ↗", help=col.help
                 )
             case _:
                 config[col.label] = st.column_config.TextColumn(

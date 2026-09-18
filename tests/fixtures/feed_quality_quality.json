@@ -1,0 +1,661 @@
+{
+  "data": [
+    {
+      "feed_id": "activeluton-openactive-legendonlineservices-co-uk-api-facility-uses-events",
+      "feed_url": "https://activeluton-openactive.legendonlineservices.co.uk/api/facility-uses/events",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://activeluton-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": "Active Luton Sessions and Facilities",
+      "publisher_id": "pub_active-luton",
+      "publisher_name": "Active Luton",
+      "status": "OK",
+      "grade": "Gold",
+      "score": 100,
+      "num_future_opportunity_items": 1768,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 100,
+        "facilities": 0,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "activeluton-openactive-legendonlineservices-co-uk-api-sessions",
+      "feed_url": "https://activeluton-openactive.legendonlineservices.co.uk/api/sessions",
+      "feed_type": "SessionSeries",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://activeluton-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": "Active Luton Sessions and Facilities",
+      "publisher_id": "pub_active-luton",
+      "publisher_name": "Active Luton",
+      "status": "OK",
+      "grade": "Silver",
+      "score": 47,
+      "num_future_opportunity_items": 2530,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 0,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "activeluton-openactive-legendonlineservices-co-uk-api-facility-uses",
+      "feed_url": "https://activeluton-openactive.legendonlineservices.co.uk/api/facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_version": "Unknown",
+      "is_regular": true,
+      "dataset_url": "https://activeluton-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": "Active Luton Sessions and Facilities",
+      "publisher_id": "pub_active-luton",
+      "publisher_name": "Active Luton",
+      "status": "OK",
+      "grade": null,
+      "score": null,
+      "num_future_opportunity_items": 0,
+      "completeness": {
+        "location": null,
+        "start_date": null,
+        "end_date": null,
+        "activities": null,
+        "facilities": null,
+        "age_range": null,
+        "level": null,
+        "accessibility_support": null,
+        "gender_restriction": null
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "better-admin-org-uk-api-openactive-better-facility-uses",
+      "feed_url": "https://better-admin.org.uk/api/openactive/better/facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://better-admin.org.uk/api/openactive/better",
+      "dataset_name": "Better Sessions and Facilities",
+      "publisher_id": "pub_better-better-admin",
+      "publisher_name": "Better (better-admin)",
+      "status": "WARNING",
+      "grade": null,
+      "score": 74.5,
+      "num_future_opportunity_items": 0,
+      "completeness": {
+        "location": 100,
+        "start_date": 0,
+        "end_date": 0,
+        "activities": 0,
+        "facilities": 100,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [
+        "Missing required fields \u2014 FacilityUse: activity"
+      ],
+      "errors": [],
+      "missing_required_fields": {
+        "FacilityUse": [
+          "activity"
+        ]
+      },
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "better-admin-org-uk-api-openactive-better-slots",
+      "feed_url": "https://better-admin.org.uk/api/openactive/better/slots",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://better-admin.org.uk/api/openactive/better",
+      "dataset_name": "Better Sessions and Facilities",
+      "publisher_id": "pub_better-better-admin",
+      "publisher_name": "Better (better-admin)",
+      "status": "OK",
+      "grade": "Silver",
+      "score": 99.9,
+      "num_future_opportunity_items": 34384,
+      "completeness": {
+        "location": 32.62,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 32.62,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-ChelmsfordCitySports-live-slots",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/ChelmsfordCitySports-live-slots",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://chelmsfordcitysports.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Chelmsford City Sports Sessions and Facilities",
+      "publisher_id": "pub_chelmsford-city-sports",
+      "publisher_name": "Chelmsford City Sports",
+      "status": "OK",
+      "grade": "Bronze",
+      "score": 100,
+      "num_future_opportunity_items": 17728,
+      "completeness": {
+        "location": 10.12,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 10.12,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-HartlepoolBoroughCouncil-live-scheduled-sessions",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/HartlepoolBoroughCouncil-live-scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://activehartlepool.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Active Hartlepool Sessions and Facilities",
+      "publisher_id": "pub_active-hartlepool",
+      "publisher_name": "Active Hartlepool",
+      "status": "OK",
+      "grade": "Gold",
+      "score": 29.2,
+      "num_future_opportunity_items": 1177,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 100,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 19.83
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "api-clubspark-uk-odi-public-courses",
+      "feed_url": "https://api.clubspark.uk/odi/public/courses",
+      "feed_type": "",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://lawntennisassociation.github.io/",
+      "dataset_name": "LTA Participation Campaigns ",
+      "publisher_id": "pub_lawn-tennis-association",
+      "publisher_name": "Lawn Tennis Association",
+      "status": "WARNING",
+      "grade": null,
+      "score": 75.4,
+      "num_future_opportunity_items": 0,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 0,
+        "activities": 100,
+        "facilities": 100,
+        "age_range": 100,
+        "level": 100,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [
+        "No future opportunities scheduled"
+      ],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "halo-openactive-legendonlineservices-co-uk-api-facility-uses-events",
+      "feed_url": "https://halo-openactive.legendonlineservices.co.uk/api/facility-uses/events",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://halo-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": "Halo Sessions and Facilities",
+      "publisher_id": "pub_halo",
+      "publisher_name": "Halo",
+      "status": "ERROR",
+      "grade": null,
+      "score": 100,
+      "num_future_opportunity_items": 63585,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 100,
+        "facilities": 0,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [
+        "Data parsing error (invalid JSON or missing 'items')"
+      ],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "hcandl-openactive-legendonlineservices-co-uk-api-facility-uses-events",
+      "feed_url": "https://hcandl-openactive.legendonlineservices.co.uk/api/facility-uses/events",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://hcandl-openactive.legendonlineservices.co.uk/OpenActive",
+      "dataset_name": " Sessions and Facilities",
+      "publisher_id": "pub_hcandl",
+      "publisher_name": "hcandl",
+      "status": "ERROR",
+      "grade": null,
+      "score": 100,
+      "num_future_opportunity_items": 4229,
+      "completeness": {
+        "location": 0,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 0,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [
+        "Data parsing error (invalid JSON or missing 'items')"
+      ],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "api-schools-plus-co-uk-api-oa-slots",
+      "feed_url": "https://api.schools-plus.co.uk/api/oa/slots",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": false,
+      "dataset_url": "http://www.schools-plus.co.uk/OpenActive.php",
+      "dataset_name": "Schools Plus Ltd Facilities",
+      "publisher_id": "pub_schools-plus-ltd",
+      "publisher_name": "Schools Plus Ltd",
+      "status": "OK",
+      "grade": "Bronze",
+      "score": 90.2,
+      "num_future_opportunity_items": 16794,
+      "completeness": {
+        "location": 0,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 0,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "api-schools-plus-co-uk-api-oa-facility-uses",
+      "feed_url": "https://api.schools-plus.co.uk/api/oa/facility-uses",
+      "feed_type": "FacilityUse",
+      "feed_version": "Unknown",
+      "is_regular": false,
+      "dataset_url": "http://www.schools-plus.co.uk/OpenActive.php",
+      "dataset_name": "Schools Plus Ltd Facilities",
+      "publisher_id": "pub_schools-plus-ltd",
+      "publisher_name": "Schools Plus Ltd",
+      "status": "OK",
+      "grade": null,
+      "score": null,
+      "num_future_opportunity_items": 0,
+      "completeness": {
+        "location": null,
+        "start_date": null,
+        "end_date": null,
+        "activities": null,
+        "facilities": null,
+        "age_range": null,
+        "level": null,
+        "accessibility_support": null,
+        "gender_restriction": null
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "betterflow-coursepro-co-uk-odi-scheduled-sessions",
+      "feed_url": "https://betterflow.coursepro.co.uk/odi/scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "feed_version": "V0.x",
+      "is_regular": false,
+      "dataset_url": "https://betterflow.coursepro.co.uk/odi/feed",
+      "dataset_name": "Better Sessions",
+      "publisher_id": "pub_better-betterflow",
+      "publisher_name": "Better (betterflow)",
+      "status": "OK",
+      "grade": "Silver",
+      "score": null,
+      "num_future_opportunity_items": 29437,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 0,
+        "age_range": 100,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-ActiveLeeds-live-slots",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/ActiveLeeds-live-slots",
+      "feed_type": "Slot",
+      "feed_version": "V2.0",
+      "is_regular": true,
+      "dataset_url": "https://activeleeds-oa.leisurecloud.net/OpenActive/",
+      "dataset_name": "Active Leeds Sessions and Facilities",
+      "publisher_id": "pub_active-leeds",
+      "publisher_name": "Active Leeds",
+      "status": "OK",
+      "grade": "Gold",
+      "score": 100,
+      "num_future_opportunity_items": 10493,
+      "completeness": {
+        "location": 100,
+        "start_date": 100,
+        "end_date": 100,
+        "activities": 0,
+        "facilities": 100,
+        "age_range": 0,
+        "level": 0,
+        "accessibility_support": 0,
+        "gender_restriction": 0
+      },
+      "warnings": [],
+      "errors": [],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    },
+    {
+      "feed_id": "api-letsride-co-uk-public-v1-rides",
+      "feed_url": "http://api.letsride.co.uk/public/v1/rides",
+      "feed_type": "",
+      "feed_version": "Unknown",
+      "is_regular": true,
+      "dataset_url": "http://data.letsride.co.uk/",
+      "dataset_name": "British Cycling Let's Ride Sessions",
+      "publisher_id": "pub_british-cycling",
+      "publisher_name": "British Cycling",
+      "status": "ERROR",
+      "grade": null,
+      "score": null,
+      "num_future_opportunity_items": 0,
+      "completeness": {
+        "location": null,
+        "start_date": null,
+        "end_date": null,
+        "activities": null,
+        "facilities": null,
+        "age_range": null,
+        "level": null,
+        "accessibility_support": null,
+        "gender_restriction": null
+      },
+      "warnings": [],
+      "errors": [
+        "Data parsing error (invalid JSON or missing 'items')"
+      ],
+      "missing_required_fields": {},
+      "last_assessed": "2026-08-21T01:56:24.156787Z"
+    }
+  ],
+  "summary": {
+    "total_feeds": 15,
+    "total_datasets": 11,
+    "total_publishers": 11,
+    "regular_feeds": 12,
+    "irregular_feeds": 3,
+    "regularity_unknown": 0,
+    "feeds_ok": 10,
+    "feeds_with_warnings": 2,
+    "feeds_with_errors": 3,
+    "feeds_status_unknown": 0,
+    "datasets_with_errors": 3,
+    "feeds_with_future_data": 10,
+    "datasets_with_future_data": 9,
+    "total_future_opportunity_items": 182125,
+    "feeds_scored": 11,
+    "average_score": 83.2909090909091,
+    "median_score": 99.9,
+    "min_score": 29.2,
+    "max_score": 100,
+    "score_buckets": [
+      {
+        "lower": 0,
+        "upper": 20,
+        "feed_count": 0
+      },
+      {
+        "lower": 20,
+        "upper": 40,
+        "feed_count": 1
+      },
+      {
+        "lower": 40,
+        "upper": 60,
+        "feed_count": 1
+      },
+      {
+        "lower": 60,
+        "upper": 80,
+        "feed_count": 2
+      },
+      {
+        "lower": 80,
+        "upper": 100,
+        "feed_count": 7
+      }
+    ],
+    "completeness": {
+      "location": {
+        "average": 70.22833333333334,
+        "feeds_reporting": 12
+      },
+      "start_date": {
+        "average": 91.66666666666667,
+        "feeds_reporting": 12
+      },
+      "end_date": {
+        "average": 83.33333333333333,
+        "feeds_reporting": 12
+      },
+      "activities": {
+        "average": 25.0,
+        "feeds_reporting": 12
+      },
+      "facilities": {
+        "average": 36.895,
+        "feeds_reporting": 12
+      },
+      "age_range": {
+        "average": 16.666666666666668,
+        "feeds_reporting": 12
+      },
+      "level": {
+        "average": 8.333333333333334,
+        "feeds_reporting": 12
+      },
+      "accessibility_support": {
+        "average": 0.0,
+        "feeds_reporting": 12
+      },
+      "gender_restriction": {
+        "average": 1.6524999999999999,
+        "feeds_reporting": 12
+      }
+    },
+    "status_breakdown": [
+      {
+        "value": "OK",
+        "feed_count": 10,
+        "dataset_count": 7,
+        "share": 0.6666666666666666
+      },
+      {
+        "value": "ERROR",
+        "feed_count": 3,
+        "dataset_count": 3,
+        "share": 0.2
+      },
+      {
+        "value": "WARNING",
+        "feed_count": 2,
+        "dataset_count": 2,
+        "share": 0.13333333333333333
+      }
+    ],
+    "grade_breakdown": [
+      {
+        "value": "unknown",
+        "feed_count": 7,
+        "dataset_count": 7,
+        "share": 0.4666666666666667
+      },
+      {
+        "value": "Gold",
+        "feed_count": 3,
+        "dataset_count": 3,
+        "share": 0.2
+      },
+      {
+        "value": "Silver",
+        "feed_count": 3,
+        "dataset_count": 3,
+        "share": 0.2
+      },
+      {
+        "value": "Bronze",
+        "feed_count": 2,
+        "dataset_count": 2,
+        "share": 0.13333333333333333
+      }
+    ],
+    "feed_type_breakdown": [
+      {
+        "value": "Slot",
+        "feed_count": 7,
+        "dataset_count": 7,
+        "share": 0.4666666666666667
+      },
+      {
+        "value": "FacilityUse",
+        "feed_count": 3,
+        "dataset_count": 3,
+        "share": 0.2
+      },
+      {
+        "value": "ScheduledSession",
+        "feed_count": 2,
+        "dataset_count": 2,
+        "share": 0.13333333333333333
+      },
+      {
+        "value": "unknown",
+        "feed_count": 2,
+        "dataset_count": 2,
+        "share": 0.13333333333333333
+      },
+      {
+        "value": "SessionSeries",
+        "feed_count": 1,
+        "dataset_count": 1,
+        "share": 0.06666666666666667
+      }
+    ],
+    "feed_version_breakdown": [
+      {
+        "value": "V2.0",
+        "feed_count": 11,
+        "dataset_count": 9,
+        "share": 0.7333333333333333
+      },
+      {
+        "value": "Unknown",
+        "feed_count": 3,
+        "dataset_count": 3,
+        "share": 0.2
+      },
+      {
+        "value": "V0.x",
+        "feed_count": 1,
+        "dataset_count": 1,
+        "share": 0.06666666666666667
+      }
+    ],
+    "oldest_assessment": "2026-08-21T01:56:24.156787Z",
+    "newest_assessment": "2026-08-21T01:56:24.156787Z"
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 15
+  }
+}

@@ -291,3 +291,80 @@ def test_the_stall_draft_still_names_a_feed() -> None:
     assert "this feed" in draft
     assert "Feed type: ScheduledSession" in draft
     assert "Dataset:" not in draft
+
+
+# --- a monitor whose finding is a falling count --------------------------------------------
+
+FUTURE_DECLINE_GOLDEN = """\
+Subject: OpenActive data check: Better Sessions and Facilities — future opportunity decline
+
+Hello Better (better-admin) team,
+
+We monitor the OpenActive feeds you publish as part of the open data service.
+In our snapshot of 2026-08-21, we have recorded a falling count of opportunities starting \
+in the future for 9 days: 12,981 fewer items are visible to consumers now than at the start \
+of the window we compare against. A decline of this shape usually means items are being \
+deleted or allowed to expire faster than new ones are published.
+
+Dataset: Better Sessions and Facilities
+Feeds: 1
+Endpoint: https://better-admin.org.uk/api/openactive/better
+First detected: 2026-08-12 (9 days open)
+
+Could you confirm whether the export that populates this dataset is still running,
+and let us know by 2026-08-26 if you need help investigating.
+
+No action is needed on our side once the dataset resumes; the check clears itself
+on the next daily snapshot.
+
+Thank you,
+The ODI data stewards team"""
+
+
+def future_decline_incident(**overrides: object) -> Incident:
+    return Incident.model_validate(
+        {
+            "monitor_id": "dataset_future_decline",
+            "publisher_id": "pub_better-better-admin",
+            "publisher_name": "Better (better-admin)",
+            "dataset_url": "https://better-admin.org.uk/api/openactive/better",
+            "dataset_name": "Better Sessions and Facilities",
+            "feed_count": 1,
+            "first_detected": "2026-08-12",
+            "days_open": 9,
+            "past_threshold": True,
+            "status": "open",
+            "detail": {
+                "reason": "monotonic_decline",
+                "window_days": 5,
+                "start_total": 190167,
+                "current_total": 177186,
+                "drop": 12981,
+                "drop_percent": 6.83,
+                "feeds": [],
+            },
+        }
+        | overrides
+    )
+
+
+def test_future_decline_draft_matches_the_golden_copy() -> None:
+    monitor = get_monitor("dataset_future_decline")
+    assert draft_email(monitor, future_decline_incident(), SNAPSHOT) == FUTURE_DECLINE_GOLDEN
+
+
+def test_the_future_decline_draft_cites_the_drop_the_dataset_reported() -> None:
+    """The evidence is the dataset's own figure, thousands-separated, not a feed's."""
+    monitor = get_monitor("dataset_future_decline")
+    draft = draft_email(monitor, future_decline_incident(), SNAPSHOT)
+    assert "12,981 fewer items" in draft
+    assert "None" not in draft
+
+
+def test_the_future_decline_draft_falls_back_to_the_detection_date() -> None:
+    """The degenerate path: `drop` is mandatory in the contract, so this is the shared
+    fallback showing through — with no figure to cite, the draft names the date we first
+    recorded the decline rather than raising or printing None."""
+    monitor = get_monitor("dataset_future_decline")
+    draft = draft_email(monitor, future_decline_incident(detail={}), SNAPSHOT)
+    assert "2026-08-12 fewer items" in draft

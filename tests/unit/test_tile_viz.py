@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from stewards.monitors.registry import MONITOR_REGISTRY, Monitor
-from stewards.monitors.tile_viz import Gauge, Sparkline, TileViz
+from stewards.monitors.registry import MONITOR_REGISTRY, Monitor, Source
+from stewards.monitors.tile_viz import Facts, Gauge, Sparkline, TileViz
 
 pytestmark = pytest.mark.parametrize(
     "monitor", MONITOR_REGISTRY, ids=[m.id for m in MONITOR_REGISTRY]
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.parametrize(
 
 
 def test_the_declared_visualisation_is_one_the_overview_can_draw(monitor: Monitor) -> None:
-    assert isinstance(monitor.viz, Sparkline | Gauge)
+    assert isinstance(monitor.viz, Sparkline | Gauge | Facts)
 
 
 def test_a_sparkline_is_the_default(monitor: Monitor) -> None:
@@ -46,9 +46,18 @@ def test_a_monitor_with_no_incident_age_does_not_order_by_age(monitor: Monitor) 
     if monitor.sort_field != "days_open":
         return
     assert isinstance(monitor.viz, Sparkline), (
-        f"{monitor.id} is judged on a benchmark, which suggests it reports no age to sort by"
+        f"{monitor.id} is judged on something other than its series, which suggests it "
+        "reports no age to sort by"
     )
 
 
+def test_a_facts_card_belongs_to_a_monitor_that_supplies_one(monitor: Monitor) -> None:
+    """`Facts` draws no chart and reads no count, so the figures have to come from the
+    monitor itself — which is exactly what a non-incident source does."""
+    if not isinstance(monitor.viz, Facts):
+        pytest.skip(f"{monitor.id} draws its own figure")
+    assert monitor.source is not Source.INCIDENTS
+
+
 def test_the_alias_covers_every_variant(monitor: Monitor) -> None:
-    assert TileViz.__args__ == (Sparkline, Gauge)
+    assert TileViz.__args__ == (Sparkline, Gauge, Facts)

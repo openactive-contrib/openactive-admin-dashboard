@@ -11,6 +11,7 @@ from stewards.monitors.registry import (
     Group,
     Monitor,
     Severity,
+    Source,
     get_monitor,
     groups,
     monitor_ids,
@@ -39,9 +40,22 @@ def test_groups_are_in_registry_order_without_duplicates() -> None:
 
 
 def test_monitors_in_group_filters() -> None:
-    availability = list(monitors_in_group(Group.AVAILABILITY))
-    assert availability == [m for m in MONITOR_REGISTRY if m.group is Group.AVAILABILITY]
-    assert list(monitors_in_group(Group.COVERAGE)) == []
+    for group in Group:
+        assert list(monitors_in_group(group)) == [
+            m for m in MONITOR_REGISTRY if m.group is group
+        ]
+    assert list(monitors_in_group(Group.OVERVIEW)) == []
+
+
+def test_monitor_ids_narrow_to_one_backing_read() -> None:
+    """The overview reads a trend per incident monitor and the monitor's own snapshot for
+    each of the others, so the three sets have to partition the registry — a monitor in
+    none of them would get no card at all, and one in two would be read twice."""
+    by_source = {source: set(monitor_ids(source)) for source in Source}
+    assert set().union(*by_source.values()) == set(monitor_ids())
+    assert sum(len(ids) for ids in by_source.values()) == len(monitor_ids())
+    assert by_source[Source.QUALITY] == {"feed_quality"}
+    assert by_source[Source.COVERAGE] == {"active_places_coverage"}
 
 
 def test_column_lookup_by_label() -> None:

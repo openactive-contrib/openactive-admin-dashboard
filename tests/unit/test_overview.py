@@ -10,7 +10,9 @@ from stewards.api.models import MonitorCount, Summary, SummaryResponse, TrendPoi
 from stewards.monitors.health import Direction, HealthPolicy, HealthState
 from stewards.monitors.overview import (
     MINUS,
+    Fact,
     NavBadge,
+    TileCard,
     build_tiles,
     format_badge,
     format_count,
@@ -293,6 +295,7 @@ def test_sidebar_counts_maps_every_reported_monitor(summary: SummaryResponse) ->
         "single_feed_stall": 23,
         "feed_ingestion_error": 9,
         "dataset_orphaned_children": 590056,
+        "dataset_future_decline": 9,
     }
 
 
@@ -494,3 +497,81 @@ def test_the_sidebar_pill_takes_its_tone_from_the_same_verdict_as_the_card(summa
     for monitor_id, badge in badges.items():
         if monitor_id in tiles:
             assert badge.tone is tiles[monitor_id].state
+
+
+# --- a monitor that supplies its own card -------------------------------------------------
+#
+# A quality snapshot has no open count and no daily series, so neither the count path nor the
+# trend arithmetic has anything to say about it. Such a monitor hands the card over ready
+# made; these assert that the rest of the overview then leaves it alone.
+
+QUALITY_ID = "feed_quality"
+
+
+def quality_card(state: HealthState = HealthState.HEALTHY, badge: int | None = 4) -> TileCard:
+    from stewards.monitors.health import Health, Movement
+
+    return TileCard(
+        value="73.4",
+        unit="average quality score",
+        health=Health(state, Movement.UNKNOWN, "73.4 average score"),
+        facts=(Fact("Errors", "4", Tone.RED), Fact("Feeds OK", "300", Tone.GREEN)),
+        note="258 of 460 feeds scored in this snapshot",
+        badge=badge,
+    )
+
+
+def tile_for(tiles: tuple, monitor_id: str):
+    return next(tile for tile in tiles if tile.monitor.id == monitor_id)
+
+
+def test_a_supplied_card_decides_the_tile_rather_than_the_summary_counts(
+    summary: SummaryResponse,
+) -> None:
+    tiles = build_tiles(summary.data, {}, {QUALITY_ID: quality_card()})
+    tile = tile_for(tiles, QUALITY_ID)
+    assert tile.value == "73.4"
+    assert tile.unit == "average quality score"
+    assert tile.state is Tone.GREEN
+    assert tile.note == "258 of 460 feeds scored in this snapshot"
+    assert [fact.label for fact in tile.facts] == ["Errors", "Feeds OK"]
+
+
+def test_a_supplied_card_claims_no_trend_and_draws_no_sparkline(
+    summary: SummaryResponse,
+) -> None:
+    """One snapshot says nothing about movement, so the card states none."""
+    tile = tile_for(build_tiles(summary.data, {}, {QUALITY_ID: quality_card()}), QUALITY_ID)
+    assert tile.trend_note == ""
+    assert tile.sparkline == ()
+    assert tile.count is None
+
+
+def test_a_monitor_with_no_supplied_card_is_unaffected(summary: SummaryResponse) -> None:
+    with_card = build_tiles(summary.data, {}, {QUALITY_ID: quality_card()})
+    without = build_tiles(summary.data, {})
+    for monitor_id in ("single_feed_stall", "feed_ingestion_error"):
+        assert tile_for(with_card, monitor_id).value == tile_for(without, monitor_id).value
+
+
+def test_a_registered_monitor_whose_card_did_not_load_still_gets_a_tile(
+    summary: SummaryResponse,
+) -> None:
+    """The quality endpoint 404ing costs that card its figures, never the overview."""
+    tile = tile_for(build_tiles(summary.data, {}, {}), QUALITY_ID)
+    assert tile.facts == ()
+    assert tile.value == "0"
+
+
+def test_a_supplied_card_badges_the_sidebar_with_its_own_tone(
+    summary: SummaryResponse,
+) -> None:
+    badges = nav_badges(summary.data, {}, {QUALITY_ID: quality_card()})
+    assert badges[QUALITY_ID] == NavBadge("4", Tone.GREEN)
+
+
+def test_a_card_with_nothing_to_report_gets_no_pill(summary: SummaryResponse) -> None:
+    assert QUALITY_ID not in nav_badges(summary.data, {}, {QUALITY_ID: quality_card(badge=0)})
+    assert QUALITY_ID not in nav_badges(
+        summary.data, {}, {QUALITY_ID: quality_card(badge=None)}
+    )

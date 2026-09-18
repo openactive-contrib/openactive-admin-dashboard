@@ -12,11 +12,18 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
+from stewards.monitors import coverage, quality
 from stewards.monitors.gauge import gauge_chart
-from stewards.monitors.overview import Tile, build_tiles, format_count, format_delta
-from stewards.monitors.registry import monitor_ids
+from stewards.monitors.overview import (
+    Cards,
+    Tile,
+    build_tiles,
+    format_count,
+    format_delta,
+)
+from stewards.monitors.registry import Source, monitor_ids
 from stewards.monitors.thresholds import Tone
-from stewards.monitors.tile_viz import Gauge
+from stewards.monitors.tile_viz import Facts, Gauge
 from stewards.monitors.transforms import EMPTY
 from stewards.monitors.trend import sparkline_chart
 
@@ -109,15 +116,43 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
             nav.switch_to("contact_queue")
 
 
+def tile_cards() -> Cards:
+    """The card each monitor that supplies its own hands over, by monitor id.
+
+    A monitor whose figure `/summary` does not describe at all builds its whole card from its
+    own read — see `tile_viz.Facts`. Each such read is tolerant in the same way as the trend
+    read: a monitor whose endpoint this deployment has not built yet is simply absent from
+    the mapping, and its tile falls back to the `/summary` path, which reports nothing for
+    it, so the card reads "not reported" rather than costing the whole overview.
+    """
+    cards = {
+        monitor_id: quality.tile_card(summary)
+        for monitor_id, summary in repository.fetch_quality_summaries(
+            monitor_ids(Source.QUALITY)
+        ).items()
+    }
+    cards.update(
+        {
+            monitor_id: coverage.tile_card(snapshot)
+            for monitor_id, snapshot in repository.fetch_coverage_snapshots(
+                monitor_ids(Source.COVERAGE)
+            ).items()
+        }
+    )
+    return cards
+
+
 def tile_chart(tile: Tile) -> alt.Chart | alt.LayerChart | None:
     """The tile's visualisation, as its monitor declares it.
 
-    None means draw nothing: a series too short to plot, or a figure the snapshot did not
-    report. Adding a visualisation is one `TileViz` variant, one builder and one case here —
-    no page or tile learns about it.
+    None means draw nothing: a series too short to plot, a figure the snapshot did not
+    report, or a card whose figures are the visualisation. Adding a visualisation is one
+    `TileViz` variant, one builder and one case here — no page or tile learns about it.
     """
     colour = theme.FOREGROUND[tile.state]
     match tile.monitor.viz:
+        case Facts():
+            return None
         case Gauge() as spec:
             return gauge_chart(
                 tile.count,
@@ -128,6 +163,20 @@ def tile_chart(tile: Tile) -> alt.Chart | alt.LayerChart | None:
             )
         case _:
             return sparkline_chart(tile.sparkline, colour)
+
+
+def render_facts(tile: Tile) -> None:
+    """The figures beside the headline, for a card that summarises rather than counts."""
+    muted = theme.markdown_colour(Tone.GREY)
+    for fact in tile.facts:
+        with st.container(
+            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        ):
+            st.markdown(f":{muted}[{fact.label}]")
+            if fact.tone is None:
+                st.markdown(fact.value)
+            else:
+                st.markdown(f":{theme.markdown_colour(fact.tone)}[**{fact.value}**]")
 
 
 def render_tile(tile: Tile) -> None:
@@ -144,12 +193,15 @@ def render_tile(tile: Tile) -> None:
         count_col, spark_col = st.columns([1, 1], vertical_alignment="center")
         with count_col:
             layout.tone_metric(
-                "", tile.value, tile.state, slug=f"tile{tile.monitor.id}", sub=tile.monitor.unit
+                "", tile.value, tile.state, slug=f"tile{tile.monitor.id}", sub=tile.unit
             )
         with spark_col:
-            chart = tile_chart(tile)
-            if chart is not None:
-                st.altair_chart(chart, width="stretch")
+            if tile.facts:
+                render_facts(tile)
+            else:
+                chart = tile_chart(tile)
+                if chart is not None:
+                    st.altair_chart(chart, width="stretch")
 
         if tile.trend_note:
             st.caption(tile.trend_note)
@@ -175,8 +227,13 @@ def render_overview_page() -> None:
     summary = response.data
     # The card states are judged on each monitor's daily series; `fetch_monitor_trends`
     # leaves out a monitor whose trend endpoint this deployment does not serve, and that
-    # monitor is judged on the sparkline in the summary instead.
-    tiles = build_tiles(summary, repository.fetch_monitor_trends(monitor_ids()))
+    # monitor is judged on the sparkline in the summary instead. A quality or coverage
+    # monitor has no series at all and supplies its own card, verdict included.
+    tiles = build_tiles(
+        summary,
+        repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
+        tile_cards(),
+    )
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"
         if summary.publishers_monitored

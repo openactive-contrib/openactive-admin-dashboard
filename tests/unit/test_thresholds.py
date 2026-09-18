@@ -82,6 +82,10 @@ def test_days_label() -> None:
         ("new", Tone.GREY, "New"),
         ("open", Tone.GREY, "Open"),
         ("resolved", Tone.GREEN, "Resolved"),
+        # The quality assessment's own vocabulary, which it sends upper case.
+        ("OK", Tone.GREEN, "OK"),
+        ("WARNING", Tone.AMBER, "Warning"),
+        ("ERROR", Tone.RED, "Error"),
     ],
 )
 def test_known_statuses(status: str, tone: Tone, label: str) -> None:
@@ -98,6 +102,14 @@ def test_the_admin_apis_open_token_is_labelled_rather_than_de_slugged() -> None:
     """Every incident from the admin API carries it, so it is declared, not a fallback."""
     assert status_label("open") == "Open"
     assert status_tone("open") is Tone.GREY
+
+
+def test_the_status_vocabulary_is_case_insensitive() -> None:
+    """The admin API sends `open` and the quality assessment sends `OK`; both name a status
+    this module already knows, and the case they arrive in is not a new token."""
+    assert status_tone("Open") is status_tone("open")
+    assert status_label(" ok ") == "OK"
+    assert status_tone("error") is Tone.RED
 
 
 def test_empty_status_is_not_blank() -> None:
