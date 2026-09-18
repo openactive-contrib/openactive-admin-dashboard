@@ -115,7 +115,7 @@ def test_each_dataset_becomes_one_row_per_child_type() -> None:
 def test_the_breakdown_columns_land_in_their_declared_columns() -> None:
     row = to_dataframe(MONITOR, expand(MONITOR, [incident()])).iloc[0]
     assert row["Dataset"] == "Played Sessions and Facilities"
-    assert row["Children checked"] == 198790
+    assert row["Child Count"] == 198790
     assert row["Dataset feed"] == URL
     assert row["Share orphaned"] == pytest.approx(100 * 79744 / 198790)
 
@@ -133,17 +133,17 @@ def test_a_dataset_the_batch_reported_without_a_breakdown_falls_back_to_its_own_
     row = to_dataframe(MONITOR, rows).iloc[0]
     assert row["Child type"] == EMPTY
     assert row["Orphans"] == 91748
-    assert row["Children checked"] == 230660
+    assert row["Child Count"] == 230660
     assert row["Missing parents"] == 862
     assert row["Share orphaned"] == pytest.approx(39.776294112546606)
     assert row["Publisher"] == "Played"
 
 
 def test_a_dataset_with_neither_a_breakdown_nor_a_figure_reads_empty() -> None:
-    rows = expand(MONITOR, [incident(detail={}, orphan_count=None, checked_count=None)])
+    rows = expand(MONITOR, [incident(detail={}, orphan_count=None, child_count=None)])
     row = to_dataframe(MONITOR, rows).iloc[0]
     assert row["Orphans"] is None
-    assert row["Children checked"] is None
+    assert row["Child Count"] is None
 
 
 def test_the_total_counts_a_dataset_with_no_breakdown_exactly_once() -> None:
@@ -171,7 +171,7 @@ def test_no_incidents_yields_an_empty_frame_with_the_declared_columns() -> None:
 
 
 @pytest.mark.parametrize(
-    ("orphans", "checked", "expected_share", "expected_tone"),
+    ("orphans", "children", "expected_share", "expected_tone"),
     [
         (0, 100, 0.0, Tone.GREEN),
         (19, 100, 19.0, Tone.GREEN),
@@ -182,10 +182,10 @@ def test_no_incidents_yields_an_empty_frame_with_the_declared_columns() -> None:
     ],
 )
 def test_the_orphan_share_shades_the_other_way_from_a_quality_score(
-    orphans: int, checked: int, expected_share: float, expected_tone: Tone
+    orphans: int, children: int, expected_share: float, expected_tone: Tone
 ) -> None:
     """High is bad here: on the score scale a wholly orphaned dataset would read green."""
-    detail = {"by_kind": [{"kind": "Slot", "orphan_count": orphans, "checked_count": checked}]}
+    detail = {"by_kind": [{"kind": "Slot", "orphan_count": orphans, "child_count": children}]}
     rows = expand(MONITOR, [incident(detail=detail)])
     assert to_dataframe(MONITOR, rows).iloc[0]["Share orphaned"] == pytest.approx(
         expected_share
@@ -194,9 +194,9 @@ def test_the_orphan_share_shades_the_other_way_from_a_quality_score(
 
 
 def test_a_child_type_the_crawl_did_not_reach_reports_no_share() -> None:
-    """Zero checked is not zero orphaned, so the share is absent rather than 0%."""
+    """No children is not zero orphaned, so the share is absent rather than 0%."""
     detail = {
-        "by_kind": [{"kind": "ScheduledSession", "orphan_count": 0, "checked_count": 0}],
+        "by_kind": [{"kind": "ScheduledSession", "orphan_count": 0, "child_count": 0}],
     }
     rows = expand(MONITOR, [incident(detail=detail)])
     assert to_dataframe(MONITOR, rows).iloc[0]["Share orphaned"] is None

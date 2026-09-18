@@ -85,10 +85,10 @@ class OrphanKind(DetailModel):
 
     @property
     def orphan_percent(self) -> float | None:
-        """Orphans as a percentage of the children actually checked, for the table's bar.
+        """Orphans as a percentage of the children of this kind, for the table's bar.
 
-        None rather than zero when nothing was checked: a kind the crawl did not reach has
-        no share to report, and a zero would read as "none orphaned".
+        None rather than zero when the dataset holds none: a kind the crawl did not reach
+        has no share to report, and a zero would read as "none orphaned".
         """
         if not self.child_count or self.orphan_count is None:
             return None
