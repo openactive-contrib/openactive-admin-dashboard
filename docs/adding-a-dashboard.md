@@ -32,7 +32,8 @@ data. The complete file list, for any new monitor:
 | `src/stewards/api/sample_data/<id>_trend.json` | new: 30-snapshot series for the chart |
 | `src/stewards/api/sample_data/summary.json` | append a `MonitorCount` for the new id — this is what makes the home-page card and the sidebar badge real |
 | `tests/unit/test_<id>.py` | happy path, empty input, threshold boundary |
-| *(a quality monitor instead)* | `<id>_quality.json` in place of the two payloads above, and no `summary.json` entry — see "Two backing reads" |
+| *(a quality monitor instead)* | `<id>_quality.json` in place of the two payloads above, and no `summary.json` entry — see "The backing reads" |
+| *(a coverage monitor instead)* | `<id>_coverage.json` and `<id>_mappings.json`, and no `summary.json` entry — same section |
 | `src/stewards/api/models.py` *(only if the monitor has `detail` fields)* | a `DetailModel` subclass |
 | `src/stewards/monitors/email_draft.py` *(optional)* | a check-specific observation sentence |
 
@@ -44,42 +45,56 @@ or any other shared module, that is a signal the shared code is not general enou
 Generalise the component instead of special-casing the monitor. That rule is what keeps
 eight dashboards from becoming eight one-off pages.
 
-## Two backing reads
+## The backing reads
 
-Most monitors report **incidents**, and everything below assumes that shape. One other shape
-exists, declared as `source=Source.QUALITY` on the registry entry: a **quality snapshot** —
-one row per feed carrying this snapshot's measurements, a fleet-wide `summary` block beside
-the rows, and no history at all.
+Most monitors report **incidents**, and everything below assumes that shape. Two other shapes
+exist, declared as `source=` on the registry entry:
 
-The two are not interchangeable. A quality row has no `first_detected`, no `days_open` and no
-`past_threshold`, and folding it into an `Incident` would mean inventing all three. So a
-quality monitor swaps the parts of the app that depend on an incident ageing, and keeps
-everything else:
+- `Source.QUALITY` — a **quality snapshot**: one row per feed carrying this snapshot's
+  measurements, a fleet-wide `summary` block beside the rows, and no history at all.
+- `Source.COVERAGE` — a **coverage snapshot**: how much of an external estate the fleet
+  reaches. Its figures and its rows are *two* endpoints — one object of totals and a
+  paginated list of rows — and it has no history either.
 
-| | `Source.INCIDENTS` (default) | `Source.QUALITY` |
-|---|---|---|
-| Read | `incidents` + `trend` | `quality` (one request; see §2) |
-| Shaping | `monitors/transforms.py` | `monitors/quality.py` |
-| Page | `components/monitor_page.py` | `components/quality_page.py` |
-| Above the table | 3 KPIs, then the trend chart | 5 figures off the `summary` block, then 4 summary charts |
-| Table | incidents, worst-first on `sort_field` | feeds, grouped by dataset, datasets ordered by `sort_field` |
-| Threshold toggle | "Past threshold only" | "Issues only" — nothing ages, so nothing passes a threshold |
-| Row selection | the publisher email draft | the feed's own assessment: issues, missing required fields, coverage per field |
-| Contact queue | included | never: it has no incidents to contact anyone about |
-| Card | `Sparkline` or `Gauge` off `/summary` | `Facts` — the monitor supplies the card, verdict included |
-| Sample payload | `<id>_incidents.json`, `<id>_trend.json` | `<id>_quality.json` |
+None of the three are interchangeable. A quality row and a coverage row both lack
+`first_detected`, `days_open` and `past_threshold`, and folding either into an `Incident`
+would mean inventing all three. A coverage monitor is not a quality monitor because its
+figures do not arrive beside its rows, so it cannot be one request and its rows must page.
+
+So a non-incident monitor swaps the parts of the app that depend on an incident ageing, and
+keeps everything else:
+
+| | `Source.INCIDENTS` (default) | `Source.QUALITY` | `Source.COVERAGE` |
+|---|---|---|---|
+| Read | `incidents` + `trend` | `quality` (one request; see §2) | `coverage` + `coverage_mappings` (paged) |
+| Shaping | `monitors/transforms.py` | `monitors/quality.py` | `monitors/coverage.py` |
+| Page | `components/monitor_page.py` | `components/quality_page.py` | `components/coverage_page.py` |
+| Above the table | 3 KPIs, then the trend chart | 5 figures off the `summary` block, then 4 summary charts | 4 figures off the `headline` block, then the regional chart |
+| Table | incidents, worst-first on `sort_field` | feeds, grouped by dataset | rows, worst-first on `sort_field`, a key's own rows together |
+| Threshold toggle | "Past threshold only" | "Issues only" | "Primary pairs only" |
+| Row selection | the publisher email draft | the feed's own assessment | the row's own evidence |
+| Contact queue | included | never | never |
+| Card | `Sparkline` or `Gauge` off `/summary` | `Facts` — the monitor supplies the card, verdict included | `Facts`, the same way |
+| Sample payload | `<id>_incidents.json`, `<id>_trend.json` | `<id>_quality.json` | `<id>_coverage.json`, `<id>_mappings.json` |
+| Extra registry field | — | — | `rows_id`, naming the rows' own resource |
 
 What is unchanged is everything the registry already drove: `columns` and `ColKind` format
 and RAG-shade the table exactly as they do an incident table, `filters` become the same
 selectboxes, `thresholds.py` supplies every tone, and the card's verdict is a `Health`, so
 the chip, the tone and the sidebar pill run through the code every other monitor uses. A
-column path on a quality row is a plain attribute name — `score`, `dataset_score` — because
-every figure a quality row reports is on the row; there is no `detail.` or `part.` prefix to
-learn.
+column path on a quality or coverage row is a plain attribute name — `score`,
+`dataset_score`, `match_label` — because every figure such a row reports is on the row; there
+is no `detail.` or `part.` prefix to learn.
 
-`tests/unit/test_registry.py` is parametrised over both kinds and skips whichever checks do
-not apply, keyed off the declared source, so the next monitor of either shape is validated
-for free.
+`tests/unit/test_registry.py` is parametrised over all three kinds and skips whichever checks
+do not apply, keyed off the declared source, so the next monitor of any shape is validated
+the moment it lands.
+
+**Adding a fourth read is not a registry entry.** It is a `Source` member, a shaping module
+under `monitors/`, a page renderer under `components/`, endpoint functions for *both* URL
+shapes, models, repository reads and a branch in `overview_page.tile_cards`. Only reach for
+one when the data genuinely cannot be any of the three — as `COVERAGE` could not, because its
+rows page and its figures come from somewhere else.
 
 The rest of this page is the incident procedure. Where a step differs for a quality monitor
 it says so.
@@ -90,7 +105,8 @@ Settle these before writing anything. Every one of them is a field on the regist
 
 | Decision | Field | Notes |
 |---|---|---|
-| Backing read | `source` | `Source.INCIDENTS` (default) or `Source.QUALITY`. See "Two backing reads" above; it decides which read, which shaping module and which page renderer the monitor gets. |
+| Backing read | `source` | `Source.INCIDENTS` (default), `Source.QUALITY` or `Source.COVERAGE`. See "The backing reads" above; it decides which read, which shaping module and which page renderer the monitor gets. |
+| Rows resource | `rows_id` | `COVERAGE` only: the rows' own id, because they are a second endpoint with a name of their own and no suffix rule would produce it. |
 | Machine id | `id` | snake_case. **It is the API path segment**: `/monitors/<id>/incidents`. It also names the sample payloads and keys the sidebar badge. |
 | Display name | `name` | Sentence case, e.g. `Zero future opportunities`. Used on the page, the tile and the sidebar. |
 | Group | `group` | `Group.AVAILABILITY`, `Group.CONTENT` or `Group.COVERAGE`. Sets the sidebar section and the page breadcrumb (`"<group> monitor"`). |
@@ -135,7 +151,7 @@ Settle these before writing anything. Every one of them is a field on the regist
 | `RISK` | `ProgressColumn` 0–100, where **high is bad** | yes (red ≥ 50, amber ≥ 20, else green) |
 | `SPARKLINE` | `LineChartColumn` from `Incident.trend` | no |
 | `STATUS` | humanised status label | yes |
-| `LINK` | `LinkColumn` showing `feed ↗` | no |
+| `LINK` | `LinkColumn` showing `feed ↗`, or `Col.link_text` where that is the wrong noun | no |
 
 The first column must have `primary=True` (asserted), and column labels must be unique
 within a monitor (asserted).
@@ -183,6 +199,8 @@ speaks is `STEWARDS_API_STYLE`; no page or component ever builds a URL.
 | incidents | `GET /api/v1/monitors/<id>/incidents?page=1&page_size=500` | `GET /admin/<id-with-hyphens>-incidents?as_of=<date>&page=1&page_size=500` |
 | trend | `GET /api/v1/monitors/<id>/trend?days=30` | `GET /admin/<id-with-hyphens>-trend?as_of=<date>` (singular, and it picks its own window) |
 | quality snapshot | `GET /api/v1/monitors/<id>/quality` | `GET /admin/<id-with-hyphens>?as_of=<date>` (no suffix: the snapshot is the resource) |
+| coverage snapshot | `GET /api/v1/monitors/<id>/coverage` | `GET /admin/<id-with-hyphens>?as_of=<date>` (no suffix, same reason) |
+| coverage rows | `GET /api/v1/monitors/<id>/mappings?page=1&page_size=1000` | `GET /admin/<rows-id-with-hyphens>?as_of=<date>&page=1&page_size=1000` |
 | contact queue | `GET /api/v1/contact-queue` | `GET /admin/contact-queue?as_of=<date>` |
 
 So under `admin`, `single_feed_stall` reads `/admin/single-feed-stall-incidents`: the path
@@ -208,6 +226,9 @@ logged: every error message names the path, which carries no query string.
 | trend, every monitor | the home-page card states and the sidebar badge tones | `fetch_monitor_trends(ids)` |
 | quality snapshot | a quality monitor's whole page | `fetch_quality(id)` |
 | quality summary, every quality monitor | their home-page cards and sidebar badges | `fetch_quality_summaries(ids)` |
+| coverage snapshot | a coverage monitor's figures and chart | `fetch_coverage(id)` |
+| coverage rows | that monitor's table | `fetch_site_mappings(id, rows_id)` |
+| coverage snapshot, every coverage monitor | their home-page cards | `fetch_coverage_snapshots(ids)` |
 | contact queue | the cross-monitor queue | `fetch_contact_queue()` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
@@ -347,6 +368,71 @@ Which figures reach the page:
   short name from the last segment of `feed_url`, the dataset's mean score (which orders the
   table and keeps a dataset's feeds together), the mean of the reported completeness fields,
   and the issue count.
+
+### The coverage snapshot and its rows
+
+For a `Source.COVERAGE` monitor only. **Two** requests: one object of figures, and the rows
+behind it, paginated at `page_size=1000` and merged inside `repository._fetch_site_mappings`
+exactly as incidents are.
+
+```json
+// GET /admin/active-places-coverage
+{
+  "data": {
+    "run_date": "2026-08-21",
+    "source": {"active_places_data_version": "…", "geography_scope": "England",
+               "excluded_kinds": ["Slot"]},
+    "parameters": {"buffer_metres": 200.0, "postcode_max_metres": 1000.0,
+                   "name_max_metres": 500.0},
+    "headline": {"coverage_pct": 26.4, "sites_total": 27857, "sites_matched": 7351,
+                 "sites_missing": 20506, "local_authorities": 296, "venues_total": 16405,
+                 "venues_matched": 7840, "venues_unmatched": 8565,
+                 "venues_unmatched_pct": 52.2, "pairs": 10034},
+    "coverage_by_region": [{"region_name": "London", "sites_total": 2826,
+                            "sites_matched": 1110, "sites_missing": 1716,
+                            "coverage_pct": 39.3}]
+  },
+  "meta": {"snapshot_date": "2026-08-21", "generated_at": "…", "total": 1}
+}
+```
+
+```json
+// GET /admin/active-places-site-mappings?page=1&page_size=1000
+{
+  "data": [
+    {"site_id": "1042120", "site_name": "…", "postcode": "TA6 6AW",
+     "local_authority_name": "Somerset", "ownership_type_group": "Education",
+     "ap_facility_count": 6, "oa_location_names": ["…"], "oa_dataset_urls": ["…"],
+     "oa_publisher_names": ["…"], "oa_postal_codes": ["…"], "oa_kinds": ["SessionSeries"],
+     "oa_opportunity_count": 122, "distance_metres": 20.4,
+     "match_method": "spatial_and_postcode", "name_similarity": null,
+     "is_primary_for_venue": true, "is_mutual_best": true}
+  ],
+  "meta": {"snapshot_date": "2026-08-21", "generated_at": "…", "page": 1,
+           "page_size": 1000, "total": 10034}
+}
+```
+
+Every field is optional and every one may be `null`, for the reason `/summary` gives: a
+figure the batch did not compute is not a zero. An unreported figure renders as em dash with
+no tone, and a row reporting none sorts after every row that does rather than as a zero.
+
+Which figures reach the page:
+
+- `headline` alone fills the four figures and the whole of the overview card. The table never
+  moves them: they describe the estate the batch measured, and a filter narrowing the rows
+  must not appear to change what was measured. Its `pairs` count is the exception and is not
+  modelled: the caption above the table already states how many rows there are, and two
+  figures for the same thing read as a bug the moment a filter moves one of them.
+- `coverage_by_region` fills the one chart. The other breakdowns the payload carries —
+  ownership, management, facility type, local authority — are deliberately not modelled yet:
+  a field earns a line in `api/models.py` when something draws it.
+- the rows fill the table. `monitors/coverage.py` derives what the API does not send: the
+  venue's display name, the joined publisher and kind cells, the match channel's prose label
+  and the similarity as a percentage.
+
+The rows endpoint has its own name, so the registry entry declares `rows_id`. Deriving a
+suffix from the monitor id would point the read at a path that does not exist.
 
 ### Contact queue
 
@@ -610,6 +696,17 @@ that date, and mixed snapshot dates would make the app contradict itself on scre
 These payloads are also the happy-path contract fixtures for the tests — one copy of each
 shape. Test-only variants (empty, malformed, paginated) belong in `tests/fixtures/`.
 
+### A coverage monitor's payloads
+
+Two files, `tests/fixtures/<id>_coverage.json` and `tests/fixtures/<id>_mappings.json`, with
+`meta.snapshot_date` at `2026-08-21` like every other fixture. Between them cover: a null
+optional figure, a row with an empty list where the API usually sends one, a row carrying
+several values in a list field, every value of the monitor's main categorical, both sides of
+each boolean the page filters on, and one key with several rows so the grouping and the
+toggle are both exercised. Add `<id>_mappings_page1.json` / `_page2.json` if you want the
+paging loop asserted, as `active_places_coverage` does. There is no trend file and no
+`/summary` entry: the card comes from the snapshot's own figures.
+
 ### A quality monitor's payload
 
 One file, `tests/fixtures/<id>_quality.json`, in the envelope above, with `meta.snapshot_date`
@@ -713,8 +810,10 @@ this site.
 - [ ] registry entry appended to `MONITOR_REGISTRY`, page module path correct
 - [ ] detail model added to `api/models.py` if the monitor has detail fields
 - [ ] three-line page stub in `views/`, numeric prefix matching its group range
-- [ ] `<id>_incidents.json` and `<id>_trend.json` in `api/sample_data/`, with a past-threshold
+- [ ] `<id>_incidents.json` and `<id>_trend.json` in `tests/fixtures/`, with a past-threshold
       row, a below-threshold row, an exactly-at-threshold row and a null optional field
+      (a quality monitor ships `<id>_quality.json`; a coverage monitor ships
+      `<id>_coverage.json` and `<id>_mappings.json`)
 - [ ] `summary.json` carries a `MonitorCount` for the new id, sparkline included
 - [ ] home-page card shows the right count, state colour and unit noun
 - [ ] `health` policy declared if the monitor's figure is a volume rather than a fault count,

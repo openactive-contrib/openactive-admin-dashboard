@@ -98,6 +98,45 @@ def test_admin_quality_is_the_monitor_slug_itself() -> None:
     assert endpoint.params == {"as_of": "2026-09-02"}
 
 
+# --- coverage -----------------------------------------------------------------------------
+
+
+def test_contract_coverage_hangs_off_the_monitor() -> None:
+    endpoint = endpoints.coverage(Style.CONTRACT, "active_places_coverage", as_of=AS_OF)
+    assert endpoint.path == "/monitors/active_places_coverage/coverage"
+    assert endpoint.params == {}
+
+
+def test_admin_coverage_is_the_monitor_slug_itself() -> None:
+    """As with a quality snapshot, the figures are the resource and carry no suffix."""
+    endpoint = endpoints.coverage(Style.ADMIN, "active_places_coverage", as_of=AS_OF)
+    assert endpoint.path == "/admin/active-places-coverage"
+    assert endpoint.params == {"as_of": "2026-09-02"}
+
+
+def test_contract_coverage_mappings_hang_off_the_monitor_and_page() -> None:
+    endpoint = endpoints.coverage_mappings(
+        Style.CONTRACT, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
+    )
+    assert endpoint.path == "/monitors/active_places_coverage/mappings"
+    assert endpoint.params == {"page": 1, "page_size": 1000}
+
+
+def test_admin_coverage_mappings_use_the_rows_id_not_the_monitor_id() -> None:
+    """The rows are their own resource; deriving a suffix from the monitor id would point
+    the read at a path that does not exist."""
+    endpoint = endpoints.coverage_mappings(
+        Style.ADMIN,
+        "active_places_coverage",
+        "active_places_site_mappings",
+        as_of=AS_OF,
+        page=3,
+        page_size=500,
+    )
+    assert endpoint.path == "/admin/active-places-site-mappings"
+    assert endpoint.params == {"as_of": "2026-09-02", "page": 3, "page_size": 500}
+
+
 # --- endpoints a shape does not have ------------------------------------------------------
 
 
@@ -123,5 +162,9 @@ def test_every_style_routes_every_read() -> None:
         assert endpoints.incidents(style, "single_feed_stall", as_of=AS_OF).path
         assert endpoints.trend(style, "single_feed_stall", as_of=AS_OF).path
         assert endpoints.quality(style, "feed_quality", as_of=AS_OF).path
+        assert endpoints.coverage(style, "active_places_coverage", as_of=AS_OF).path
+        assert endpoints.coverage_mappings(
+            style, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
+        ).path
         assert endpoints.summary(style, as_of=AS_OF).path
         assert endpoints.contact_queue(style, as_of=AS_OF).path

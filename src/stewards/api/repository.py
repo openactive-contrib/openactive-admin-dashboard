@@ -18,9 +18,13 @@ from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
 from stewards.api.errors import ApiContractError, ApiError
 from stewards.api.models import (
+    CoverageResponse,
+    CoverageSnapshot,
     FeedQualityResponse,
     FeedQualitySummary,
     IncidentPage,
+    SiteMapping,
+    SiteMappingPage,
     SummaryResponse,
     TrendPoint,
     TrendResponse,
@@ -31,6 +35,11 @@ log = logging.getLogger(__name__)
 CACHE_TTL = 3600
 PAGE_SIZE = 500
 MAX_PAGES = 20
+
+#: Mapping rows are far more numerous than incidents and the resource caps the page at this,
+#: so asking for more would silently get this anyway. Ten thousand pairs is eleven requests,
+#: comfortably inside `MAX_PAGES`.
+MAPPING_PAGE_SIZE = 1000
 
 
 def _parse[T: BaseModel](model: type[T], payload: object, endpoint: str) -> T:
@@ -176,6 +185,89 @@ def _fetch_quality_summaries(
     return summaries
 
 
+def _fetch_coverage(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> CoverageResponse:
+    """One monitor's coverage snapshot: this run's figures for the whole estate.
+
+    No paging loop, as with the quality snapshot: this read answers with one object, and the
+    rows it describes are a separate resource — see `_fetch_site_mappings`.
+    """
+    client = client or get_client()
+    endpoint = endpoints.coverage(client.style, monitor_id, as_of=as_of or date.today())
+    return _parse(CoverageResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
+
+
+def _fetch_site_mappings(
+    monitor_id: str,
+    rows_id: str,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> SiteMappingPage:
+    """Every site-venue pair behind a coverage snapshot, paging inside this function.
+
+    The same bargain `_fetch_incidents` makes: the caller never loops, and filtering,
+    searching and sorting then happen locally over the returned snapshot.
+    """
+    client = client or get_client()
+    as_of = as_of or date.today()
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.coverage_mappings(
+            client.style,
+            monitor_id,
+            rows_id,
+            as_of=as_of,
+            page=page,
+            page_size=MAPPING_PAGE_SIZE,
+        )
+
+    endpoint = request(1)
+    first = _parse(SiteMappingPage, client.get(endpoint.path, endpoint.params), endpoint.path)
+
+    mappings: list[SiteMapping] = list(first.data)
+    page = 1
+    while len(mappings) < first.meta.total and mappings and page < MAX_PAGES:
+        page += 1
+        nxt_endpoint = request(page)
+        nxt = _parse(
+            SiteMappingPage,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
+        )
+        if not nxt.data:
+            break
+        mappings.extend(nxt.data)
+    if len(mappings) < first.meta.total:
+        log.warning(
+            "Fetched %d of %d site mappings for %s",
+            len(mappings),
+            first.meta.total,
+            monitor_id,
+        )
+    return SiteMappingPage(data=tuple(mappings), meta=first.meta)
+
+
+def _fetch_coverage_snapshots(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, CoverageSnapshot]:
+    """Each coverage monitor's snapshot, for its overview card.
+
+    Tolerant in the same way as `_fetch_quality_summaries`: a monitor whose coverage endpoint
+    this deployment has not built yet is left out of the mapping rather than costing the
+    whole overview. The rows are not read here — the card states figures, not pairs.
+    """
+    snapshots: dict[str, CoverageSnapshot] = {}
+    for monitor_id in monitor_ids:
+        try:
+            snapshots[monitor_id] = _fetch_coverage(monitor_id, client=client, as_of=as_of).data
+        except ApiError as exc:
+            log.info("No coverage snapshot for %s: %s", monitor_id, exc)
+    return snapshots
+
+
 def _fetch_contact_queue(
     client: StewardsClient | None = None, as_of: date | None = None
 ) -> IncidentPage:
@@ -212,6 +304,21 @@ def fetch_quality(monitor_id: str) -> FeedQualityResponse:
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_quality_summaries(monitor_ids: tuple[str, ...]) -> dict[str, FeedQualitySummary]:
     return _fetch_quality_summaries(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading coverage snapshot…")
+def fetch_coverage(monitor_id: str) -> CoverageResponse:
+    return _fetch_coverage(monitor_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading site mappings…")
+def fetch_site_mappings(monitor_id: str, rows_id: str) -> SiteMappingPage:
+    return _fetch_site_mappings(monitor_id, rows_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_coverage_snapshots(monitor_ids: tuple[str, ...]) -> dict[str, CoverageSnapshot]:
+    return _fetch_coverage_snapshots(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Loading contact queue…")

@@ -1,0 +1,191 @@
+{
+  "data": [
+    {
+      "site_id": "1008333",
+      "site_name": "ABBEY MEADOWS OUTDOOR POOL",
+      "postcode": "OX14 3JD",
+      "local_authority_name": "Vale of White Horse",
+      "ownership_type_group": "Local Authority",
+      "ap_facility_count": 1,
+      "oa_location_names": [
+        "Abbey Close Car Park\nAbingdon\nOX14 3NJ",
+        "Abbey Meadows\n1 Abbey Close\nAbingdon\nOX14 3NJ"
+      ],
+      "oa_dataset_urls": [
+        "https://data.bookwhen.com/"
+      ],
+      "oa_publisher_names": [
+        "Bookwhen"
+      ],
+      "oa_postal_codes": [],
+      "oa_kinds": [
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 2,
+      "distance_metres": 225.4,
+      "match_method": "name",
+      "name_similarity": 0.8333333333333333,
+      "is_primary_for_venue": true,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "6004728",
+      "site_name": "ABINGTON PARK",
+      "postcode": "NN1 5LW",
+      "local_authority_name": "West Northamptonshire",
+      "ownership_type_group": "Local Authority",
+      "ap_facility_count": 4,
+      "oa_location_names": [
+        "Abington Park, Northampton NN1 5LW, UK"
+      ],
+      "oa_dataset_urls": [
+        "http://data.letsride.co.uk/",
+        "https://playwaze.com/opendata/openactive"
+      ],
+      "oa_publisher_names": [
+        "British Cycling",
+        "Playwaze"
+      ],
+      "oa_postal_codes": [
+        "NN1 5LW"
+      ],
+      "oa_kinds": [
+        "Event",
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 151,
+      "distance_metres": 237.1,
+      "match_method": "name",
+      "name_similarity": 1,
+      "is_primary_for_venue": true,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "1001207",
+      "site_name": "24/7 FITNESS (YORK)",
+      "postcode": "YO30 4RA",
+      "local_authority_name": "York",
+      "ownership_type_group": "Commercial",
+      "ap_facility_count": 3,
+      "oa_location_names": [],
+      "oa_dataset_urls": [
+        "http://data.letsride.co.uk/"
+      ],
+      "oa_publisher_names": [
+        "British Cycling"
+      ],
+      "oa_postal_codes": [
+        "YO30 4WU"
+      ],
+      "oa_kinds": [
+        "Event"
+      ],
+      "oa_opportunity_count": 15,
+      "distance_metres": 114.3,
+      "match_method": "spatial_centroid_only",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": true
+    },
+    {
+      "site_id": "1042120",
+      "site_name": "1610 ROBERT BLAKE AND ELMWOOD LEISURE",
+      "postcode": "TA6 6AW",
+      "local_authority_name": "Somerset",
+      "ownership_type_group": "Education",
+      "ap_facility_count": 6,
+      "oa_location_names": [
+        "Robert Blake Science College"
+      ],
+      "oa_dataset_urls": [
+        "http://data.letsride.co.uk/",
+        "https://playwaze.com/opendata/openactive"
+      ],
+      "oa_publisher_names": [
+        "British Cycling",
+        "Playwaze"
+      ],
+      "oa_postal_codes": [
+        "TA6 6AW"
+      ],
+      "oa_kinds": [
+        "Event",
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 122,
+      "distance_metres": 20.4,
+      "match_method": "spatial_and_postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": true
+    },
+    {
+      "site_id": "1042120",
+      "site_name": "1610 ROBERT BLAKE AND ELMWOOD LEISURE",
+      "postcode": "TA6 6AW",
+      "local_authority_name": "Somerset",
+      "ownership_type_group": "Education",
+      "ap_facility_count": 6,
+      "oa_location_names": [
+        "Robert Blake School"
+      ],
+      "oa_dataset_urls": [
+        "https://data.englandnetball.co.uk/",
+        "https://playwaze.com/opendata/openactive"
+      ],
+      "oa_publisher_names": [
+        "England Netball",
+        "Playwaze"
+      ],
+      "oa_postal_codes": [],
+      "oa_kinds": [
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 27,
+      "distance_metres": 142.2,
+      "match_method": "spatial",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "1013803",
+      "site_name": "1610 DORCHESTER SPORTS CENTRE",
+      "postcode": "DT1 2HR",
+      "local_authority_name": "Dorset",
+      "ownership_type_group": "Local Authority",
+      "ap_facility_count": 6,
+      "oa_location_names": [
+        "1610 Leisure Centre Dorchester"
+      ],
+      "oa_dataset_urls": [
+        "http://data.britishtriathlon.org/"
+      ],
+      "oa_publisher_names": [
+        "British Triathlon"
+      ],
+      "oa_postal_codes": [
+        "DT1 2HR"
+      ],
+      "oa_kinds": [
+        "HeadlineEvent"
+      ],
+      "oa_opportunity_count": 5,
+      "distance_metres": 493.3,
+      "match_method": "postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": false,
+      "is_mutual_best": false
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 6,
+    "total": 13
+  }
+}

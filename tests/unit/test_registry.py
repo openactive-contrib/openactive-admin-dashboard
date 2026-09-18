@@ -7,8 +7,14 @@ from pathlib import Path
 import pytest
 
 from fixture_loader import load_sample
-from stewards.api.models import DetailModel, FeedQualityResponse, IncidentPage
-from stewards.monitors import quality
+from stewards.api.models import (
+    CoverageResponse,
+    DetailModel,
+    FeedQualityResponse,
+    IncidentPage,
+    SiteMappingPage,
+)
+from stewards.monitors import coverage, quality
 from stewards.monitors.registry import (
     MONITOR_REGISTRY,
     Group,
@@ -29,10 +35,11 @@ pytestmark = pytest.mark.parametrize(
 def backed_by(monitor: Monitor, source: Source) -> None:
     """Skip a check that only means something for one kind of backing read.
 
-    The registry holds both kinds, and a quality monitor has no incidents to validate — no
-    `monitor_id` on its rows, no detail blob, no contact threshold and no publisher email.
-    Gating on the declared source rather than on the monitor id keeps this module
-    parametrised over the whole registry, so a future monitor of either kind is covered free.
+    The registry holds all three kinds, and a quality or coverage monitor has no incidents
+    to validate — no `monitor_id` on its rows, no detail blob, no contact threshold and no
+    publisher email. Gating on the declared source rather than on the monitor id keeps this
+    module parametrised over the whole registry, so a future monitor of any kind is covered
+    free.
     """
     if monitor.source is not source:
         pytest.skip(f"{monitor.id} is backed by the {monitor.source.value} read")
@@ -253,3 +260,78 @@ def test_a_quality_payload_carries_a_summary_block(monitor: Monitor) -> None:
     assert payload.summary.total_feeds
     assert payload.summary.score_buckets
     assert payload.summary.completeness
+
+
+# --- coverage monitors ---------------------------------------------------------------------
+#
+# The third backing read, checked the same way. Two payloads rather than one: the figures and
+# the rows are separate endpoints, and the rows carry their own resource id.
+
+
+def coverage_rows(monitor: Monitor) -> tuple[coverage.MappingRow, ...]:
+    payload = SiteMappingPage.model_validate(load_sample(f"{monitor.id}_mappings"))
+    return coverage.build_rows(payload.data)
+
+
+def test_a_coverage_monitor_ships_both_sample_payloads(monitor: Monitor) -> None:
+    backed_by(monitor, Source.COVERAGE)
+    assert (SAMPLE_DIR / f"{monitor.id}_coverage.json").is_file()
+    assert (SAMPLE_DIR / f"{monitor.id}_mappings.json").is_file()
+
+
+def test_a_coverage_monitor_names_its_row_resource(monitor: Monitor) -> None:
+    """Without it there is no path to the rows: they are not derivable from the monitor id."""
+    backed_by(monitor, Source.COVERAGE)
+    assert monitor.rows_id
+
+
+def test_every_coverage_column_field_resolves_against_the_payload(monitor: Monitor) -> None:
+    backed_by(monitor, Source.COVERAGE)
+    rows = coverage_rows(monitor)
+    assert rows, f"{monitor.id} sample payload has no mappings"
+    for row in rows:
+        for col in monitor.columns:
+            coverage.resolve(row, col.field)  # must not raise
+
+
+def test_every_declared_coverage_column_reports_a_value_somewhere(monitor: Monitor) -> None:
+    """A column no payload row can fill is a typo in the field name, not a sparse column."""
+    backed_by(monitor, Source.COVERAGE)
+    rows = coverage_rows(monitor)
+    for col in monitor.columns:
+        assert any(coverage.resolve(row, col.field) is not None for row in rows), (
+            f"{monitor.id} column {col.field!r} resolves to None on every payload row"
+        )
+
+
+def test_declared_coverage_filters_resolve_and_are_labelled(monitor: Monitor) -> None:
+    backed_by(monitor, Source.COVERAGE)
+    rows = coverage_rows(monitor)
+    for spec in monitor.filters:
+        assert spec.label
+        assert coverage.filter_options(rows, spec.field), (
+            f"{monitor.id} filter {spec.field!r} has no options in the payload"
+        )
+
+
+def test_a_coverage_monitor_sorts_on_a_field_its_rows_report(monitor: Monitor) -> None:
+    backed_by(monitor, Source.COVERAGE)
+    rows = coverage_rows(monitor)
+    assert any(coverage.resolve(row, monitor.sort_field) is not None for row in rows)
+
+
+def test_a_coverage_monitor_states_no_contact_threshold(monitor: Monitor) -> None:
+    """Nothing in a coverage snapshot ages, so a threshold chip or toggle would be a claim
+    the data cannot support."""
+    backed_by(monitor, Source.COVERAGE)
+    assert not monitor.has_threshold_filter
+    assert not any(chip.startswith("contact after") for chip in monitor.meta_chips)
+
+
+def test_a_coverage_payload_carries_a_headline(monitor: Monitor) -> None:
+    """The page's four figures and the whole of its card come off this block."""
+    backed_by(monitor, Source.COVERAGE)
+    payload = CoverageResponse.model_validate(load_sample(f"{monitor.id}_coverage"))
+    assert payload.data.headline.coverage_pct is not None
+    assert payload.data.headline.sites_total
+    assert payload.data.coverage_by_region

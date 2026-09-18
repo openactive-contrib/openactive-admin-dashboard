@@ -19,6 +19,8 @@ say what to do about it.
   timestamp stops advancing while the endpoint still returns 200.
 - [Feed data quality]({% link feed-quality-runbook.md %}) — the nightly assessment of every
   feed: status, score, grade and how complete the recommended fields are.
+- [Active Places coverage]({% link active-places-coverage.md %}) — how much of the English
+  sports estate the OpenActive data reaches, and how to read a figure that is a lower bound.
 
 Figures in the dashboard come from a daily BigQuery batch, so every page there states the
 snapshot date it was built from.

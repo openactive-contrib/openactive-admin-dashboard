@@ -48,13 +48,14 @@ def test_monitors_in_group_filters() -> None:
 
 
 def test_monitor_ids_narrow_to_one_backing_read() -> None:
-    """The overview reads trends for the incident monitors and quality for the rest, so the
-    two sets have to partition the registry."""
-    incidents = monitor_ids(Source.INCIDENTS)
-    quality = monitor_ids(Source.QUALITY)
-    assert set(incidents) | set(quality) == set(monitor_ids())
-    assert not set(incidents) & set(quality)
-    assert quality == ("feed_quality",)
+    """The overview reads a trend per incident monitor and the monitor's own snapshot for
+    each of the others, so the three sets have to partition the registry — a monitor in
+    none of them would get no card at all, and one in two would be read twice."""
+    by_source = {source: set(monitor_ids(source)) for source in Source}
+    assert set().union(*by_source.values()) == set(monitor_ids())
+    assert sum(len(ids) for ids in by_source.values()) == len(monitor_ids())
+    assert by_source[Source.QUALITY] == {"feed_quality"}
+    assert by_source[Source.COVERAGE] == {"active_places_coverage"}
 
 
 def test_column_lookup_by_label() -> None:

@@ -38,10 +38,15 @@ class Source(StrEnum):
     `QUALITY` is a snapshot of the whole fleet with a summary block beside it and no
     history, which cannot be folded into an incident without inventing the age and the
     threshold flag the batch never reported. See `monitors.quality`.
+    `COVERAGE` is a snapshot of how much of an external estate the fleet reaches: figures
+    from one read and rows from a second, paginated one, and no history either. It is
+    neither of the others — its rows do not age, and its figures do not arrive beside them.
+    See `monitors.coverage`.
     """
 
     INCIDENTS = "incidents"
     QUALITY = "quality"
+    COVERAGE = "coverage"
 
 
 class Severity(StrEnum):
@@ -83,6 +88,9 @@ class Col:
     kind: ColKind = ColKind.TEXT
     primary: bool = False
     help: str | None = None
+
+    #: What a `LINK` cell reads, where "feed" is the wrong noun for what it opens.
+    link_text: str | None = None
 
     @property
     def is_detail(self) -> bool:
@@ -156,8 +164,13 @@ class Monitor:
 
     #: Which read backs this monitor. `QUALITY` swaps the incident machinery — ageing,
     #: contact threshold, trend, email draft — for the fleet snapshot `monitors.quality`
-    #: shapes, and routes the page to `components.quality_page`.
+    #: shapes, and routes the page to `components.quality_page`; `COVERAGE` does the same
+    #: through `monitors.coverage` and `components.coverage_page`.
     source: Source = Source.INCIDENTS
+
+    #: The row resource's own id, for a monitor whose rows are a second endpoint rather than
+    #: arriving beside its figures. Only a `COVERAGE` monitor declares one.
+    rows_id: str = ""
 
     key_cols: tuple[str, ...] = ("publisher_id", "feed_id")
     detail_model: type[DetailModel] = DetailModel
@@ -620,6 +633,79 @@ FEED_QUALITY = Monitor(
 )
 
 
+ACTIVE_PLACES_COVERAGE = Monitor(
+    id="active_places_coverage",
+    name="Active Places coverage",
+    group=Group.COVERAGE,
+    # Context, not a queue: nothing here is a fault a publisher is contacted about, so the
+    # card stays grey. See `monitors.coverage.assess_coverage`.
+    severity=Severity.INFORMATIONAL,
+    # Neither an incident list nor a quality snapshot: the figures and the rows are two
+    # endpoints, and neither has history. See `monitors.coverage`.
+    source=Source.COVERAGE,
+    rows_id="active_places_site_mappings",
+    blurb=(
+        "How much of the Active Places estate appears in the OpenActive data. A site counts "
+        "as covered when an OpenActive venue sits within 200m of it, shares its postcode "
+        "within 1km, or carries a clearly matching name within 500m. England only, every "
+        "opportunity kind except Slot. The batch reports this snapshot only, so nothing "
+        "on this page describes a trend. Method and caveats: "
+        "[the Active Places reports]"
+        "(https://github.com/openactive-contrib/openactive-monitor/tree/main/jobs/"
+        "opportunity-insights/reports/active_places)."
+    ),
+    unit="of Active Places sites covered",
+    # The card is a set of figures rather than a count, and the monitor supplies it along
+    # with its verdict. See `monitors.coverage.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("site_name", "Active Places site", ColKind.TEXT, primary=True),
+        Col("local_authority_name", "Local authority", ColKind.TEXT),
+        Col("postcode", "Postcode", ColKind.MONO),
+        Col("ownership_type_group", "Ownership", ColKind.TEXT),
+        Col("venue_name", "OpenActive venue", ColKind.TEXT),
+        Col("publisher_names", "Publisher", ColKind.TEXT),
+        Col("kinds", "Kinds", ColKind.TEXT),
+        Col("opportunity_count", "Opportunities", ColKind.NUMBER),
+        Col(
+            "distance_metres",
+            "Distance (m)",
+            ColKind.NUMBER,
+            help="Between the Active Places site and the matched OpenActive venue",
+        ),
+        Col("match_label", "Matched by", ColKind.TEXT),
+        Col(
+            "name_similarity_percent",
+            "Name similarity",
+            ColKind.PERCENT,
+            help="Only the name channel reports one; blank where the match was spatial",
+        ),
+        Col(
+            "dataset_url",
+            "Dataset",
+            ColKind.LINK,
+            link_text="dataset \u2197",
+            help="Opens the OpenActive dataset the matched venue was published in",
+        ),
+    ),
+    filters=(
+        FilterSpec("match_label", "Matched by"),
+        FilterSpec("ownership_type_group", "Ownership"),
+        FilterSpec("local_authority_name", "Local authority"),
+    ),
+    # The biggest venues first: a pair carrying hundreds of opportunities is the one worth
+    # reading, and a site's own pairs stay together beneath it.
+    sort_field="opportunity_count",
+    # Nothing here ages, so there is no contact threshold to filter on; the page offers a
+    # "primary pairs only" toggle in its place.
+    has_threshold_filter=False,
+    summary_field="site_name",
+    schedule="daily · England, excluding Slot",
+    query="active_places_coverage_v1",
+    page="views/31_active_places_coverage.py",
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
@@ -628,6 +714,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_ORPHANED_CHILDREN,
     DATASET_FUTURE_DECLINE,
     FEED_QUALITY,
+    ACTIVE_PLACES_COVERAGE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}

@@ -793,3 +793,147 @@ def test_a_card_whose_figures_were_not_reported_renders_them_without_a_tone() ->
     assert "Errors" in markdown
     assert "—" in markdown
     assert "red[" not in markdown
+
+
+# --- the coverage page ---------------------------------------------------------------------
+
+
+def _coverage_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.coverage_page import render_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_coverage
+    repository.fetch_coverage = boom  # type: ignore[assignment]
+    try:
+        render_coverage_page(get_monitor("active_places_coverage"))
+    finally:
+        repository.fetch_coverage = original
+        st.cache_data.clear()
+
+
+def test_a_coverage_page_whose_endpoint_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_coverage_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _coverage_rows_missing_script() -> None:
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.api.models import CoverageResponse
+    from stewards.components.coverage_page import render_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def snapshot(*_args: object, **_kwargs: object) -> CoverageResponse:
+        return CoverageResponse.model_validate(load_sample("active_places_coverage_coverage"))
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no rows endpoint")
+
+    st.cache_data.clear()
+    coverage_read = repository.fetch_coverage
+    mappings_read = repository.fetch_site_mappings
+    repository.fetch_coverage = snapshot  # type: ignore[assignment]
+    repository.fetch_site_mappings = boom  # type: ignore[assignment]
+    try:
+        render_coverage_page(get_monitor("active_places_coverage"))
+    finally:
+        repository.fetch_coverage = coverage_read
+        repository.fetch_site_mappings = mappings_read
+        st.cache_data.clear()
+
+
+def test_a_rows_endpoint_that_is_not_live_costs_the_table_and_not_the_figures() -> None:
+    """The pairs are a second endpoint. One that is missing must leave the figures and the
+    chart standing, the way a missing trend leaves a monitor page its incidents."""
+    app = run(_coverage_rows_missing_script)
+    text = " ".join(m.value for m in app.markdown)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert "26.4%" in text
+    assert any("Snapshot" in m.value for m in app.markdown)
+    assert len(app.get("vega_lite_chart")) == 1
+    assert not app.dataframe
+
+
+def _coverage_no_region_script() -> None:
+    from stewards.api.models import CoverageHeadline, CoverageSnapshot
+    from stewards.components.coverage_page import render_summary_chart
+    from stewards.monitors.registry import get_monitor
+
+    render_summary_chart(
+        get_monitor("active_places_coverage"),
+        CoverageSnapshot(headline=CoverageHeadline(coverage_pct=26.4)),
+    )
+
+
+def test_a_snapshot_with_no_regional_breakdown_says_so_rather_than_drawing_an_empty_axis() -> (
+    None
+):
+    app = run(_coverage_no_region_script)
+    assert not app.get("vega_lite_chart")
+    assert any("does not report a regional breakdown" in c.value for c in app.caption)
+
+
+def _coverage_row_detail_script() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import SiteMappingPage
+    from stewards.components.coverage_page import render_row_detail
+    from stewards.monitors import coverage
+
+    payload = SiteMappingPage.model_validate(load_sample("active_places_coverage_mappings"))
+    rows = coverage.build_rows(payload.data)
+    named = next(row for row in rows if row.name_similarity_percent is not None)
+    render_row_detail(named)
+
+
+def test_selecting_a_pair_shows_the_openactive_side_and_the_matching_evidence() -> None:
+    app = run(_coverage_row_detail_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Matched by" in markdown
+    assert "Name similarity" in markdown
+    assert "Publishers" in markdown
+    assert "https://" in markdown or "http://" in markdown
+
+
+def _coverage_table_selection_script() -> None:
+    """`AppTest` cannot click a dataframe row, so the selection is the one thing stubbed:
+    everything below it — sorting, the frame, the panel — is the real code path."""
+    from fixture_loader import load_sample
+    from stewards.api.models import SiteMappingPage
+    from stewards.components import coverage_page
+    from stewards.monitors import coverage
+    from stewards.monitors.registry import get_monitor
+
+    payload = SiteMappingPage.model_validate(load_sample("active_places_coverage_mappings"))
+    original = coverage_page.render_table
+
+    def first_row(*args: object, **kwargs: object) -> int:
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        return 0
+
+    coverage_page.render_table = first_row  # type: ignore[assignment]
+    try:
+        coverage_page.render_table_section(
+            get_monitor("active_places_coverage"), coverage.build_rows(payload.data)
+        )
+    finally:
+        coverage_page.render_table = original
+
+
+def test_selecting_a_row_in_the_pairs_table_opens_that_pair() -> None:
+    app = run(_coverage_table_selection_script)
+    assert [node.label for node in app.get("expander")]
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Matched by" in markdown

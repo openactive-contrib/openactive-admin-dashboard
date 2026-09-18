@@ -1,0 +1,105 @@
+{
+  "data": {
+    "schema_version": 1,
+    "run_date": "2026-09-17",
+    "source": {
+      "opportunities_table": "openactive-monitor.openactive_analytics.opportunities",
+      "active_places_data_version": "2026-09-17 03:30:29",
+      "geography_scope": "England",
+      "excluded_kinds": [
+        "Slot"
+      ]
+    },
+    "parameters": {
+      "buffer_metres": 200.0,
+      "postcode_max_metres": 1000.0,
+      "name_max_metres": 500.0,
+      "name_threshold": 0.8,
+      "venue_cluster_metres": 50.0
+    },
+    "headline": {
+      "coverage_pct": 26.4,
+      "sites_total": 27857,
+      "sites_matched": 7351,
+      "sites_missing": 20506,
+      "local_authorities": 296,
+      "venues_total": 16405,
+      "venues_matched": 7840,
+      "venues_unmatched": 8565,
+      "venues_unmatched_pct": 52.2,
+      "pairs": 10034
+    },
+    "coverage_by_region": [
+      {
+        "region_name": "South East",
+        "sites_total": 5186,
+        "sites_matched": 1263,
+        "sites_missing": 3923,
+        "coverage_pct": 24.4
+      },
+      {
+        "region_name": "North West",
+        "sites_total": 3550,
+        "sites_matched": 859,
+        "sites_missing": 2691,
+        "coverage_pct": 24.2
+      },
+      {
+        "region_name": "South West",
+        "sites_total": 3503,
+        "sites_matched": 897,
+        "sites_missing": 2606,
+        "coverage_pct": 25.6
+      },
+      {
+        "region_name": "East of England",
+        "sites_total": 3347,
+        "sites_matched": 935,
+        "sites_missing": 2412,
+        "coverage_pct": 27.9
+      },
+      {
+        "region_name": "Yorkshire and The Humber",
+        "sites_total": 3033,
+        "sites_matched": 682,
+        "sites_missing": 2351,
+        "coverage_pct": 22.5
+      },
+      {
+        "region_name": "London",
+        "sites_total": 2826,
+        "sites_matched": 1110,
+        "sites_missing": 1716,
+        "coverage_pct": 39.3
+      },
+      {
+        "region_name": "West Midlands",
+        "sites_total": 2609,
+        "sites_matched": 633,
+        "sites_missing": 1976,
+        "coverage_pct": 24.3
+      },
+      {
+        "region_name": "East Midlands",
+        "sites_total": 2494,
+        "sites_matched": 659,
+        "sites_missing": 1835,
+        "coverage_pct": 26.4
+      },
+      {
+        "region_name": "North East",
+        "sites_total": 1309,
+        "sites_matched": 313,
+        "sites_missing": 996,
+        "coverage_pct": 23.9
+      }
+    ]
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 1,
+    "total": 1
+  }
+}

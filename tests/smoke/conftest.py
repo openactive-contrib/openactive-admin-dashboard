@@ -25,6 +25,10 @@ MONITOR_IDS = (
 
 #: Monitors backed by a quality snapshot instead: one read, no incidents and no trend.
 QUALITY_IDS = ("feed_quality",)
+
+#: Monitors backed by a coverage snapshot: two reads — the figures and their rows — and no
+#: incidents, no trend and no `/summary` entry.
+COVERAGE_IDS = ("active_places_coverage",)
 TREND_IDS = (
     "dataset_stall",
     "single_feed_stall",
@@ -67,6 +71,13 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         for monitor_id in QUALITY_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/quality").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_quality"))
+            )
+        for monitor_id in COVERAGE_IDS:
+            mock.get(f"{BASE}/monitors/{monitor_id}/coverage").mock(
+                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_coverage"))
+            )
+            mock.get(f"{BASE}/monitors/{monitor_id}/mappings").mock(
+                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings"))
             )
         yield
 

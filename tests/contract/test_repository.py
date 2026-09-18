@@ -21,18 +21,24 @@ from stewards.api.errors import (
     ApiUnavailable,
 )
 from stewards.api.models import (
+    CoverageResponse,
     FeedQualityResponse,
     IncidentPage,
+    SiteMappingPage,
     SummaryResponse,
     TrendResponse,
 )
 from stewards.api.repository import (
+    MAPPING_PAGE_SIZE,
     PAGE_SIZE,
     _fetch_contact_queue,
+    _fetch_coverage,
+    _fetch_coverage_snapshots,
     _fetch_incidents,
     _fetch_monitor_trends,
     _fetch_quality,
     _fetch_quality_summaries,
+    _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
     _fetch_trend_points,
@@ -488,3 +494,115 @@ def test_quality_summaries_return_one_entry_per_monitor(client: StewardsClient) 
 
 def test_quality_summaries_of_nothing_is_an_empty_mapping(client: StewardsClient) -> None:
     assert _fetch_quality_summaries((), client) == {}
+
+
+# --- coverage ------------------------------------------------------------------------------
+
+COVERAGE = f"{BASE}/monitors/active_places_coverage/coverage"
+MAPPINGS = f"{BASE}/monitors/active_places_coverage/mappings"
+ROWS_ID = "active_places_site_mappings"
+
+
+@respx.mock
+def test_coverage_returns_the_snapshot_figures(client: StewardsClient) -> None:
+    respx.get(COVERAGE).mock(
+        return_value=httpx.Response(200, json=load_sample("active_places_coverage_coverage"))
+    )
+    response = _fetch_coverage("active_places_coverage", client)
+    assert isinstance(response, CoverageResponse)
+    assert response.data.headline.coverage_pct == 26.4
+    assert response.data.headline.sites_matched == 7351
+    assert len(response.data.coverage_by_region) == 9
+    assert response.meta.snapshot_date == date(2026, 8, 21)
+
+
+@respx.mock
+def test_coverage_rejects_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
+    respx.get(COVERAGE).mock(return_value=httpx.Response(200, json={"data": {}}))
+    with pytest.raises(ApiContractError):
+        _fetch_coverage("active_places_coverage", client)
+
+
+@respx.mock
+def test_coverage_tolerates_a_snapshot_reporting_no_figures(client: StewardsClient) -> None:
+    """A batch that computed nothing this run is not a broken contract: the page says so."""
+    meta = load_sample("active_places_coverage_coverage")["meta"]
+    respx.get(COVERAGE).mock(return_value=httpx.Response(200, json={"data": {}, "meta": meta}))
+    response = _fetch_coverage("active_places_coverage", client)
+    assert response.data.headline.coverage_pct is None
+    assert response.data.coverage_by_region == ()
+
+
+@respx.mock
+def test_site_mappings_follow_every_page(client: StewardsClient) -> None:
+    page1, page2 = load_sample("mappings_page1"), load_sample("mappings_page2")
+    route = respx.get(MAPPINGS)
+    route.side_effect = [
+        httpx.Response(200, json=page1),
+        httpx.Response(200, json=page2),
+    ]
+    response = _fetch_site_mappings("active_places_coverage", ROWS_ID, client)
+    assert isinstance(response, SiteMappingPage)
+    assert len(response.data) == len(page1["data"]) + len(page2["data"])
+    assert response.meta.total == page1["meta"]["total"]
+    assert route.call_count == 2
+    assert route.calls[0].request.url.params["page"] == "1"
+    assert route.calls[1].request.url.params["page"] == "2"
+
+
+@respx.mock
+def test_site_mappings_ask_for_the_larger_page(client: StewardsClient) -> None:
+    """There are far more pairs than incidents, and the resource caps the page at this."""
+    route = respx.get(MAPPINGS).mock(
+        return_value=httpx.Response(200, json=load_sample("active_places_coverage_mappings"))
+    )
+    _fetch_site_mappings("active_places_coverage", ROWS_ID, client)
+    assert route.calls[0].request.url.params["page_size"] == str(MAPPING_PAGE_SIZE)
+    assert MAPPING_PAGE_SIZE > PAGE_SIZE
+
+
+@respx.mock
+def test_site_mappings_stop_rather_than_loop_on_an_empty_page(
+    client: StewardsClient,
+) -> None:
+    """A `total` the rows never reach must end the loop, not spin to `MAX_PAGES`."""
+    first = load_sample("mappings_page1")
+    first["meta"] = {**first["meta"], "total": 10_000}
+    route = respx.get(MAPPINGS)
+    route.side_effect = [
+        httpx.Response(200, json=first),
+        httpx.Response(200, json={"data": [], "meta": first["meta"]}),
+    ]
+    response = _fetch_site_mappings("active_places_coverage", ROWS_ID, client)
+    assert len(response.data) == len(first["data"])
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_site_mappings_return_an_empty_page_rather_than_raising(
+    client: StewardsClient,
+) -> None:
+    meta = load_sample("active_places_coverage_mappings")["meta"]
+    respx.get(MAPPINGS).mock(
+        return_value=httpx.Response(200, json={"data": [], "meta": {**meta, "total": 0}})
+    )
+    assert _fetch_site_mappings("active_places_coverage", ROWS_ID, client).data == ()
+
+
+@respx.mock
+def test_coverage_snapshots_skip_a_monitor_whose_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    """One undeployed endpoint must not cost the whole overview."""
+    respx.get(COVERAGE).mock(return_value=httpx.Response(404))
+    assert _fetch_coverage_snapshots(("active_places_coverage",), client) == {}
+
+
+@respx.mock
+def test_coverage_snapshots_return_one_entry_per_monitor(client: StewardsClient) -> None:
+    respx.get(COVERAGE).mock(
+        return_value=httpx.Response(200, json=load_sample("active_places_coverage_coverage"))
+    )
+    snapshots = _fetch_coverage_snapshots(("active_places_coverage",), client)
+    assert set(snapshots) == {"active_places_coverage"}
+    assert snapshots["active_places_coverage"].headline.coverage_pct == 26.4

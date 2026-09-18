@@ -13,7 +13,7 @@ from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.auth.google import render_identity_footer, require_login
 from stewards.components import nav
-from stewards.components.overview_page import quality_cards
+from stewards.components.overview_page import tile_cards
 from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
 from stewards.monitors.overview import NavBadge, nav_badges
@@ -40,7 +40,7 @@ def _nav_badges() -> dict[str, NavBadge]:
     return nav_badges(
         summary,
         repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
-        quality_cards(),
+        tile_cards(),
     )
 
 

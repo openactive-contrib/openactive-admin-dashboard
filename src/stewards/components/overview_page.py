@@ -12,7 +12,7 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.surface import card
 from stewards.config import get_settings
-from stewards.monitors import quality
+from stewards.monitors import coverage, quality
 from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import (
     Cards,
@@ -116,16 +116,30 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
             nav.switch_to("contact_queue")
 
 
-def quality_cards() -> Cards:
-    """The card each quality-source monitor supplies, from its own snapshot.
+def tile_cards() -> Cards:
+    """The card each monitor that supplies its own hands over, by monitor id.
 
-    Tolerant in the same way as the trend read: a monitor whose quality endpoint this
-    deployment has not built yet is simply absent from the mapping, and its tile falls back
-    to the `/summary` path — which reports nothing for it, so the card reads "not reported"
-    rather than costing the whole overview.
+    A monitor whose figure `/summary` does not describe at all builds its whole card from its
+    own read — see `tile_viz.Facts`. Each such read is tolerant in the same way as the trend
+    read: a monitor whose endpoint this deployment has not built yet is simply absent from
+    the mapping, and its tile falls back to the `/summary` path, which reports nothing for
+    it, so the card reads "not reported" rather than costing the whole overview.
     """
-    summaries = repository.fetch_quality_summaries(monitor_ids(Source.QUALITY))
-    return {monitor_id: quality.tile_card(summary) for monitor_id, summary in summaries.items()}
+    cards = {
+        monitor_id: quality.tile_card(summary)
+        for monitor_id, summary in repository.fetch_quality_summaries(
+            monitor_ids(Source.QUALITY)
+        ).items()
+    }
+    cards.update(
+        {
+            monitor_id: coverage.tile_card(snapshot)
+            for monitor_id, snapshot in repository.fetch_coverage_snapshots(
+                monitor_ids(Source.COVERAGE)
+            ).items()
+        }
+    )
+    return cards
 
 
 def tile_chart(tile: Tile) -> alt.Chart | alt.LayerChart | None:
@@ -213,12 +227,12 @@ def render_overview_page() -> None:
     summary = response.data
     # The card states are judged on each monitor's daily series; `fetch_monitor_trends`
     # leaves out a monitor whose trend endpoint this deployment does not serve, and that
-    # monitor is judged on the sparkline in the summary instead. A quality monitor has no
-    # series at all and supplies its own card, verdict included.
+    # monitor is judged on the sparkline in the summary instead. A quality or coverage
+    # monitor has no series at all and supplies its own card, verdict included.
     tiles = build_tiles(
         summary,
         repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
-        quality_cards(),
+        tile_cards(),
     )
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"

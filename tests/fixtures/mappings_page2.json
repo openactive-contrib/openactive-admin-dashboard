@@ -1,0 +1,210 @@
+{
+  "data": [
+    {
+      "site_id": "1008895",
+      "site_name": "24/7 FITNESS (PORTSMOUTH)",
+      "postcode": "PO4 8SH",
+      "local_authority_name": "Portsmouth",
+      "ownership_type_group": "Commercial",
+      "ap_facility_count": 3,
+      "oa_location_names": [
+        "Better Gym Portsmouth"
+      ],
+      "oa_dataset_urls": [
+        "http://data.better.org.uk/"
+      ],
+      "oa_publisher_names": [
+        "GLL"
+      ],
+      "oa_postal_codes": [
+        "PO4 8SH"
+      ],
+      "oa_kinds": [
+        "Event"
+      ],
+      "oa_opportunity_count": 1,
+      "distance_metres": 18.7,
+      "match_method": "spatial_and_postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": true
+    },
+    {
+      "site_id": "1042120",
+      "site_name": "1610 ROBERT BLAKE AND ELMWOOD LEISURE",
+      "postcode": "TA6 6AW",
+      "local_authority_name": "Somerset",
+      "ownership_type_group": "Education",
+      "ap_facility_count": 6,
+      "oa_location_names": [
+        "Hamp Academy"
+      ],
+      "oa_dataset_urls": [
+        "https://playwaze.com/opendata/openactive"
+      ],
+      "oa_publisher_names": [
+        "Playwaze"
+      ],
+      "oa_postal_codes": [],
+      "oa_kinds": [
+        "Event",
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 24,
+      "distance_metres": 198.3,
+      "match_method": "spatial",
+      "name_similarity": null,
+      "is_primary_for_venue": false,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "1200170",
+      "site_name": "3 HAMMERS GOLF COMPLEX",
+      "postcode": "WV10 7PP",
+      "local_authority_name": "South Staffordshire",
+      "ownership_type_group": "Commercial",
+      "ap_facility_count": 2,
+      "oa_location_names": [
+        "3 Hammers Golf Complex"
+      ],
+      "oa_dataset_urls": [
+        "https://openactive.played.co/openactive/"
+      ],
+      "oa_publisher_names": [
+        "Played"
+      ],
+      "oa_postal_codes": [
+        "WV10 7PP"
+      ],
+      "oa_kinds": [
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 110,
+      "distance_metres": 12.6,
+      "match_method": "spatial_and_postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": true
+    },
+    {
+      "site_id": "1047599",
+      "site_name": "24/7 FITNESS (REDDITCH)",
+      "postcode": "B97 4EQ",
+      "local_authority_name": "Redditch",
+      "ownership_type_group": "Commercial",
+      "ap_facility_count": 2,
+      "oa_location_names": [
+        "6 Evesham Walk"
+      ],
+      "oa_dataset_urls": [
+        "https://www.sportsuite.co.uk/odapikey/datasite"
+      ],
+      "oa_publisher_names": [
+        "SportSuite"
+      ],
+      "oa_postal_codes": [
+        "B974EX"
+      ],
+      "oa_kinds": [
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 1,
+      "distance_metres": 82.9,
+      "match_method": "spatial_centroid_only",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "50002044",
+      "site_name": "AB SALUTE GYM (BISHOPS STORTFORD)",
+      "postcode": "CM23 5PB",
+      "local_authority_name": "East Hertfordshire",
+      "ownership_type_group": "Commercial",
+      "ap_facility_count": 1,
+      "oa_location_names": [
+        "Bishops Stortford"
+      ],
+      "oa_dataset_urls": [
+        "https://goteamup.com/api/openactive/v1/"
+      ],
+      "oa_publisher_names": [
+        "TeamUp"
+      ],
+      "oa_postal_codes": [
+        "CM23 5PB"
+      ],
+      "oa_kinds": [
+        "ScheduledSession",
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 397,
+      "distance_metres": 264.8,
+      "match_method": "postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": true,
+      "is_mutual_best": true
+    },
+    {
+      "site_id": "1043502",
+      "site_name": "ADEYFIELD COMMUNITY CENTRE",
+      "postcode": "HP2 4EW",
+      "local_authority_name": "Dacorum",
+      "ownership_type_group": "Community Organisation",
+      "ap_facility_count": 1,
+      "oa_location_names": [
+        "Adeyfield School"
+      ],
+      "oa_dataset_urls": [
+        "https://playwaze.com/opendata/openactive"
+      ],
+      "oa_publisher_names": [
+        "Playwaze"
+      ],
+      "oa_postal_codes": [],
+      "oa_kinds": [
+        "SessionSeries"
+      ],
+      "oa_opportunity_count": 4,
+      "distance_metres": 381.6,
+      "match_method": "name",
+      "name_similarity": 1,
+      "is_primary_for_venue": true,
+      "is_mutual_best": false
+    },
+    {
+      "site_id": "9999999",
+      "site_name": "UNREPORTED SITE",
+      "postcode": "DT1 2HR",
+      "local_authority_name": "Dorset",
+      "ownership_type_group": "Local Authority",
+      "ap_facility_count": null,
+      "oa_location_names": [],
+      "oa_dataset_urls": [
+        "http://data.britishtriathlon.org/"
+      ],
+      "oa_publisher_names": [
+        "British Triathlon"
+      ],
+      "oa_postal_codes": [
+        "DT1 2HR"
+      ],
+      "oa_kinds": [],
+      "oa_opportunity_count": null,
+      "distance_metres": null,
+      "match_method": "postcode",
+      "name_similarity": null,
+      "is_primary_for_venue": false,
+      "is_mutual_best": false
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 2,
+    "page_size": 6,
+    "total": 13
+  }
+}

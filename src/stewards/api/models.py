@@ -439,3 +439,103 @@ class FeedQualityResponse(ApiModel):
     data: tuple[FeedQualityFeed, ...] = ()
     summary: FeedQualitySummary = Field(default_factory=FeedQualitySummary)
     meta: Meta
+
+
+# --- active places coverage ---------------------------------------------------------------
+#
+# The third backing read. Like the quality snapshot it reports this run's measurements with
+# no history, so it is not an incident feed; unlike the quality snapshot its figures and its
+# rows are two endpoints, and the rows are paginated. Only the fields the page renders are
+# declared — `extra="ignore"` carries the rest of the payload, and a field earns a line here
+# when something draws it.
+
+
+class CoverageHeadline(NullTolerantModel):
+    """The run's top-line figures, both ways round: sites covered, and venues not."""
+
+    coverage_pct: float | None = None
+    sites_total: int | None = None
+    sites_matched: int | None = None
+    sites_missing: int | None = None
+    local_authorities: int | None = None
+    venues_total: int | None = None
+    venues_matched: int | None = None
+    venues_unmatched: int | None = None
+    venues_unmatched_pct: float | None = None
+
+
+class CoverageGroup(NullTolerantModel):
+    """One row of a coverage breakdown — by region here.
+
+    The same shape backs the ownership, management and facility-type breakdowns, so a second
+    chart over any of them needs a field on `CoverageSnapshot` and nothing else.
+    """
+
+    region_name: str = ""
+    sites_total: int | None = None
+    sites_matched: int | None = None
+    sites_missing: int | None = None
+    coverage_pct: float | None = None
+
+
+class CoverageParameters(NullTolerantModel):
+    """The thresholds the run was computed at, for the page's own copy."""
+
+    buffer_metres: float | None = None
+    postcode_max_metres: float | None = None
+    name_max_metres: float | None = None
+
+
+class CoverageSource(NullTolerantModel):
+    active_places_data_version: str = ""
+    geography_scope: str = ""
+    excluded_kinds: tuple[str, ...] = ()
+
+
+class CoverageSnapshot(NullTolerantModel):
+    run_date: date | None = None
+    headline: CoverageHeadline = Field(default_factory=CoverageHeadline)
+    parameters: CoverageParameters = Field(default_factory=CoverageParameters)
+    source: CoverageSource = Field(default_factory=CoverageSource)
+    coverage_by_region: tuple[CoverageGroup, ...] = ()
+
+
+class CoverageResponse(ApiModel):
+    data: CoverageSnapshot = Field(default_factory=CoverageSnapshot)
+    meta: Meta
+
+
+class SiteMapping(NullTolerantModel):
+    """One site-venue pair: an Active Places site and an OpenActive venue matched to it.
+
+    The coordinates and the raw `oa_location_json` are deliberately not declared: the app
+    draws no map, and the distance the batch already computed is the figure a reader needs.
+    """
+
+    site_id: str = ""
+    site_name: str = ""
+    postcode: str = ""
+    local_authority_name: str = ""
+    ownership_type_group: str = ""
+    ap_facility_count: int | None = None
+    oa_location_names: tuple[str, ...] = ()
+    oa_dataset_urls: tuple[str, ...] = ()
+    oa_publisher_names: tuple[str, ...] = ()
+    oa_postal_codes: tuple[str, ...] = ()
+    oa_kinds: tuple[str, ...] = ()
+    oa_opportunity_count: int | None = None
+    distance_metres: float | None = None
+
+    #: `spatial`, `spatial_and_postcode`, `spatial_centroid_only`, `postcode` or `name`.
+    match_method: str = ""
+
+    #: 0-1, and only the name channel reports one.
+    name_similarity: float | None = None
+
+    is_primary_for_venue: bool = False
+    is_mutual_best: bool = False
+
+
+class SiteMappingPage(ApiModel):
+    data: tuple[SiteMapping, ...] = ()
+    meta: Meta
