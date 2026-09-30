@@ -539,3 +539,110 @@ class SiteMapping(NullTolerantModel):
 class SiteMappingPage(ApiModel):
     data: tuple[SiteMapping, ...] = ()
     meta: Meta
+
+
+# --- feed custom properties (schema drift) ------------------------------------------------
+#
+# The fourth backing read. Like the quality snapshot it arrives as one envelope with a
+# fleet-wide `summary` block beside its rows and no history, but nothing in it is a score:
+# each row is a feed and the properties it publishes that the OpenActive vocabulary does not
+# define. It is therefore not a quality snapshot with different field names, and gets models
+# of its own.
+
+
+class CustomPropertyUse(NullTolerantModel):
+    """One property on one entity type in one feed.
+
+    A property used on two entity types is two of these, which is why a feed's usage count
+    can exceed its property count.
+    """
+
+    property: str = ""
+
+    #: `beta` for the OpenActive beta namespace, a publisher's own prefix, or null for an
+    #: unprefixed property.
+    namespace: str | None = None
+
+    entity_type: str = ""
+
+    #: Share of the feed's sampled items carrying the property, 0-100.
+    presence_pct: float | None = None
+
+
+class CustomPropertyFeed(NullTolerantModel):
+    """One feed that publishes at least one custom property in this snapshot."""
+
+    feed_id: str = ""
+    feed_url: str = ""
+    feed_type: str = ""
+    is_regular: bool | None = None
+    dataset_url: str = ""
+    dataset_name: str = ""
+    publisher_id: str = ""
+    publisher_name: str = ""
+
+    #: How many of the feed's items the analysis read.
+    sampled_items: int | None = None
+
+    #: Distinct property names, and property-entity type pairs.
+    num_custom_properties: int | None = None
+    num_custom_property_usages: int | None = None
+
+    custom_properties: tuple[CustomPropertyUse, ...] = ()
+
+
+class NamespaceUsage(NullTolerantModel):
+    """How many properties one namespace contributes, and how widely they are used."""
+
+    namespace: str | None = None
+    property_count: int | None = None
+    feed_count: int | None = None
+    dataset_count: int | None = None
+
+
+class EntityTypeUsage(NullTolerantModel):
+    """How many custom properties one entity type carries, and how widely."""
+
+    entity_type: str = ""
+    property_count: int | None = None
+    feed_count: int | None = None
+    dataset_count: int | None = None
+
+
+class PropertyUsage(NullTolerantModel):
+    """One custom property across the fleet: where it appears and how widely."""
+
+    property: str = ""
+    namespace: str | None = None
+    entity_types: tuple[str, ...] = ()
+    feed_count: int | None = None
+    dataset_count: int | None = None
+
+
+class CustomPropertySummary(NullTolerantModel):
+    """The fleet-wide block the custom-properties endpoint sends beside its rows.
+
+    Every figure is optional for the reason `/summary` gives: a batch that does not compute
+    one sends null, and null is not zero.
+    """
+
+    feeds_assessed: int | None = None
+    datasets_assessed: int | None = None
+    feeds_with_custom_properties: int | None = None
+    datasets_with_custom_properties: int | None = None
+    publishers_with_custom_properties: int | None = None
+
+    #: Feeds with custom properties over feeds assessed, 0-1.
+    feed_share: float | None = None
+
+    distinct_custom_properties: int | None = None
+    total_custom_property_usages: int | None = None
+    namespace_breakdown: tuple[NamespaceUsage, ...] = ()
+    entity_type_breakdown: tuple[EntityTypeUsage, ...] = ()
+    property_breakdown: tuple[PropertyUsage, ...] = ()
+
+
+class CustomPropertyResponse(ApiModel):
+    data: tuple[CustomPropertyFeed, ...] = ()
+    summary: CustomPropertySummary = Field(default_factory=CustomPropertySummary)
+    meta: Meta

@@ -21,6 +21,7 @@ from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
     _fetch_contact_queue,
     _fetch_coverage,
+    _fetch_custom_properties,
     _fetch_incidents,
     _fetch_quality,
     _fetch_site_mappings,
@@ -28,8 +29,12 @@ from stewards.api.repository import (
     _fetch_trend,
 )
 from stewards.config import Settings
-from stewards.monitors import coverage
-from stewards.monitors.registry import ACTIVE_PLACES_COVERAGE, SINGLE_FEED_STALL
+from stewards.monitors import coverage, schema_drift
+from stewards.monitors.registry import (
+    ACTIVE_PLACES_COVERAGE,
+    FEED_CUSTOM_PROPERTIES,
+    SINGLE_FEED_STALL,
+)
 from stewards.monitors.transforms import to_dataframe
 
 BASE = "http://localhost:5268"
@@ -321,4 +326,51 @@ def test_the_real_mapping_payload_fills_every_column_the_registry_declares(
     response = _fetch_site_mappings("active_places_coverage", ROWS_ID, client, as_of=AS_OF)
     frame = coverage.to_dataframe(ACTIVE_PLACES_COVERAGE, coverage.build_rows(response.data))
     assert list(frame.columns) == [c.label for c in ACTIVE_PLACES_COVERAGE.columns]
+    assert len(frame) == len(response.data)
+
+
+# --- the custom-property snapshot ---------------------------------------------------------
+
+PROPERTIES = f"{BASE}/admin/feed-custom-properties"
+
+
+@respx.mock
+def test_the_custom_property_snapshot_comes_from_the_monitor_slug_with_no_suffix(
+    client: StewardsClient, payload
+) -> None:
+    """`/admin/feed-custom-properties`: the snapshot is the resource, and its rows page."""
+    route = respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=payload("feed_custom_properties_properties"))
+    )
+    response = _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
+
+    assert response.data
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["page"] == "1"
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers
+
+
+@respx.mock
+def test_a_custom_property_endpoint_this_deployment_has_not_built_raises_not_found(
+    client: StewardsClient,
+) -> None:
+    respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
+
+
+@respx.mock
+def test_the_real_custom_property_payload_fills_every_declared_column(
+    client: StewardsClient, payload
+) -> None:
+    """The live rows, through the models and the shaping, into the declared table."""
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=payload("feed_custom_properties_properties"))
+    )
+    response = _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
+    rows = schema_drift.build_rows(response.data)
+    frame = schema_drift.to_dataframe(FEED_CUSTOM_PROPERTIES, rows)
+    assert list(frame.columns) == [c.label for c in FEED_CUSTOM_PROPERTIES.columns]
     assert len(frame) == len(response.data)

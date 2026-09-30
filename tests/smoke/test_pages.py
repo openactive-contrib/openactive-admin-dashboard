@@ -23,6 +23,7 @@ PAGES = [
     "23_dataset_future_decline.py",
     "30_feed_quality.py",
     "31_active_places_coverage.py",
+    "32_feed_custom_properties.py",
 ]
 
 #: Pages rendered by `components.monitor_page` — the incident shape. The quality page has a
@@ -39,6 +40,8 @@ QUALITY_PAGES = ["30_feed_quality.py"]
 
 COVERAGE_PAGES = ["31_active_places_coverage.py"]
 
+SCHEMA_DRIFT_PAGES = ["32_feed_custom_properties.py"]
+
 #: Page filename -> registry id, so the counts a page must render are read from the monitor
 #: rather than hard-coded per page.
 MONITOR_IDS = {
@@ -47,6 +50,7 @@ MONITOR_IDS = {
     "12_feed_ingestion_errors.py": "feed_ingestion_error",
     "22_dataset_orphaned_children.py": "dataset_orphaned_children",
     "23_dataset_future_decline.py": "dataset_future_decline",
+    "32_feed_custom_properties.py": "feed_custom_properties",
     "30_feed_quality.py": "feed_quality",
     "31_active_places_coverage.py": "active_places_coverage",
 }
@@ -220,6 +224,63 @@ def test_the_coverage_page_states_the_run_figures_not_the_filtered_ones() -> Non
     # The run's own pair count was dropped as a figure: the caption above the table already
     # says how many rows there are, and the two disagreeing read as a bug.
     assert "10,034" not in text
+
+
+@pytest.mark.parametrize("name", SCHEMA_DRIFT_PAGES)
+def test_schema_drift_page_has_one_chart_and_two_tables(name: str) -> None:
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor(MONITOR_IDS[name])
+    app = run(name)
+    # The feeds and the fleet-wide properties, one per tab; the detail tables render only
+    # once a row is selected.
+    assert len(app.dataframe) == 2
+    assert len(app.tabs) == 2
+    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.selectbox) == len(monitor.filters)
+    assert len(app.toggle) == 1  # "outside beta only" stands where the threshold toggle would
+    assert len(app.text_input) == 1
+
+
+def test_schema_drift_tables_carry_every_declared_column() -> None:
+    from fixture_loader import load_sample
+    from stewards.monitors.registry import get_monitor
+    from stewards.monitors.schema_drift import PROPERTY_COLUMNS
+
+    payload = load_sample("feed_custom_properties_properties")
+    app = run("32_feed_custom_properties.py")
+    feeds, properties = (frame.value for frame in app.dataframe)
+    monitor = get_monitor("feed_custom_properties")
+    assert list(feeds.columns) == [c.label for c in monitor.columns]
+    assert len(feeds) == len(payload["data"])
+    assert list(properties.columns) == [c.label for c in PROPERTY_COLUMNS]
+    assert len(properties) == len(payload["summary"]["property_breakdown"])
+
+
+def test_schema_drift_outside_beta_toggle_narrows_the_feeds() -> None:
+    app = run("32_feed_custom_properties.py")
+    total = len(app.dataframe[0].value)
+    app.toggle[0].set_value(True).run()
+    assert not app.exception
+    assert 0 < len(app.dataframe[0].value) < total
+
+
+def test_schema_drift_namespace_filter_matches_a_feed_using_it_anywhere() -> None:
+    app = run("32_feed_custom_properties.py")
+    app.selectbox[0].set_value("btf").run()
+    assert not app.exception
+    assert list(app.dataframe[0].value["Publisher"]) == ["British Triathlon"]
+
+
+def test_the_schema_drift_page_states_the_fleet_figures_not_the_filtered_ones() -> None:
+    app = run("32_feed_custom_properties.py")
+    app.text_input[0].set_value("triathlon").run()
+    text = text_of(app)
+    assert "1 of 12 feeds shown" in text
+    assert "62" in text  # datasets with custom properties, fleet-wide
+    assert "of 159 datasets assessed" in text
+    assert "40.6% of 397 feeds assessed" in text
+    assert "Actions available: none" in text
 
 
 def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:

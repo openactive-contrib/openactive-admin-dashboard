@@ -26,6 +26,7 @@ from stewards.components import layout, theme
 from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
+from stewards.components.loading import loading
 from stewards.components.surface import card
 from stewards.monitors import coverage, transforms
 from stewards.monitors.coverage import MappingRow
@@ -164,7 +165,8 @@ def render_table_section(monitor: Monitor, rows: Sequence[MappingRow]) -> None:
 def render_coverage_page(monitor: Monitor) -> None:
     """Header, blurb, figures, the regional chart, filters, table, selected pair, footer."""
     try:
-        response = repository.fetch_coverage(monitor.id)
+        with loading("Loading the coverage snapshot"):
+            response = repository.fetch_coverage(monitor.id)
     except ApiError as exc:
         layout.render_error_header(monitor.crumb, monitor.name)
         render_api_error(exc)
@@ -176,7 +178,8 @@ def render_coverage_page(monitor: Monitor) -> None:
     render_summary_chart(monitor, response.data)
 
     try:
-        mappings = repository.fetch_site_mappings(monitor.id, monitor.rows_id)
+        with loading("Loading site-venue pairs"):
+            mappings = repository.fetch_site_mappings(monitor.id, monitor.rows_id)
     except ApiError as exc:
         # The rows are a second endpoint. One that is not live costs the page its table, the
         # way a missing trend costs a monitor page its chart — never the figures above it.

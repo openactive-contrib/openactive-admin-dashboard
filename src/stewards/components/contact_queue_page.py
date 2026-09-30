@@ -10,6 +10,7 @@ from stewards.components import layout
 from stewards.components.email_draft import render_email_draft
 from stewards.components.errors import render_api_error
 from stewards.components.incident_table import render_table
+from stewards.components.loading import loading
 from stewards.components.surface import card
 from stewards.config import get_settings
 from stewards.monitors import contact_queue
@@ -23,7 +24,8 @@ QUERY = "view_contact_queue"
 def render_contact_queue_page() -> None:
     threshold_days = get_settings().contact_threshold_days
     try:
-        page = repository.fetch_contact_queue()
+        with loading("Loading the contact queue"):
+            page = repository.fetch_contact_queue()
     except ApiError as exc:
         layout.render_error_header("Cross-monitor", TITLE)
         render_api_error(exc)

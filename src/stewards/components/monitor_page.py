@@ -14,6 +14,7 @@ from stewards.components.email_draft import render_email_draft
 from stewards.components.errors import render_api_error
 from stewards.components.filters import render_filters
 from stewards.components.incident_table import column_config, render_monitor_table
+from stewards.components.loading import loading
 from stewards.components.surface import card
 from stewards.components.trend_chart import render_figure
 from stewards.monitors import transforms
@@ -59,15 +60,16 @@ def render_row_detail(monitor: Monitor, incident: Incident) -> None:
 def render_monitor_page(monitor: Monitor) -> None:
     """Header, blurb, KPIs, trend, filters, table, row detail, footer."""
     try:
-        page = repository.fetch_incidents(monitor.id)
+        with loading(f"Loading {monitor.name.lower()}"):
+            page = repository.fetch_incidents(monitor.id)
+            # The trend is read separately and tolerantly: a monitor whose trend endpoint
+            # this deployment has not built yet loses its chart, not its incidents.
+            trend = repository.fetch_trend_points(monitor.id)
     except ApiError as exc:
         layout.render_error_header(monitor.crumb, monitor.name)
         render_api_error(exc)
         return
 
-    # The trend is read separately and tolerantly: a monitor whose trend endpoint this
-    # deployment has not built yet loses its chart, not its incidents.
-    trend = repository.fetch_trend_points(monitor.id)
     incidents = list(page.data)
 
     # Everything above the filters is rendered into reserved slots, because the KPIs need

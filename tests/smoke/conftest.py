@@ -29,6 +29,10 @@ QUALITY_IDS = ("feed_quality",)
 #: Monitors backed by a coverage snapshot: two reads — the figures and their rows — and no
 #: incidents, no trend and no `/summary` entry.
 COVERAGE_IDS = ("active_places_coverage",)
+
+#: Monitors backed by a custom-property snapshot: one read, rows and a summary block, and no
+#: incidents, no trend and no `/summary` entry.
+SCHEMA_DRIFT_IDS = ("feed_custom_properties",)
 TREND_IDS = (
     "dataset_stall",
     "single_feed_stall",
@@ -78,6 +82,10 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             )
             mock.get(f"{BASE}/monitors/{monitor_id}/mappings").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings"))
+            )
+        for monitor_id in SCHEMA_DRIFT_IDS:
+            mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
+                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
             )
         yield
 

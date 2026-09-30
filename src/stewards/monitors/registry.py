@@ -42,11 +42,16 @@ class Source(StrEnum):
     from one read and rows from a second, paginated one, and no history either. It is
     neither of the others — its rows do not age, and its figures do not arrive beside them.
     See `monitors.coverage`.
+    `SCHEMA_DRIFT` is a snapshot of the custom properties the fleet publishes: rows and a
+    summary block in one paginated read, and no history. It arrives shaped like a quality
+    snapshot but measures nothing a score describes — each row is a feed and the properties
+    it uses that the OpenActive vocabulary does not define. See `monitors.schema_drift`.
     """
 
     INCIDENTS = "incidents"
     QUALITY = "quality"
     COVERAGE = "coverage"
+    SCHEMA_DRIFT = "schema_drift"
 
 
 class Severity(StrEnum):
@@ -122,6 +127,11 @@ class RowSpec:
     field: str
     item_model: type[DetailModel]
 
+    #: A `part.<name>` path whose rows are dropped where it is exactly zero: a breakdown item
+    #: with nothing in it is not a finding. A null is kept, because a figure the batch did not
+    #: report is not a zero. None keeps every row.
+    hide_zero: str | None = None
+
 
 @dataclass(frozen=True, slots=True)
 class RowDetail:
@@ -165,7 +175,8 @@ class Monitor:
     #: Which read backs this monitor. `QUALITY` swaps the incident machinery — ageing,
     #: contact threshold, trend, email draft — for the fleet snapshot `monitors.quality`
     #: shapes, and routes the page to `components.quality_page`; `COVERAGE` does the same
-    #: through `monitors.coverage` and `components.coverage_page`.
+    #: through `monitors.coverage` and `components.coverage_page`, and `SCHEMA_DRIFT`
+    #: through `monitors.schema_drift` and `components.schema_drift_page`.
     source: Source = Source.INCIDENTS
 
     #: The row resource's own id, for a monitor whose rows are a second endpoint rather than
@@ -422,7 +433,8 @@ DATASET_ORPHANED_CHILDREN = Monitor(
     detail_model=OrphanedChildrenDetail,
     # The answer a steward needs is which child type is orphaned, so each dataset becomes
     # one row per kind rather than one row carrying a collapsed breakdown.
-    rows=RowSpec("detail.by_kind", OrphanKind),
+    # A child type with no orphans in a dataset is not a finding, so its row is not shown.
+    rows=RowSpec("detail.by_kind", OrphanKind, hide_zero="part.orphan_count"),
     # The batch reports no history for this monitor yet — `sparkline` is empty and the trend
     # endpoint is not deployed — so the card reads today's figure against a fixed benchmark
     # instead of against a series it does not have.
@@ -706,6 +718,64 @@ ACTIVE_PLACES_COVERAGE = Monitor(
 )
 
 
+FEED_CUSTOM_PROPERTIES = Monitor(
+    id="feed_custom_properties",
+    name="Schema drift",
+    group=Group.COVERAGE,
+    # Context, not a queue: the beta namespace is how the specification is meant to grow, so
+    # a custom property is not a fault a publisher is contacted about. The card stays grey.
+    # See `monitors.schema_drift.assess_drift`.
+    severity=Severity.INFORMATIONAL,
+    # Neither an incident list nor a quality snapshot: rows and a summary block in one read,
+    # with nothing that ages and nothing scored. See `monitors.schema_drift`.
+    source=Source.SCHEMA_DRIFT,
+    blurb=(
+        "Which feeds publish data beyond the OpenActive specification, and what that extra "
+        "data is. It shows where publishers are extending the standard, which extensions "
+        "are most widely used, and which datasets rely on them."
+    ),
+    unit="datasets using custom properties",
+    # The card is a set of figures rather than a count, and the monitor supplies it along
+    # with its verdict. See `monitors.schema_drift.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("dataset_name", "Dataset", ColKind.TEXT),
+        Col("feed_name", "Feed", ColKind.MONO),
+        Col("feed_type", "Type", ColKind.TEXT),
+        Col(
+            "property_count",
+            "Custom properties",
+            ColKind.NUMBER,
+            help="Distinct property names this feed uses outside the OpenActive vocabulary",
+        ),
+        Col(
+            "property_label",
+            "Properties",
+            ColKind.TEXT,
+            help="Every custom property this feed uses; hover a cell to read it in full",
+        ),
+        Col("namespace_label", "Namespaces", ColKind.TEXT),
+        Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+    ),
+    # List-valued fields filter by membership: a feed matches a namespace it uses anywhere.
+    filters=(
+        FilterSpec("namespaces", "Namespace"),
+        FilterSpec("property_names", "Property"),
+        FilterSpec("entity_types", "Entity type"),
+        FilterSpec("feed_type", "Feed type"),
+    ),
+    sort_field="property_count",
+    # Nothing here ages, so there is no contact threshold to filter on; the page offers an
+    # "outside beta only" toggle in its place.
+    has_threshold_filter=False,
+    summary_field="feed_name",
+    schedule="daily snapshot",
+    query="monitor_feed_custom_properties_v1",
+    page="views/32_feed_custom_properties.py",
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
@@ -715,6 +785,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_FUTURE_DECLINE,
     FEED_QUALITY,
     ACTIVE_PLACES_COVERAGE,
+    FEED_CUSTOM_PROPERTIES,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}

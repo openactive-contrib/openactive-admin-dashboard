@@ -147,6 +147,24 @@ def test_contract_summary_and_queue_are_unqualified() -> None:
     )
 
 
+# --- custom properties --------------------------------------------------------------------
+
+
+def test_contract_custom_properties_hang_off_the_monitor_and_page() -> None:
+    endpoint = endpoints.custom_properties(
+        Style.CONTRACT, "feed_custom_properties", as_of=AS_OF, page=2
+    )
+    assert endpoint.path == "/monitors/feed_custom_properties/properties"
+    assert endpoint.params == {"page": 2, "page_size": 500}
+
+
+def test_admin_custom_properties_are_the_monitor_slug_itself() -> None:
+    """As with a quality snapshot, the snapshot is the resource and carries no suffix."""
+    endpoint = endpoints.custom_properties(Style.ADMIN, "feed_custom_properties", as_of=AS_OF)
+    assert endpoint.path == "/admin/feed-custom-properties"
+    assert endpoint.params == {"as_of": "2026-09-02", "page": 1, "page_size": 500}
+
+
 def test_admin_summary_and_queue_sit_under_admin_and_name_the_snapshot() -> None:
     assert endpoints.summary(Style.ADMIN, as_of=AS_OF) == endpoints.Endpoint(
         "/admin/summary", {"as_of": "2026-09-02"}
@@ -166,5 +184,6 @@ def test_every_style_routes_every_read() -> None:
         assert endpoints.coverage_mappings(
             style, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
         ).path
+        assert endpoints.custom_properties(style, "feed_custom_properties", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
         assert endpoints.contact_queue(style, as_of=AS_OF).path

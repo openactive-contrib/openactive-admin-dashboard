@@ -937,3 +937,160 @@ def test_selecting_a_row_in_the_pairs_table_opens_that_pair() -> None:
     assert [node.label for node in app.get("expander")]
     markdown = " ".join(m.value for m in app.markdown)
     assert "Matched by" in markdown
+
+
+# --- the schema drift page -----------------------------------------------------------------
+
+
+def _schema_drift_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.schema_drift_page import render_schema_drift_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_custom_properties
+    repository.fetch_custom_properties = boom  # type: ignore[assignment]
+    try:
+        render_schema_drift_page(get_monitor("feed_custom_properties"))
+    finally:
+        repository.fetch_custom_properties = original
+        st.cache_data.clear()
+
+
+def test_a_schema_drift_page_whose_endpoint_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_schema_drift_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _schema_drift_selection_script() -> None:
+    """`AppTest` cannot click a dataframe row, so the selection is the one thing stubbed:
+    everything below it — sorting, the frames, the panels — is the real code path."""
+    from fixture_loader import load_sample
+    from stewards.api.models import CustomPropertyResponse
+    from stewards.components import schema_drift_page
+    from stewards.monitors import schema_drift
+    from stewards.monitors.registry import get_monitor
+
+    payload = CustomPropertyResponse.model_validate(
+        load_sample("feed_custom_properties_properties")
+    )
+    rows = schema_drift.build_rows(payload.data)
+    monitor = get_monitor("feed_custom_properties")
+    original = schema_drift_page.render_table
+
+    def first_row(*args: object, **kwargs: object) -> int:
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        return 0
+
+    schema_drift_page.render_table = first_row  # type: ignore[assignment]
+    try:
+        schema_drift_page.render_feeds(monitor, rows)
+        schema_drift_page.render_properties(monitor, payload.summary, rows)
+    finally:
+        schema_drift_page.render_table = original
+
+
+def test_selecting_a_feed_and_a_property_opens_their_detail_tables() -> None:
+    app = run(_schema_drift_selection_script)
+    labels = [node.label for node in app.get("expander")]
+    assert labels == [
+        "Custom properties · rides",
+        "Feeds using · beta:formattedDescription",
+    ]
+    # The feeds, the selected feed's uses, the properties, the feeds using the selected one.
+    assert len(app.dataframe) == 4
+    assert list(app.dataframe[1].value.columns) == [
+        "Property",
+        "Namespace",
+        "Entity type",
+        "Presence",
+    ]
+    assert "Publisher" in app.dataframe[3].value.columns
+
+
+def _schema_drift_empty_detail_script() -> None:
+    from stewards.api.models import CustomPropertyFeed, CustomPropertySummary, PropertyUsage
+    from stewards.components import schema_drift_page
+    from stewards.components.schema_drift_page import (
+        render_feed_detail,
+        render_properties,
+        render_summary_chart,
+    )
+    from stewards.monitors import schema_drift
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor("feed_custom_properties")
+    bare = schema_drift.build_row(
+        CustomPropertyFeed.model_validate({"feed_id": "bare", "custom_properties": []})
+    )
+    render_feed_detail(monitor, bare)
+    render_summary_chart(monitor, CustomPropertySummary())
+
+    original = schema_drift_page.render_table
+    schema_drift_page.render_table = lambda *a, **k: 0  # type: ignore[assignment]
+    try:
+        unused = CustomPropertySummary(property_breakdown=(PropertyUsage(property="x:y"),))
+        render_properties(monitor, unused, (bare,))
+    finally:
+        schema_drift_page.render_table = original
+
+
+def test_empty_detail_and_unreported_charts_render_captions_not_tables() -> None:
+    app = run(_schema_drift_empty_detail_script)
+    captions = [c.value for c in app.caption]
+    assert any("lists no custom properties for this feed" in c for c in captions)
+    assert any("None of the feeds in this snapshot lists this property" in c for c in captions)
+    assert sum("does not report the figures" in c for c in captions) == 1
+    assert not app.get("vega_lite_chart")
+    assert not app.dataframe
+
+
+# --- the loading card ----------------------------------------------------------------------
+
+
+def _slow_read_script() -> None:
+    import time
+
+    import streamlit as st
+
+    from stewards.components.loading import loading
+
+    with loading("Loading the latest snapshot"):
+        time.sleep(0.7)  # past the spinner's half-second delay, so it does appear
+    st.markdown("loaded")
+
+
+def test_the_loading_card_is_gone_once_the_reads_return() -> None:
+    app = run(_slow_read_script)
+    assert not app.get("spinner")
+    assert [m.value for m in app.markdown] == ["loaded"]
+
+
+def _failed_read_script() -> None:
+    import streamlit as st
+
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.loading import loading
+
+    try:
+        with loading("Loading monitor health"):
+            raise ApiNotFound("no endpoint")
+    except ApiNotFound:
+        st.error("failed")
+    # A second card in the same run takes its own key.
+    with loading("Loading the latest snapshot"):
+        pass
+
+
+def test_a_read_that_raises_still_clears_the_card_and_a_second_card_can_open() -> None:
+    app = run(_failed_read_script)
+    assert [e.value for e in app.error] == ["failed"]
+    assert not app.get("spinner")

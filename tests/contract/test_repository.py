@@ -22,6 +22,7 @@ from stewards.api.errors import (
 )
 from stewards.api.models import (
     CoverageResponse,
+    CustomPropertyResponse,
     FeedQualityResponse,
     IncidentPage,
     SiteMappingPage,
@@ -34,6 +35,8 @@ from stewards.api.repository import (
     _fetch_contact_queue,
     _fetch_coverage,
     _fetch_coverage_snapshots,
+    _fetch_custom_properties,
+    _fetch_custom_property_summaries,
     _fetch_incidents,
     _fetch_monitor_trends,
     _fetch_quality,
@@ -606,3 +609,107 @@ def test_coverage_snapshots_return_one_entry_per_monitor(client: StewardsClient)
     snapshots = _fetch_coverage_snapshots(("active_places_coverage",), client)
     assert set(snapshots) == {"active_places_coverage"}
     assert snapshots["active_places_coverage"].headline.coverage_pct == 26.4
+
+
+# --- custom properties ---------------------------------------------------------------------
+
+PROPERTIES = f"{BASE}/monitors/feed_custom_properties/properties"
+DRIFT_ID = "feed_custom_properties"
+
+
+def _drift_page(page: int, rows: slice, total: int) -> dict[str, object]:
+    """One page of the sample snapshot. Every page carries the summary block, as the live
+    endpoint does."""
+    sample = load_sample("feed_custom_properties_properties")
+    meta = {**sample["meta"], "page": page, "page_size": PAGE_SIZE, "total": total}
+    return {"data": sample["data"][rows], "summary": sample["summary"], "meta": meta}
+
+
+@respx.mock
+def test_custom_properties_return_rows_and_the_summary_block(client: StewardsClient) -> None:
+    route = respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    response = _fetch_custom_properties(DRIFT_ID, client)
+    assert isinstance(response, CustomPropertyResponse)
+    assert response.meta.snapshot_date == date(2026, 8, 21)
+    assert len(response.data) == 12
+    assert response.summary.datasets_with_custom_properties == 62
+    assert response.summary.distinct_custom_properties == 57
+    assert route.call_count == 1
+    assert route.calls.last.request.url.params["page_size"] == str(PAGE_SIZE)
+
+
+@respx.mock
+def test_custom_properties_follow_the_total_across_pages(client: StewardsClient) -> None:
+    """The rows page; the summary describes the whole fleet, so the first page's is kept."""
+    first, second = _drift_page(1, slice(0, 7), 12), _drift_page(2, slice(7, None), 12)
+    second["summary"] = {}  # a later page's summary is not read
+    route = respx.get(PROPERTIES).mock(
+        side_effect=[httpx.Response(200, json=first), httpx.Response(200, json=second)]
+    )
+    response = _fetch_custom_properties(DRIFT_ID, client)
+    assert len(response.data) == 12
+    assert route.call_count == 2
+    assert route.calls.last.request.url.params["page"] == "2"
+    assert response.summary.feeds_with_custom_properties == 161
+
+
+@respx.mock
+def test_custom_properties_stop_on_an_empty_page_short_of_the_total(
+    client: StewardsClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    first, empty = _drift_page(1, slice(0, 7), 20), _drift_page(2, slice(0, 0), 20)
+    respx.get(PROPERTIES).mock(
+        side_effect=[httpx.Response(200, json=first), httpx.Response(200, json=empty)]
+    )
+    response = _fetch_custom_properties(DRIFT_ID, client)
+    assert len(response.data) == 7
+    assert "Fetched 7 of 20" in caplog.text
+
+
+@respx.mock
+def test_custom_properties_reject_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
+    respx.get(PROPERTIES).mock(return_value=httpx.Response(200, json={"data": []}))
+    with pytest.raises(ApiContractError):
+        _fetch_custom_properties(DRIFT_ID, client)
+
+
+@respx.mock
+def test_custom_properties_tolerate_a_snapshot_with_no_summary_block(
+    client: StewardsClient,
+) -> None:
+    """A batch that sends only rows still renders: the figures read em dash, not zero."""
+    meta = load_sample("feed_custom_properties_properties")["meta"]
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json={"data": [], "meta": {**meta, "total": 0}})
+    )
+    response = _fetch_custom_properties(DRIFT_ID, client)
+    assert response.data == ()
+    assert response.summary.datasets_with_custom_properties is None
+
+
+@respx.mock
+def test_custom_property_summaries_skip_a_monitor_whose_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
+    assert _fetch_custom_property_summaries((DRIFT_ID,), client) == {}
+
+
+@respx.mock
+def test_custom_property_summaries_return_one_entry_per_monitor(
+    client: StewardsClient,
+) -> None:
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    summaries = _fetch_custom_property_summaries((DRIFT_ID,), client)
+    assert set(summaries) == {DRIFT_ID}
+    assert summaries[DRIFT_ID].publishers_with_custom_properties == 61
+
+
+def test_custom_property_summaries_of_nothing_is_an_empty_mapping(
+    client: StewardsClient,
+) -> None:
+    assert _fetch_custom_property_summaries((), client) == {}

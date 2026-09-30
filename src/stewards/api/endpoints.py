@@ -144,3 +144,27 @@ def coverage_mappings(
             {"as_of": as_of.isoformat(), "page": page, "page_size": page_size},
         )
     return Endpoint(f"/monitors/{monitor_id}/mappings", {"page": page, "page_size": page_size})
+
+
+def custom_properties(
+    style: Style,
+    monitor_id: str,
+    *,
+    as_of: date,
+    page: int = 1,
+    page_size: int = 500,
+) -> Endpoint:
+    """A monitor's custom-property snapshot: one row per feed, plus a fleet summary block.
+
+    The fourth backing read. The admin API answers it at the monitor's own slug with no
+    suffix, as it does a quality snapshot, because the snapshot *is* the resource. Unlike a
+    quality snapshot its rows page, so the page is named in both shapes.
+    """
+    if style is Style.ADMIN:
+        return Endpoint(
+            f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}",
+            {"as_of": as_of.isoformat(), "page": page, "page_size": page_size},
+        )
+    return Endpoint(
+        f"/monitors/{monitor_id}/properties", {"page": page, "page_size": page_size}
+    )

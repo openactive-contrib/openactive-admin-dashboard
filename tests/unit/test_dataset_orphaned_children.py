@@ -173,7 +173,7 @@ def test_no_incidents_yields_an_empty_frame_with_the_declared_columns() -> None:
 @pytest.mark.parametrize(
     ("orphans", "children", "expected_share", "expected_tone"),
     [
-        (0, 100, 0.0, Tone.GREEN),
+        (1, 100, 1.0, Tone.GREEN),
         (19, 100, 19.0, Tone.GREEN),
         (20, 100, 20.0, Tone.AMBER),
         (49, 100, 49.0, Tone.AMBER),
@@ -196,11 +196,53 @@ def test_the_orphan_share_shades_the_other_way_from_a_quality_score(
 def test_a_child_type_the_crawl_did_not_reach_reports_no_share() -> None:
     """No children is not zero orphaned, so the share is absent rather than 0%."""
     detail = {
-        "by_kind": [{"kind": "ScheduledSession", "orphan_count": 0, "child_count": 0}],
+        "by_kind": [{"kind": "ScheduledSession", "orphan_count": None, "child_count": 0}],
     }
     rows = expand(MONITOR, [incident(detail=detail)])
     assert to_dataframe(MONITOR, rows).iloc[0]["Share orphaned"] is None
     assert tone_frame(MONITOR, rows).iloc[0]["Share orphaned"] == Tone.GREY.value
+
+
+# --- zero-orphan rows ------------------------------------------------------------------
+
+
+def test_a_child_type_with_no_orphans_is_not_shown() -> None:
+    """A breakdown item with nothing in it is not a finding."""
+    detail = {
+        "by_kind": [
+            {"kind": "Slot", "orphan_count": 5, "child_count": 10},
+            {"kind": "ScheduledSession", "orphan_count": 0, "child_count": 100},
+        ]
+    }
+    rows = expand(MONITOR, [incident(detail=detail)])
+    assert list(to_dataframe(MONITOR, rows)["Child type"]) == ["Slot"]
+
+
+def test_a_dataset_whose_every_child_type_is_at_zero_leaves_the_table() -> None:
+    detail = {"by_kind": [{"kind": "Slot", "orphan_count": 0, "child_count": 10}]}
+    rows = expand(MONITOR, [incident(detail=detail)])
+    assert rows == []
+    assert monitor_kpis(MONITOR, rows)[1].value == "0"  # no publisher affected
+
+
+def test_a_dataset_with_no_breakdown_and_zero_orphans_is_not_shown() -> None:
+    """The fallback row reads the dataset-level figure, and the same rule applies to it."""
+    assert expand(MONITOR, [incident(detail={}, orphan_count=0)]) == []
+
+
+def test_an_unreported_orphan_count_is_kept_rather_than_read_as_zero() -> None:
+    detail = {"by_kind": [{"kind": "Slot", "orphan_count": None, "child_count": 10}]}
+    assert len(expand(MONITOR, [incident(detail=detail)])) == 1
+
+
+def test_the_sample_payload_shows_no_zero_orphan_rows() -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import IncidentPage
+
+    page = IncidentPage.model_validate(load_sample("dataset_orphaned_children_incidents"))
+    frame = to_dataframe(MONITOR, expand(MONITOR, page.data))
+    assert (frame["Orphans"].dropna() != 0).all()
+    assert len(frame) == 9  # eleven breakdown items less the three at zero, plus one with none
 
 
 # --- KPIs, ordering and filters -----------------------------------------------------------

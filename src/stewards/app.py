@@ -13,6 +13,7 @@ from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.auth.google import render_identity_footer, require_login
 from stewards.components import nav
+from stewards.components.loading import loading
 from stewards.components.overview_page import tile_cards
 from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
@@ -57,7 +58,11 @@ def main() -> None:
     inject_card_styles()
     email = require_login(settings)
     page = nav.build_navigation()
-    nav.render_sidebar(_nav_badges())
+    # The badges read every monitor's figures before the page runs, which on a cold cache is
+    # the slowest moment of the session, so it gets the same loading card the pages use.
+    with loading("Loading the latest snapshot"):
+        badges = _nav_badges()
+    nav.render_sidebar(badges)
     render_identity_footer(email)
     page.run()
 
