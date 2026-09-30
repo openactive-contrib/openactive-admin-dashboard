@@ -1,0 +1,1318 @@
+{
+  "data": [
+    {
+      "feed_id": "api-letsride-co-uk-public-v1-rides",
+      "feed_url": "http://api.letsride.co.uk/public/v1/rides",
+      "feed_type": "",
+      "is_regular": true,
+      "dataset_url": "http://data.letsride.co.uk/",
+      "dataset_name": "British Cycling Let's Ride Sessions",
+      "publisher_id": "pub_british-cycling",
+      "publisher_name": "British Cycling",
+      "sampled_items": 500,
+      "num_custom_properties": 18,
+      "num_custom_property_usages": 18,
+      "custom_properties": [
+        {
+          "property": "bestRating",
+          "namespace": null,
+          "entity_type": "AggregateRating",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:attendeeCount",
+          "namespace": "beta",
+          "entity_type": "Event",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:distance",
+          "namespace": "beta",
+          "entity_type": "Event",
+          "presence_pct": 100
+        },
+        {
+          "property": "ratingValue",
+          "namespace": null,
+          "entity_type": "AggregateRating",
+          "presence_pct": 100
+        },
+        {
+          "property": "reviewCount",
+          "namespace": null,
+          "entity_type": "AggregateRating",
+          "presence_pct": 100
+        },
+        {
+          "property": "worstRating",
+          "namespace": null,
+          "entity_type": "AggregateRating",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:activityDuration",
+          "namespace": "beta",
+          "entity_type": "Event",
+          "presence_pct": 98.4
+        },
+        {
+          "property": "unitCode",
+          "namespace": null,
+          "entity_type": "QuantitativeValue",
+          "presence_pct": 50
+        },
+        {
+          "property": "britishcycling:gpxFile",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 13
+        },
+        {
+          "property": "britishcycling:publicTransport",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 10.4
+        },
+        {
+          "property": "britishcycling:publicTransportDetails",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 10.4
+        },
+        {
+          "property": "britishcycling:terrain",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 10.4
+        },
+        {
+          "property": "britishcycling:topography",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 10.4
+        },
+        {
+          "property": "britishcycling:stoppingPoints",
+          "namespace": "britishcycling",
+          "entity_type": "Event",
+          "presence_pct": 10
+        },
+        {
+          "property": "aggregateRating",
+          "namespace": null,
+          "entity_type": "Organization",
+          "presence_pct": 5.4
+        },
+        {
+          "property": "beta:numberOfMembers",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 5.4
+        },
+        {
+          "property": "foundingDate",
+          "namespace": null,
+          "entity_type": "Organization",
+          "presence_pct": 5.4
+        },
+        {
+          "property": "caption",
+          "namespace": null,
+          "entity_type": "ImageObject",
+          "presence_pct": 2.69
+        }
+      ]
+    },
+    {
+      "feed_id": "api-britishtriathlon-org-openactive-v1-events",
+      "feed_url": "https://api.britishtriathlon.org/openactive/v1/events",
+      "feed_type": "",
+      "is_regular": true,
+      "dataset_url": "http://data.britishtriathlon.org/",
+      "dataset_name": "British Triathlon Events",
+      "publisher_id": "pub_british-triathlon",
+      "publisher_name": "British Triathlon",
+      "sampled_items": 500,
+      "num_custom_properties": 10,
+      "num_custom_property_usages": 10,
+      "custom_properties": [
+        {
+          "property": "beta:distance",
+          "namespace": "beta",
+          "entity_type": "btf:EventComponent",
+          "presence_pct": 100
+        },
+        {
+          "property": "btf:componentEvent",
+          "namespace": "btf",
+          "entity_type": "Event",
+          "presence_pct": 100
+        },
+        {
+          "property": "btf:order",
+          "namespace": "btf",
+          "entity_type": "btf:EventComponent",
+          "presence_pct": 100
+        },
+        {
+          "property": "btf:raceTypes",
+          "namespace": "btf",
+          "entity_type": "HeadlineEvent",
+          "presence_pct": 100
+        },
+        {
+          "property": "unitCode",
+          "namespace": null,
+          "entity_type": "QuantifiedValue",
+          "presence_pct": 100
+        },
+        {
+          "property": "btf:eventFeatures",
+          "namespace": "btf",
+          "entity_type": "HeadlineEvent",
+          "presence_pct": 96.2
+        },
+        {
+          "property": "btf:expectedCompetitors",
+          "namespace": "btf",
+          "entity_type": "HeadlineEvent",
+          "presence_pct": 61.4
+        },
+        {
+          "property": "btf:swimType",
+          "namespace": "btf",
+          "entity_type": "btf:EventComponent",
+          "presence_pct": 23.49
+        },
+        {
+          "property": "btf:draftLegal",
+          "namespace": "btf",
+          "entity_type": "Event",
+          "presence_pct": 3.44
+        },
+        {
+          "property": "btf:qualifier",
+          "namespace": "btf",
+          "entity_type": "HeadlineEvent",
+          "presence_pct": 2.6
+        }
+      ]
+    },
+    {
+      "feed_id": "bookwhen-com-api-openactive-courseinstances",
+      "feed_url": "https://bookwhen.com/api/openactive/courseinstances",
+      "feed_type": "CourseInstance",
+      "is_regular": true,
+      "dataset_url": "https://data.bookwhen.com/",
+      "dataset_name": "Bookwhen Courses, Sessions, and Events",
+      "publisher_id": "pub_bookwhen",
+      "publisher_name": "Bookwhen",
+      "sampled_items": 329,
+      "num_custom_properties": 9,
+      "num_custom_property_usages": 9,
+      "custom_properties": [
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:participantSuppliedEquipment",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formalCriteriaMet",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 58.97
+        },
+        {
+          "property": "beta:virtualLocation",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 18.54
+        },
+        {
+          "property": "beta:isWheelchairAccessible",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 3.34
+        },
+        {
+          "property": "specialRequirements",
+          "namespace": null,
+          "entity_type": "CourseInstance",
+          "presence_pct": 3.04
+        },
+        {
+          "property": "beta:isInteractivityPreferred",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 1.82
+        },
+        {
+          "property": "beta:partySize",
+          "namespace": "beta",
+          "entity_type": "Offer",
+          "presence_pct": 0.81
+        },
+        {
+          "property": "beta:donationPaymentUrl",
+          "namespace": "beta",
+          "entity_type": "CourseInstance",
+          "presence_pct": 0.61
+        }
+      ]
+    },
+    {
+      "feed_id": "opensessions-io-api-rpde-session-series",
+      "feed_url": "https://opensessions.io/api/rpde/session-series",
+      "feed_type": "SessionSeries",
+      "is_regular": true,
+      "dataset_url": "https://openactive.opensessions.io/",
+      "dataset_name": "Open Sessions Sessions and Events",
+      "publisher_id": "pub_open-sessions",
+      "publisher_name": "Open Sessions",
+      "sampled_items": 500,
+      "num_custom_properties": 1,
+      "num_custom_property_usages": 1,
+      "custom_properties": [
+        {
+          "property": "subEventUrl",
+          "namespace": null,
+          "entity_type": "SessionSeries",
+          "presence_pct": 100
+        }
+      ]
+    },
+    {
+      "feed_id": "api-clubspark-uk-odi-public-courses",
+      "feed_url": "https://api.clubspark.uk/odi/public/courses",
+      "feed_type": "",
+      "is_regular": true,
+      "dataset_url": "https://lawntennisassociation.github.io/",
+      "dataset_name": "LTA Participation Campaigns ",
+      "publisher_id": "pub_lawn-tennis-association",
+      "publisher_name": "Lawn Tennis Association",
+      "sampled_items": 131,
+      "num_custom_properties": 6,
+      "num_custom_property_usages": 6,
+      "custom_properties": [
+        {
+          "property": "beta:distance",
+          "namespace": "beta",
+          "entity_type": "SessionSeries",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:estimatedDuration",
+          "namespace": "beta",
+          "entity_type": "ScheduledSession",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:isWheelchairAccessible",
+          "namespace": "beta",
+          "entity_type": "SessionSeries",
+          "presence_pct": 100
+        },
+        {
+          "property": "unitCode",
+          "namespace": null,
+          "entity_type": "QuantitativeValue",
+          "presence_pct": 100
+        },
+        {
+          "property": "courseFeatures",
+          "namespace": null,
+          "entity_type": "SessionSeries",
+          "presence_pct": 93.89
+        },
+        {
+          "property": "eligibleCustomerType",
+          "namespace": null,
+          "entity_type": "Offer",
+          "presence_pct": 13.04
+        }
+      ]
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-OneLeisure-live-facility-uses",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/OneLeisure-live-facility-uses",
+      "feed_type": "FacilityUse",
+      "is_regular": true,
+      "dataset_url": "https://oneleisure.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Huntingdonshire District Council Sessions and Facilities",
+      "publisher_id": "pub_huntingdonshire-district-council",
+      "publisher_name": "Huntingdonshire District Council",
+      "sampled_items": 86,
+      "num_custom_properties": 7,
+      "num_custom_property_usages": 9,
+      "custom_properties": [
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:offerValidityPeriod",
+          "namespace": "beta",
+          "entity_type": "FacilityUse",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:video",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Place",
+          "presence_pct": 93.02
+        },
+        {
+          "property": "alternateName",
+          "namespace": null,
+          "entity_type": "FacilityUse",
+          "presence_pct": 79.07
+        },
+        {
+          "property": "beta:facilitySetting",
+          "namespace": "beta",
+          "entity_type": "FacilityUse",
+          "presence_pct": 79.07
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "FacilityUse",
+          "presence_pct": 79.07
+        },
+        {
+          "property": "beta:isWheelchairAccessible",
+          "namespace": "beta",
+          "entity_type": "FacilityUse",
+          "presence_pct": 76.74
+        },
+        {
+          "property": "beta:facilityType",
+          "namespace": "beta",
+          "entity_type": "FacilityUse",
+          "presence_pct": 53.49
+        }
+      ]
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-OneLeisure-live-session-series",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/OneLeisure-live-session-series",
+      "feed_type": "SessionSeries",
+      "is_regular": true,
+      "dataset_url": "https://oneleisure.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Huntingdonshire District Council Sessions and Facilities",
+      "publisher_id": "pub_huntingdonshire-district-council",
+      "publisher_name": "Huntingdonshire District Council",
+      "sampled_items": 464,
+      "num_custom_properties": 4,
+      "num_custom_property_usages": 6,
+      "custom_properties": [
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "EventSeries",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:video",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Place",
+          "presence_pct": 82.97
+        },
+        {
+          "property": "beta:isWheelchairAccessible",
+          "namespace": "beta",
+          "entity_type": "EventSeries",
+          "presence_pct": 12.5
+        },
+        {
+          "property": "beta:isVirtuallyCoached",
+          "namespace": "beta",
+          "entity_type": "EventSeries",
+          "presence_pct": 2.22
+        }
+      ]
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-OneLeisure-live-scheduled-sessions",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/OneLeisure-live-scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "is_regular": true,
+      "dataset_url": "https://oneleisure.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Huntingdonshire District Council Sessions and Facilities",
+      "publisher_id": "pub_huntingdonshire-district-council",
+      "publisher_name": "Huntingdonshire District Council",
+      "sampled_items": 500,
+      "num_custom_properties": 1,
+      "num_custom_property_usages": 1,
+      "custom_properties": [
+        {
+          "property": "beta:sportsActivityLocation",
+          "namespace": "beta",
+          "entity_type": "ScheduledSession",
+          "presence_pct": 100
+        }
+      ]
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-HartlepoolBoroughCouncil-live-scheduled-sessions",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/HartlepoolBoroughCouncil-live-scheduled-sessions",
+      "feed_type": "ScheduledSession",
+      "is_regular": true,
+      "dataset_url": "https://activehartlepool.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Active Hartlepool Sessions and Facilities",
+      "publisher_id": "pub_active-hartlepool",
+      "publisher_name": "Active Hartlepool",
+      "sampled_items": 500,
+      "num_custom_properties": 1,
+      "num_custom_property_usages": 1,
+      "custom_properties": [
+        {
+          "property": "beta:sportsActivityLocation",
+          "namespace": "beta",
+          "entity_type": "ScheduledSession",
+          "presence_pct": 100
+        }
+      ]
+    },
+    {
+      "feed_id": "opendata-leisurecloud-live-api-feeds-HartlepoolBoroughCouncil-live-session-series",
+      "feed_url": "https://opendata.leisurecloud.live/api/feeds/HartlepoolBoroughCouncil-live-session-series",
+      "feed_type": "SessionSeries",
+      "is_regular": true,
+      "dataset_url": "https://activehartlepool.gs-signature.cloud/OpenActive/",
+      "dataset_name": "Active Hartlepool Sessions and Facilities",
+      "publisher_id": "pub_active-hartlepool",
+      "publisher_name": "Active Hartlepool",
+      "sampled_items": 493,
+      "num_custom_properties": 1,
+      "num_custom_property_usages": 3,
+      "custom_properties": [
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "EventSeries",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Organization",
+          "presence_pct": 100
+        },
+        {
+          "property": "beta:formattedDescription",
+          "namespace": "beta",
+          "entity_type": "Place",
+          "presence_pct": 100
+        }
+      ]
+    },
+    {
+      "feed_id": "example-test-openactive-slots",
+      "feed_url": "https://example.test/openactive/slots",
+      "feed_type": "Slot",
+      "is_regular": true,
+      "dataset_url": "https://example.test/",
+      "dataset_name": "",
+      "publisher_id": "pub_example",
+      "publisher_name": "Example Leisure",
+      "sampled_items": null,
+      "num_custom_properties": null,
+      "num_custom_property_usages": null,
+      "custom_properties": [
+        {
+          "property": "beta:offerValidityPeriod",
+          "namespace": "beta",
+          "entity_type": "Offer",
+          "presence_pct": null
+        }
+      ]
+    },
+    {
+      "feed_id": "example-test-openactive-sessions",
+      "feed_url": "https://example.test/openactive/sessions",
+      "feed_type": "ScheduledSession",
+      "is_regular": true,
+      "dataset_url": "https://example.test/",
+      "dataset_name": "",
+      "publisher_id": "pub_example",
+      "publisher_name": "Example Leisure",
+      "sampled_items": 12,
+      "num_custom_properties": null,
+      "num_custom_property_usages": null,
+      "custom_properties": null
+    }
+  ],
+  "summary": {
+    "feeds_assessed": 397,
+    "datasets_assessed": 159,
+    "feeds_with_custom_properties": 161,
+    "datasets_with_custom_properties": 62,
+    "publishers_with_custom_properties": 61,
+    "feed_share": 0.40554156171284633,
+    "distinct_custom_properties": 57,
+    "total_custom_property_usages": 463,
+    "namespace_breakdown": [
+      {
+        "namespace": "beta",
+        "property_count": 25,
+        "feed_count": 160,
+        "dataset_count": 62
+      },
+      {
+        "namespace": null,
+        "property_count": 18,
+        "feed_count": 29,
+        "dataset_count": 26
+      },
+      {
+        "namespace": "britishcycling",
+        "property_count": 6,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "namespace": "btf",
+        "property_count": 8,
+        "feed_count": 1,
+        "dataset_count": 1
+      }
+    ],
+    "entity_type_breakdown": [
+      {
+        "entity_type": "Place",
+        "property_count": 2,
+        "feed_count": 58,
+        "dataset_count": 28
+      },
+      {
+        "entity_type": "Organization",
+        "property_count": 6,
+        "feed_count": 57,
+        "dataset_count": 28
+      },
+      {
+        "entity_type": "FacilityUse",
+        "property_count": 7,
+        "feed_count": 33,
+        "dataset_count": 33
+      },
+      {
+        "entity_type": "ScheduledSession",
+        "property_count": 8,
+        "feed_count": 33,
+        "dataset_count": 33
+      },
+      {
+        "entity_type": "Slot",
+        "property_count": 1,
+        "feed_count": 28,
+        "dataset_count": 28
+      },
+      {
+        "entity_type": "EventSeries",
+        "property_count": 4,
+        "feed_count": 25,
+        "dataset_count": 24
+      },
+      {
+        "entity_type": "Offer",
+        "property_count": 2,
+        "feed_count": 23,
+        "dataset_count": 19
+      },
+      {
+        "entity_type": "Event",
+        "property_count": 25,
+        "feed_count": 10,
+        "dataset_count": 10
+      },
+      {
+        "entity_type": "SessionSeries",
+        "property_count": 16,
+        "feed_count": 9,
+        "dataset_count": 9
+      },
+      {
+        "entity_type": "Course",
+        "property_count": 2,
+        "feed_count": 4,
+        "dataset_count": 4
+      },
+      {
+        "entity_type": "Brand",
+        "property_count": 1,
+        "feed_count": 2,
+        "dataset_count": 2
+      },
+      {
+        "entity_type": "CourseInstance",
+        "property_count": 9,
+        "feed_count": 2,
+        "dataset_count": 2
+      },
+      {
+        "entity_type": "Person",
+        "property_count": 1,
+        "feed_count": 2,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "QuantitativeValue",
+        "property_count": 1,
+        "feed_count": 2,
+        "dataset_count": 2
+      },
+      {
+        "entity_type": "AggregateRating",
+        "property_count": 4,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "HeadlineEvent",
+        "property_count": 4,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "ImageObject",
+        "property_count": 1,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "IndividualFacilityUse",
+        "property_count": 2,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "OnDemandEvent",
+        "property_count": 2,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "PrivacyPolicy",
+        "property_count": 1,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "QuantifiedValue",
+        "property_count": 1,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "TermsOfUse",
+        "property_count": 1,
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "entity_type": "btf:EventComponent",
+        "property_count": 3,
+        "feed_count": 1,
+        "dataset_count": 1
+      }
+    ],
+    "property_breakdown": [
+      {
+        "property": "beta:formattedDescription",
+        "namespace": "beta",
+        "entity_types": [
+          "Course",
+          "CourseInstance",
+          "Event",
+          "EventSeries",
+          "FacilityUse",
+          "Organization",
+          "Place",
+          "SessionSeries"
+        ],
+        "feed_count": 68,
+        "dataset_count": 34
+      },
+      {
+        "property": "beta:sportsActivityLocation",
+        "namespace": "beta",
+        "entity_types": [
+          "Event",
+          "ScheduledSession",
+          "Slot"
+        ],
+        "feed_count": 57,
+        "dataset_count": 32
+      },
+      {
+        "property": "beta:offerValidityPeriod",
+        "namespace": "beta",
+        "entity_types": [
+          "FacilityUse"
+        ],
+        "feed_count": 31,
+        "dataset_count": 31
+      },
+      {
+        "property": "beta:isWheelchairAccessible",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "EventSeries",
+          "FacilityUse",
+          "IndividualFacilityUse",
+          "ScheduledSession",
+          "SessionSeries"
+        ],
+        "feed_count": 24,
+        "dataset_count": 19
+      },
+      {
+        "property": "beta:video",
+        "namespace": "beta",
+        "entity_types": [
+          "Brand",
+          "Course",
+          "Event",
+          "EventSeries",
+          "FacilityUse",
+          "OnDemandEvent",
+          "Organization",
+          "SessionSeries"
+        ],
+        "feed_count": 22,
+        "dataset_count": 12
+      },
+      {
+        "property": "beta:partySize",
+        "namespace": "beta",
+        "entity_types": [
+          "Offer"
+        ],
+        "feed_count": 20,
+        "dataset_count": 17
+      },
+      {
+        "property": "alternateName",
+        "namespace": null,
+        "entity_types": [
+          "FacilityUse"
+        ],
+        "feed_count": 16,
+        "dataset_count": 16
+      },
+      {
+        "property": "beta:facilitySetting",
+        "namespace": "beta",
+        "entity_types": [
+          "FacilityUse",
+          "IndividualFacilityUse",
+          "SessionSeries"
+        ],
+        "feed_count": 14,
+        "dataset_count": 13
+      },
+      {
+        "property": "beta:facilityType",
+        "namespace": "beta",
+        "entity_types": [
+          "FacilityUse"
+        ],
+        "feed_count": 14,
+        "dataset_count": 14
+      },
+      {
+        "property": "beta:isVirtuallyCoached",
+        "namespace": "beta",
+        "entity_types": [
+          "EventSeries",
+          "SessionSeries"
+        ],
+        "feed_count": 14,
+        "dataset_count": 14
+      },
+      {
+        "property": "beta:formalCriteriaMet",
+        "namespace": "beta",
+        "entity_types": [
+          "Organization",
+          "Person"
+        ],
+        "feed_count": 10,
+        "dataset_count": 4
+      },
+      {
+        "property": "beta:virtualLocation",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "OnDemandEvent",
+          "ScheduledSession",
+          "SessionSeries"
+        ],
+        "feed_count": 9,
+        "dataset_count": 3
+      },
+      {
+        "property": "beta:participantSuppliedEquipment",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "SessionSeries"
+        ],
+        "feed_count": 5,
+        "dataset_count": 3
+      },
+      {
+        "property": "beta:isInteractivityPreferred",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "SessionSeries"
+        ],
+        "feed_count": 4,
+        "dataset_count": 2
+      },
+      {
+        "property": "beta:FacilitySettingType",
+        "namespace": "beta",
+        "entity_types": [
+          "Event",
+          "ScheduledSession",
+          "SessionSeries"
+        ],
+        "feed_count": 3,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:attendeeCount",
+        "namespace": "beta",
+        "entity_types": [
+          "Event",
+          "ScheduledSession"
+        ],
+        "feed_count": 3,
+        "dataset_count": 2
+      },
+      {
+        "property": "beta:distance",
+        "namespace": "beta",
+        "entity_types": [
+          "Event",
+          "SessionSeries",
+          "btf:EventComponent"
+        ],
+        "feed_count": 3,
+        "dataset_count": 3
+      },
+      {
+        "property": "beta:donationPaymentUrl",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "SessionSeries"
+        ],
+        "feed_count": 3,
+        "dataset_count": 2
+      },
+      {
+        "property": "eligibleCustomerType",
+        "namespace": null,
+        "entity_types": [
+          "Offer"
+        ],
+        "feed_count": 3,
+        "dataset_count": 2
+      },
+      {
+        "property": "specialRequirements",
+        "namespace": null,
+        "entity_types": [
+          "CourseInstance",
+          "Event",
+          "SessionSeries"
+        ],
+        "feed_count": 3,
+        "dataset_count": 1
+      },
+      {
+        "property": "unitCode",
+        "namespace": null,
+        "entity_types": [
+          "QuantifiedValue",
+          "QuantitativeValue"
+        ],
+        "feed_count": 3,
+        "dataset_count": 3
+      },
+      {
+        "property": "beta:isScheduledAsSlots",
+        "namespace": "beta",
+        "entity_types": [
+          "SessionSeries"
+        ],
+        "feed_count": 2,
+        "dataset_count": 2
+      },
+      {
+        "property": "beta:placeType",
+        "namespace": "beta",
+        "entity_types": [
+          "Place"
+        ],
+        "feed_count": 2,
+        "dataset_count": 1
+      },
+      {
+        "property": "activities",
+        "namespace": null,
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "ageGroup",
+        "namespace": null,
+        "entity_types": [
+          "ScheduledSession"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "aggregateRating",
+        "namespace": null,
+        "entity_types": [
+          "Organization"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "bestRating",
+        "namespace": null,
+        "entity_types": [
+          "AggregateRating"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:activityDuration",
+        "namespace": "beta",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:contactPoint",
+        "namespace": "beta",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:course",
+        "namespace": "beta",
+        "entity_types": [
+          "CourseInstance"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:estimatedDuration",
+        "namespace": "beta",
+        "entity_types": [
+          "ScheduledSession"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:isFirstSessionAccessibleForFree",
+        "namespace": "beta",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "beta:numberOfMembers",
+        "namespace": "beta",
+        "entity_types": [
+          "Organization"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:gpxFile",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:publicTransport",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:publicTransportDetails",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:stoppingPoints",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:terrain",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "britishcycling:topography",
+        "namespace": "britishcycling",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:componentEvent",
+        "namespace": "btf",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:draftLegal",
+        "namespace": "btf",
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:eventFeatures",
+        "namespace": "btf",
+        "entity_types": [
+          "HeadlineEvent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:expectedCompetitors",
+        "namespace": "btf",
+        "entity_types": [
+          "HeadlineEvent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:order",
+        "namespace": "btf",
+        "entity_types": [
+          "btf:EventComponent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:qualifier",
+        "namespace": "btf",
+        "entity_types": [
+          "HeadlineEvent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:raceTypes",
+        "namespace": "btf",
+        "entity_types": [
+          "HeadlineEvent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "btf:swimType",
+        "namespace": "btf",
+        "entity_types": [
+          "btf:EventComponent"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "caption",
+        "namespace": null,
+        "entity_types": [
+          "ImageObject"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "courseFeatures",
+        "namespace": null,
+        "entity_types": [
+          "SessionSeries"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "dateModified",
+        "namespace": null,
+        "entity_types": [
+          "PrivacyPolicy",
+          "TermsOfUse"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "disambiguatingDescription",
+        "namespace": null,
+        "entity_types": [
+          "Event"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "foundingDate",
+        "namespace": null,
+        "entity_types": [
+          "Organization"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "participation_type",
+        "namespace": null,
+        "entity_types": [
+          "CourseInstance",
+          "ScheduledSession",
+          "SessionSeries"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "ratingValue",
+        "namespace": null,
+        "entity_types": [
+          "AggregateRating"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "reviewCount",
+        "namespace": null,
+        "entity_types": [
+          "AggregateRating"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "subEventUrl",
+        "namespace": null,
+        "entity_types": [
+          "SessionSeries"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      },
+      {
+        "property": "worstRating",
+        "namespace": null,
+        "entity_types": [
+          "AggregateRating"
+        ],
+        "feed_count": 1,
+        "dataset_count": 1
+      }
+    ]
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T06:12:04Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 12
+  }
+}

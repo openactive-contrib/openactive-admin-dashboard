@@ -38,3 +38,12 @@ def test_the_login_card_carries_its_own_type_scale() -> None:
     for key in ("oalogineyebrow", "oalogintitle", "oaloginbody", "oaloginaction"):
         assert f'div[class*="st-key-{key}"]' in _STYLES
     assert f'div[class*="st-key-{CARD_PREFIX}_login"]' in _STYLES
+
+
+def test_the_loading_card_is_styled_by_its_container_key() -> None:
+    """The card is the spinner inside the loader's container; without the rule it is the
+    bare line at the top of the page again."""
+    from stewards.components.loading import LOADING_KEY
+
+    assert f'div[class*="st-key-{LOADING_KEY}"] [data-testid="stSpinner"]' in _STYLES
+    assert f"background-color: {theme.SURFACE}" in _STYLES

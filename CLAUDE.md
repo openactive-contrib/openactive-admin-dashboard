@@ -26,13 +26,17 @@ contract below). `dataset_orphaned_children` reads
 its `/summary` sparkline is empty and its trend endpoint 404s, so its card is judged on a
 declared benchmark rather than on a series (see "Monitor card states").
 
-Two monitors are **not** backed by incidents (see "The backing reads").
+Three monitors are **not** backed by incidents (see "The backing reads").
 `feed_quality` reads the live `/admin/feed-quality`,
 a snapshot of every feed's nightly quality assessment with a fleet-wide `summary` block
 beside the rows and no history at all. `active_places_coverage` reads two live endpoints —
 `/admin/active-places-coverage` for the run's figures and `/admin/active-places-site-mappings`
 for the ~10k site-venue pairs behind them, paginated — with no history either and no
 `/summary` entry, so it supplies its whole card itself and carries no sidebar pill.
+`feed_custom_properties` (the "Schema drift" page) reads the live `/admin/feed-custom-properties`:
+one paginated read of every feed publishing a property outside the OpenActive vocabulary, with
+a fleet-wide `summary` block beside the rows, no history and no `/summary` entry; it is
+informational like the coverage monitor.
 
 The app also requests `/admin/contact-queue`; that is not deployed yet, so it 404s and that
 page renders the typed "endpoint is not live" state rather than failing. A missing **trend**
@@ -83,13 +87,15 @@ src/stewards/
                              card and summary charts
   monitors/coverage.py       the third backing read: an estate coverage snapshot plus its
                              paginated rows -> rows, figures, region chart, card
+  monitors/schema_drift.py   the fourth: a custom-property snapshot -> feed rows, list
+                             filters, figures, property chart, property table, card
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/contact_queue.py  the cross-monitor union, shaped
   monitors/trend.py          30-snapshot series
   monitors/email_draft.py    the publisher email draft
   components/…               theme, surface, layout, nav, filters, incident_table,
-                             trend_chart, email_draft, errors, monitor_page,
-                             quality_page, coverage_page, overview_page,
+                             trend_chart, email_draft, errors, loading, monitor_page,
+                             quality_page, coverage_page, schema_drift_page, overview_page,
                              contact_queue_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
@@ -153,7 +159,7 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 ## The backing reads
 
 `Monitor.source` says which read backs a monitor, and therefore which shaping module and
-which page renderer it gets. Three exist:
+which page renderer it gets. Four exist:
 
 - `Source.INCIDENTS` (the default) — a list of faults that age.
   `repository.fetch_incidents` + `fetch_trend_points`, `monitors/transforms.py`,
@@ -164,9 +170,14 @@ which page renderer it gets. Three exist:
   and rows from a second, paginated one, and no history either. `fetch_coverage` +
   `fetch_site_mappings`, `monitors/coverage.py`, `components/coverage_page.py`. The rows
   resource has its own name, declared as `Monitor.rows_id`.
+- `Source.SCHEMA_DRIFT` — the custom properties each feed publishes outside the OpenActive
+  vocabulary: rows and a `summary` block in one paginated read, no history, nothing scored.
+  `fetch_custom_properties`, `monitors/schema_drift.py`, `components/schema_drift_page.py`.
+  Its list-valued row fields (`namespaces`, `property_names`, `entity_types`) filter by
+  membership.
 
-None are interchangeable: a quality or coverage row has no `first_detected`, `days_open` or
-`past_threshold`, and folding either into an `Incident` would mean inventing all three; and a
+None are interchangeable: a quality, coverage or schema drift row has no `first_detected`,
+`days_open` or `past_threshold`, and folding any into an `Incident` would mean inventing all three; and a
 coverage monitor's figures do not arrive beside its rows, so it cannot be one request. Such a
 monitor has no trend, no contact threshold, no email draft and no place in the contact queue,
 and its page puts the snapshot's own figures and charts where the KPIs and the trend chart
@@ -174,11 +185,11 @@ would be.
 Everything the registry already drove is unchanged: `columns` and `ColKind` format and
 RAG-shade the table identically, `filters` become the same selectboxes, and the card's verdict
 is a `Health`, so the chip, the tone and the sidebar pill run through untouched code. A
-quality or coverage column path is a plain attribute name (`score`, `dataset_score`,
+quality, coverage or schema drift column path is a plain attribute name (`score`, `dataset_score`,
 `match_label`) — there is no `detail.` or `part.` prefix on such a row.
-`tests/unit/test_registry.py` is parametrised over all three kinds and skips the checks that
+`tests/unit/test_registry.py` is parametrised over all four kinds and skips the checks that
 do not apply, keyed off the declared source. `docs/adding-a-dashboard.md` "The backing reads"
-is the full account. **Adding a fourth read is not a registry entry** — it is a `Source`
+is the full account. **Adding a fifth read is not a registry entry** — it is a `Source`
 member, a shaping module, a page renderer, both URL shapes, models, repository reads and a
 branch in `overview_page.tile_cards`.
 
@@ -204,14 +215,16 @@ path for it.
 A monitor whose figure `/summary` does not describe at all is the other exception:
 `viz=Facts()` says the card draws no chart and reads no count, and the monitor hands the whole
 card over ready-made as an `overview.TileCard` — headline, a few supporting figures, the note,
-the sidebar pill and the verdict. Two monitors do this today.
+the sidebar pill and the verdict. Three monitors do this today.
 `monitors.quality.assess_quality` produces `feed_quality`'s `Health` from the fleet average
 score on the same bands `thresholds.score_tone` shades the Score column with, so the card and
 the table cannot tell different stories. `monitors.coverage.assess_coverage` makes the other
 choice deliberately: coverage is a measurement, not a fault queue, so the monitor declares
 `Severity.INFORMATIONAL` and the card renders a grey "Info" chip — the one place `severity`
 changes behaviour — rather than claiming a RAG verdict there is no defensible number to
-support. `overview_page.tile_cards` collects every such card, one branch per source.
+support. `monitors.schema_drift.assess_drift` makes the same choice for the same reason: a
+custom property is not a fault. `overview_page.tile_cards` collects every such card, one
+branch per source.
 
 A monitor with **no series at all** is the other exception: `viz=Gauge(benchmark=…)` makes
 `monitors/gauge.assess_benchmark` produce the verdict from that benchmark instead, returning
@@ -275,8 +288,13 @@ uv run mypy src
 - Copy tone: factual, no exclamation marks, no emoji in UI text. Dates are ISO
   everywhere they describe data (snapshots, incidents). The runbooks on GitHub Pages are
   outside the app and set their own conventions.
-- Cache API reads with `@st.cache_data(ttl=3600)` at the repository layer only; the wrapped
-  `_fetch_*` function stays cache-free so tests call it directly.
+- Cache API reads with `@st.cache_data(ttl=3600, show_spinner=False)` at the repository
+  layer only; the wrapped `_fetch_*` function stays cache-free so tests call it directly.
+  The cache's own spinner renders as a bare line at the top of the page, so pages wrap their
+  reads in `components.loading.loading(message)` instead: one centred card, styled in
+  `surface.py`, cleared when the reads return. Only reads go inside the block, and each card
+  in one run needs its own message (it names the container key).
+  `tests/unit/test_loading.py` fails on a cached read with a spinner.
 - No page or component builds a URL. `api/endpoints.py` maps each logical read onto a path
   and query per shape; both shapes route every read, and an endpoint a deployment has not
   built yet answers 404, which becomes `ApiNotFound` on the page that needs it.

@@ -25,6 +25,7 @@ from stewards.components import layout, theme
 from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
+from stewards.components.loading import loading
 from stewards.components.surface import card
 from stewards.monitors import quality, transforms
 from stewards.monitors.quality import QualityRow
@@ -199,7 +200,8 @@ def render_row_detail(monitor: Monitor, row: QualityRow) -> None:
 def render_quality_page(monitor: Monitor) -> None:
     """Header, blurb, figures, summary charts, filters, table, selected assessment, footer."""
     try:
-        response = repository.fetch_quality(monitor.id)
+        with loading("Loading the quality snapshot"):
+            response = repository.fetch_quality(monitor.id)
     except ApiError as exc:
         layout.render_error_header(monitor.crumb, monitor.name)
         render_api_error(exc)

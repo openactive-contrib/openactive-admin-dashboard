@@ -4,8 +4,8 @@ Streamlit exposes no theme token for the background of `st.container(border=True
 renders transparent — so on the brand canvas tint every card would flatten into an outline.
 Nor can theme config set a per-element type scale. This module is the one place the app
 writes CSS, and it writes only what the theme cannot: card fill, the sizes and weights of
-the header bar and the KPI blocks, and the plaque that keeps the OpenActive lockup legible
-on the dark sidebar.
+the header bar and the KPI blocks, the plaque that keeps the OpenActive lockup legible on
+the dark sidebar, and the loading card.
 
 Elements opt in through container keys, which Streamlit turns into stable `st-key-<key>`
 classes — so nothing here depends on Streamlit's generated emotion class names, and no data
@@ -196,6 +196,30 @@ _STYLES = f"""
   /* Bring the header bar close to the top of the canvas. */
   [data-testid="stMainBlockContainer"] {{
       padding-top: 2rem;
+  }}
+  /* --- loading card ------------------------------------------------------------------ */
+  /* Streamlit's spinner, lifted off the top edge of the page into a centred card. See
+     `components.loading`: the container holds nothing but the spinner, and only while a
+     read is running. */
+  div[class*="st-key-oaloading"] {{
+      align-items: center;
+  }}
+  div[class*="st-key-oaloading"] [data-testid="stSpinner"] {{
+      margin: 18vh auto 0;
+      padding: 1.1rem 1.6rem;
+      background-color: {theme.SURFACE};
+      border: 1px solid {theme.BORDER};
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(16, 32, 43, 0.08);
+      color: {theme.INK_SOFT};
+      font-size: 0.9rem;
+  }}
+  div[class*="st-key-oaloading"] [data-testid="stSpinner"] > div {{
+      gap: 0.8rem;
+  }}
+  div[class*="st-key-oaloading"] [data-testid="stSpinnerIcon"] {{
+      border-color: {theme.TEAL_TINT};
+      border-top-color: {theme.TEAL};
   }}
 </style>
 """

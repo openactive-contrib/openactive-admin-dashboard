@@ -3,6 +3,10 @@
 Each endpoint has a plain `_fetch_*` function (importable and callable without a Streamlit
 runtime — this is what the tests exercise) and a cached public wrapper. The batch refreshes
 once a day, so the cache is deliberately generous and there is no refresh button.
+
+Every cached read is silent (`show_spinner=False`): the cache's own spinner renders at the
+top of the page wherever the call happens to sit, so pages wrap their reads in
+`components.loading.loading` instead.
 """
 
 from __future__ import annotations
@@ -20,6 +24,9 @@ from stewards.api.errors import ApiContractError, ApiError
 from stewards.api.models import (
     CoverageResponse,
     CoverageSnapshot,
+    CustomPropertyFeed,
+    CustomPropertyResponse,
+    CustomPropertySummary,
     FeedQualityResponse,
     FeedQualitySummary,
     IncidentPage,
@@ -268,6 +275,72 @@ def _fetch_coverage_snapshots(
     return snapshots
 
 
+def _fetch_custom_properties(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> CustomPropertyResponse:
+    """One monitor's custom-property snapshot: every feed row and the fleet summary block.
+
+    Pages inside this function, as `_fetch_incidents` does, because the rows are paginated.
+    The summary block describes the whole fleet whichever page carries it, so the first
+    page's copy is kept and later pages contribute rows only.
+    """
+    client = client or get_client()
+    as_of = as_of or date.today()
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.custom_properties(
+            client.style, monitor_id, as_of=as_of, page=page, page_size=PAGE_SIZE
+        )
+
+    endpoint = request(1)
+    first = _parse(
+        CustomPropertyResponse, client.get(endpoint.path, endpoint.params), endpoint.path
+    )
+
+    feeds: list[CustomPropertyFeed] = list(first.data)
+    page = 1
+    while len(feeds) < first.meta.total and feeds and page < MAX_PAGES:
+        page += 1
+        nxt_endpoint = request(page)
+        nxt = _parse(
+            CustomPropertyResponse,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
+        )
+        if not nxt.data:
+            break
+        feeds.extend(nxt.data)
+    if len(feeds) < first.meta.total:
+        log.warning(
+            "Fetched %d of %d custom-property feeds for %s",
+            len(feeds),
+            first.meta.total,
+            monitor_id,
+        )
+    return CustomPropertyResponse(data=tuple(feeds), summary=first.summary, meta=first.meta)
+
+
+def _fetch_custom_property_summaries(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, CustomPropertySummary]:
+    """Each custom-property monitor's summary block, for its overview card.
+
+    Tolerant in the same way as `_fetch_quality_summaries`: a monitor whose endpoint this
+    deployment has not built yet is left out of the mapping rather than costing the whole
+    overview.
+    """
+    summaries: dict[str, CustomPropertySummary] = {}
+    for monitor_id in monitor_ids:
+        try:
+            response = _fetch_custom_properties(monitor_id, client=client, as_of=as_of)
+            summaries[monitor_id] = response.summary
+        except ApiError as exc:
+            log.info("No custom-property snapshot for %s: %s", monitor_id, exc)
+    return summaries
+
+
 def _fetch_contact_queue(
     client: StewardsClient | None = None, as_of: date | None = None
 ) -> IncidentPage:
@@ -276,12 +349,12 @@ def _fetch_contact_queue(
     return _parse(IncidentPage, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading snapshot…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_summary() -> SummaryResponse:
     return _fetch_summary()
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading incidents…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_incidents(monitor_id: str) -> IncidentPage:
     return _fetch_incidents(monitor_id)
 
@@ -296,7 +369,7 @@ def fetch_monitor_trends(monitor_ids: tuple[str, ...]) -> dict[str, tuple[TrendP
     return _fetch_monitor_trends(monitor_ids)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading quality snapshot…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_quality(monitor_id: str) -> FeedQualityResponse:
     return _fetch_quality(monitor_id)
 
@@ -306,12 +379,12 @@ def fetch_quality_summaries(monitor_ids: tuple[str, ...]) -> dict[str, FeedQuali
     return _fetch_quality_summaries(monitor_ids)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading coverage snapshot…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_coverage(monitor_id: str) -> CoverageResponse:
     return _fetch_coverage(monitor_id)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading site mappings…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_site_mappings(monitor_id: str, rows_id: str) -> SiteMappingPage:
     return _fetch_site_mappings(monitor_id, rows_id)
 
@@ -321,6 +394,18 @@ def fetch_coverage_snapshots(monitor_ids: tuple[str, ...]) -> dict[str, Coverage
     return _fetch_coverage_snapshots(monitor_ids)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner="Loading contact queue…")
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_custom_properties(monitor_id: str) -> CustomPropertyResponse:
+    return _fetch_custom_properties(monitor_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_custom_property_summaries(
+    monitor_ids: tuple[str, ...],
+) -> dict[str, CustomPropertySummary]:
+    return _fetch_custom_property_summaries(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_contact_queue() -> IncidentPage:
     return _fetch_contact_queue()

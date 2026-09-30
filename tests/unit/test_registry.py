@@ -9,12 +9,13 @@ import pytest
 from fixture_loader import load_sample
 from stewards.api.models import (
     CoverageResponse,
+    CustomPropertyResponse,
     DetailModel,
     FeedQualityResponse,
     IncidentPage,
     SiteMappingPage,
 )
-from stewards.monitors import coverage, quality
+from stewards.monitors import coverage, quality, schema_drift
 from stewards.monitors.registry import (
     MONITOR_REGISTRY,
     Group,
@@ -35,11 +36,11 @@ pytestmark = pytest.mark.parametrize(
 def backed_by(monitor: Monitor, source: Source) -> None:
     """Skip a check that only means something for one kind of backing read.
 
-    The registry holds all three kinds, and a quality or coverage monitor has no incidents
-    to validate — no `monitor_id` on its rows, no detail blob, no contact threshold and no
-    publisher email. Gating on the declared source rather than on the monitor id keeps this
-    module parametrised over the whole registry, so a future monitor of any kind is covered
-    free.
+    The registry holds all four kinds, and a quality, coverage or schema drift monitor has
+    no incidents to validate — no `monitor_id` on its rows, no detail blob, no contact
+    threshold and no publisher email. Gating on the declared source rather than on the
+    monitor id keeps this module parametrised over the whole registry, so a future monitor
+    of any kind is covered free.
     """
     if monitor.source is not source:
         pytest.skip(f"{monitor.id} is backed by the {monitor.source.value} read")
@@ -132,6 +133,17 @@ def test_payload_monitor_id_matches_the_registry(monitor: Monitor) -> None:
     backed_by(monitor, Source.INCIDENTS)
     page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
     assert {i.monitor_id for i in page.data} == {monitor.id}
+
+
+def test_a_hidden_zero_field_is_a_breakdown_path_the_payload_reports(monitor: Monitor) -> None:
+    """A typo here would hide nothing, silently: every row's figure would resolve to None."""
+    backed_by(monitor, Source.INCIDENTS)
+    if monitor.rows is None or monitor.rows.hide_zero is None:
+        return
+    assert monitor.rows.hide_zero.startswith("part.")
+    page = IncidentPage.model_validate(load_sample(f"{monitor.id}_incidents"))
+    rows = expand(monitor, page.data)
+    assert any(resolve_field(monitor, row, monitor.rows.hide_zero) for row in rows)
 
 
 def test_meta_chips_state_the_threshold(monitor: Monitor) -> None:
@@ -335,3 +347,77 @@ def test_a_coverage_payload_carries_a_headline(monitor: Monitor) -> None:
     assert payload.data.headline.coverage_pct is not None
     assert payload.data.headline.sites_total
     assert payload.data.coverage_by_region
+
+
+# --- schema drift monitors -----------------------------------------------------------------
+#
+# The fourth backing read, checked the same way: one payload carrying the rows and the summary
+# block together.
+
+
+def drift_payload(monitor: Monitor) -> CustomPropertyResponse:
+    return CustomPropertyResponse.model_validate(load_sample(f"{monitor.id}_properties"))
+
+
+def drift_rows(monitor: Monitor) -> tuple[schema_drift.PropertyRow, ...]:
+    return schema_drift.build_rows(drift_payload(monitor).data)
+
+
+def test_a_schema_drift_monitor_ships_a_sample_snapshot(monitor: Monitor) -> None:
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    assert (SAMPLE_DIR / f"{monitor.id}_properties.json").is_file()
+
+
+def test_every_schema_drift_column_field_resolves_against_the_payload(monitor: Monitor) -> None:
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    rows = drift_rows(monitor)
+    assert rows, f"{monitor.id} sample payload has no feeds"
+    for row in rows:
+        for col in monitor.columns:
+            schema_drift.resolve(row, col.field)  # must not raise
+
+
+def test_every_declared_schema_drift_column_reports_a_value_somewhere(monitor: Monitor) -> None:
+    """A column no payload row can fill is a typo in the field name, not a sparse column."""
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    rows = drift_rows(monitor)
+    for col in monitor.columns:
+        assert any(schema_drift.resolve(row, col.field) is not None for row in rows), (
+            f"{monitor.id} column {col.field!r} resolves to None on every payload row"
+        )
+
+
+def test_declared_schema_drift_filters_resolve_and_are_labelled(monitor: Monitor) -> None:
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    rows = drift_rows(monitor)
+    for spec in monitor.filters:
+        assert spec.label
+        assert schema_drift.filter_options(rows, spec.field), (
+            f"{monitor.id} filter {spec.field!r} has no options in the payload"
+        )
+
+
+def test_a_schema_drift_monitor_sorts_on_a_field_its_rows_report(monitor: Monitor) -> None:
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    rows = drift_rows(monitor)
+    assert any(schema_drift.resolve(row, monitor.sort_field) is not None for row in rows)
+
+
+def test_a_schema_drift_monitor_states_no_contact_threshold(monitor: Monitor) -> None:
+    """Nothing in the snapshot ages, so a threshold chip or toggle would be a claim the data
+    cannot support."""
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    assert not monitor.has_threshold_filter
+    assert not any(chip.startswith("contact after") for chip in monitor.meta_chips)
+
+
+def test_a_schema_drift_payload_carries_a_summary_block(monitor: Monitor) -> None:
+    """The page's four figures, its charts, its property table and its card come off it."""
+    backed_by(monitor, Source.SCHEMA_DRIFT)
+    summary = drift_payload(monitor).summary
+    assert summary.datasets_with_custom_properties is not None
+    assert summary.feeds_with_custom_properties is not None
+    assert summary.distinct_custom_properties is not None
+    assert summary.property_breakdown
+    assert summary.namespace_breakdown
+    assert summary.entity_type_breakdown

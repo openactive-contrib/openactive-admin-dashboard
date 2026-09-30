@@ -10,9 +10,10 @@ from stewards.api.errors import ApiError
 from stewards.api.models import Summary
 from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
+from stewards.components.loading import loading
 from stewards.components.surface import card
 from stewards.config import get_settings
-from stewards.monitors import coverage, quality
+from stewards.monitors import coverage, quality, schema_drift
 from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import (
     Cards,
@@ -139,6 +140,14 @@ def tile_cards() -> Cards:
             ).items()
         }
     )
+    cards.update(
+        {
+            monitor_id: schema_drift.tile_card(summary)
+            for monitor_id, summary in repository.fetch_custom_property_summaries(
+                monitor_ids(Source.SCHEMA_DRIFT)
+            ).items()
+        }
+    )
     return cards
 
 
@@ -218,22 +227,22 @@ def render_tile(tile: Tile) -> None:
 
 def render_overview_page() -> None:
     try:
-        response = repository.fetch_summary()
+        with loading("Loading monitor health"):
+            response = repository.fetch_summary()
+            # The card states are judged on each monitor's daily series;
+            # `fetch_monitor_trends` leaves out a monitor whose trend endpoint this
+            # deployment does not serve, and that monitor is judged on the sparkline in the
+            # summary instead. A non-incident monitor has no series at all and supplies its
+            # own card, verdict included.
+            trends = repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS))
+            cards = tile_cards()
     except ApiError as exc:
         layout.render_error_header("Overview", "Health of the publisher fleet")
         render_api_error(exc)
         return
 
     summary = response.data
-    # The card states are judged on each monitor's daily series; `fetch_monitor_trends`
-    # leaves out a monitor whose trend endpoint this deployment does not serve, and that
-    # monitor is judged on the sparkline in the summary instead. A quality or coverage
-    # monitor has no series at all and supplies its own card, verdict included.
-    tiles = build_tiles(
-        summary,
-        repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
-        tile_cards(),
-    )
+    tiles = build_tiles(summary, trends, cards)
     title = (
         f"Health of {summary.publishers_monitored:,} publishers"
         if summary.publishers_monitored

@@ -68,18 +68,22 @@ def expand(monitor: Monitor, incidents: Sequence[Incident]) -> list[Row]:
     """The table's rows. One per incident, or one per breakdown item where declared.
 
     An incident whose breakdown is absent or empty still yields its own row, so a dataset
-    the batch reported without a breakdown is visible rather than dropped.
+    the batch reported without a breakdown is visible rather than dropped. Where the spec
+    declares `hide_zero`, a row whose figure is exactly zero is dropped — including that
+    fallback row, so an incident with nothing in it anywhere leaves the table altogether.
     """
     if monitor.rows is None:
         return [Row(incident) for incident in incidents]
+    spec = monitor.rows
     rows = []
     for incident in incidents:
-        items = resolve_field(monitor, incident, monitor.rows.field) or ()
-        parts = [
-            monitor.rows.item_model.model_validate(item, from_attributes=True) for item in items
-        ]
+        items = resolve_field(monitor, incident, spec.field) or ()
+        parts = [spec.item_model.model_validate(item, from_attributes=True) for item in items]
         rows.extend([Row(incident, part) for part in parts] or [Row(incident)])
-    return rows
+    if spec.hide_zero is None:
+        return rows
+    hide = spec.hide_zero
+    return [row for row in rows if resolve_field(monitor, row, hide) != 0]
 
 
 def resolve_field(monitor: Monitor, row: RowLike, path: str) -> Any:
