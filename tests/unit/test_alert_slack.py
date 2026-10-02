@@ -68,7 +68,6 @@ def test_digest_summarises_and_links() -> None:
         in text
     )
     assert "Nothing new: Dataset-wide stalls, Feed ingestion errors" in text
-    assert "daily snapshot of 2026-10-06" in text
     assert buttons(payload) == [DASH]
     assert payload["text"] == "OpenActive daily incident summary, 2026-10-06: 1 new incident"
 

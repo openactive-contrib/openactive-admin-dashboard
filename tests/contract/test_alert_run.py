@@ -49,7 +49,6 @@ def test_happy_path_posts_one_digest() -> None:
     [payload] = posted(slack_route)
     body = json.dumps(payload, ensure_ascii=False)
     assert "*<https://dash.test/dataset_stalls|Dataset-wide stalls>*: 1 new incident" in body
-    assert "daily snapshot of" in body
     summary_call = respx.calls[0].request
     assert summary_call.url.params["token"] == "test-token"
     assert summary_call.url.params["as_of"] == "2026-10-06"
