@@ -65,15 +65,10 @@ def build_digest(digest: Digest) -> dict[str, Any]:
     blocks: list[dict[str, Any]] = [
         {"type": "header", "text": {"type": "plain_text", "text": title}}
     ]
-    failed = [r for r in digest.results if r.error is not None]
-    if digest.total == 0 and not failed:
-        blocks.append(_section("No incidents crossed a threshold today."))
-        fallback = f"{title}: no incidents crossed a threshold"
-    else:
-        blocks += [_section(_section_text(r)) for r in digest.results]
-        fallback = f"{title}: {digest.total} incident(s) crossed a threshold"
-        if failed:
-            fallback += f", {len(failed)} check(s) failed"
+    blocks += [_section(_section_text(r)) for r in digest.results]
+    fallback = f"{title}: {digest.total} incident(s) crossed a threshold"
+    if digest.failed:
+        fallback += f", {digest.failed} check(s) failed"
     return {"text": fallback, "blocks": blocks}
 
 

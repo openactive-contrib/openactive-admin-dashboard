@@ -48,14 +48,23 @@ def test_digest_with_hits() -> None:
     )
 
 
-def test_digest_with_nothing() -> None:
-    payload = slack.build_digest(Digest(MONDAY, (CheckResult(CHECK),)))
-    assert "No incidents crossed a threshold today." in texts(payload)
+def test_monday_title_mentions_the_weekend() -> None:
+    payload = slack.build_digest(Digest(MONDAY, (CheckResult(CHECK, (hit(),)),)))
     assert "Monday, includes the weekend" in texts(payload)
 
 
-def test_digest_with_no_checks() -> None:
-    assert "No incidents" in texts(slack.build_digest(Digest(TUESDAY)))
+@pytest.mark.parametrize(
+    ("results", "empty"),
+    [
+        ((), True),
+        ((CheckResult(CHECK),), True),
+        ((CheckResult(CHECK, (hit(),)),), False),
+        ((CheckResult(CHECK, error="boom"),), False),
+    ],
+    ids=["no-checks", "no-hits", "one-hit", "failed-check"],
+)
+def test_is_empty(results: tuple[CheckResult, ...], empty: bool) -> None:
+    assert Digest(TUESDAY, results).is_empty is empty
 
 
 def test_failed_check_is_reported_not_zero() -> None:
