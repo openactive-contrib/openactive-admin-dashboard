@@ -18,6 +18,7 @@ ENV = {
     "ADMIN_API_BASE_URL": f"{BASE}/",
     "ADMIN_API_TOKEN": "test-token",
     "SLACK_WEBHOOK_URL": WEBHOOK,
+    "DASHBOARD_URL": "https://dash.test",
 }
 TUESDAY = datetime(2026, 10, 6, 9, 0, tzinfo=UTC)
 MONDAY = datetime(2026, 10, 5, 9, 0, tzinfo=UTC)
@@ -46,8 +47,9 @@ def test_happy_path_posts_one_digest() -> None:
     assert runner.run(ENV, now=TUESDAY) == 0
 
     [payload] = posted(slack_route)
-    body = json.dumps(payload)
-    assert "Dataset-wide stalls* (Days stalled = 5): 1" in body
+    body = json.dumps(payload, ensure_ascii=False)
+    assert "*<https://dash.test/dataset_stalls|Dataset-wide stalls>*: 1 new incident" in body
+    assert "daily snapshot of" in body
     summary_call = respx.calls[0].request
     assert summary_call.url.params["token"] == "test-token"
     assert summary_call.url.params["as_of"] == "2026-10-06"
@@ -73,7 +75,7 @@ def test_monday_widens_the_window() -> None:
     slack_route = respx.post(WEBHOOK).respond(200)
 
     assert runner.run(ENV, now=MONDAY) == 0
-    assert "Dataset-wide stalls* (Days stalled = 5): 2" in json.dumps(posted(slack_route))
+    assert "Dataset-wide stalls>*: 2 new incidents" in json.dumps(posted(slack_route))
 
 
 @respx.mock
@@ -83,7 +85,7 @@ def test_one_monitor_missing_still_posts_the_rest() -> None:
 
     assert runner.run(ENV, now=TUESDAY) == 0
     body = json.dumps(posted(slack_route))
-    assert "Feed ingestion errors*: could not be checked" in body
+    assert "We could not check *Feed ingestion errors* today" in body
     assert "Dataset-wide stalls" in body
 
 

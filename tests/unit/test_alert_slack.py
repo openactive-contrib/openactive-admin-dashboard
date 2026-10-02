@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import httpx
@@ -13,7 +14,8 @@ from stewards.alerts.evaluate import CheckResult, Digest, Hit
 
 TUESDAY = date(2026, 10, 6)
 MONDAY = date(2026, 10, 5)
-CHECK = CHECKS[1]
+DASH = "https://dash.test/"
+DATASET, FEED, INGESTION = CHECKS
 
 
 def hit(n: int = 0, **kw: object) -> Hit:
@@ -27,39 +29,94 @@ def hit(n: int = 0, **kw: object) -> Hit:
     return Hit(**{**base, **kw})  # type: ignore[arg-type]
 
 
-def texts(payload: dict[str, object]) -> str:
+def body(payload: dict[str, object]) -> str:
+    return json.dumps(payload["blocks"], ensure_ascii=False)
+
+
+def buttons(payload: dict[str, object]) -> list[str]:
     blocks = payload["blocks"]
     assert isinstance(blocks, list)
-    return "\n".join(b["text"]["text"] for b in blocks)
+    return [e["url"] for b in blocks if b["type"] == "actions" for e in b["elements"]]
 
 
-def test_digest_with_hits() -> None:
-    payload = slack.build_digest(
-        Digest(TUESDAY, (CheckResult(CHECK, (hit(),)), CheckResult(CHECKS[0])))
+@pytest.mark.parametrize(
+    ("monitor_id", "route"),
+    [
+        ("dataset_stall", "dataset_stalls"),
+        ("single_feed_stall", "single_feed_stalls"),
+        ("feed_ingestion_error", "feed_ingestion_errors"),
+    ],
+)
+def test_page_url_drops_the_numeric_prefix(monitor_id: str, route: str) -> None:
+    assert slack.page_url(DASH, monitor_id) == f"https://dash.test/{route}"
+    assert slack.page_url("https://dash.test", monitor_id) == f"https://dash.test/{route}"
+
+
+def test_digest_summarises_and_links() -> None:
+    digest = Digest(
+        TUESDAY,
+        (CheckResult(DATASET), CheckResult(FEED, (hit(),)), CheckResult(INGESTION)),
+        snapshot_date=TUESDAY,
     )
-    body = texts(payload)
-    assert "OpenActive incidents 2026-10-06" in body
-    assert "Single feed stalls* (Days stalled = 10): 1" in body
-    line = "*Pub &lt;0&gt;* · <https://example.org/slots|slots> · Slot · Days stalled: 10"
-    assert line in body
-    assert "Dataset-wide stalls* (Days stalled = 5): 0" in body
-    assert payload["text"] == (
-        "OpenActive incidents 2026-10-06: 1 incident(s) crossed a threshold"
+    payload = slack.build_digest(digest, DASH)
+    text = body(payload)
+
+    assert "*1 new incident* since yesterday" in text
+    assert "*<https://dash.test/single_feed_stalls|Single feed stalls>*: 1 new incident" in text
+    assert (
+        "• Pub &lt;0&gt;: <https://example.org/slots|slots>, Slot (10 days without new data)"
+        in text
     )
+    assert "Nothing new: Dataset-wide stalls, Feed ingestion errors" in text
+    assert "daily snapshot of 2026-10-06" in text
+    assert buttons(payload) == [DASH]
+    assert payload["text"] == "OpenActive daily incident summary, 2026-10-06: 1 new incident"
 
 
-def test_monday_title_mentions_the_weekend() -> None:
-    payload = slack.build_digest(Digest(MONDAY, (CheckResult(CHECK, (hit(),)),)))
-    assert "Monday, includes the weekend" in texts(payload)
+def test_plurals_and_monday_wording() -> None:
+    payload = slack.build_digest(Digest(MONDAY, (CheckResult(INGESTION, (hit(), hit(1))),)))
+    text = body(payload)
+    assert "*2 new incidents* since Friday" in text
+    assert "(10 failed runs in a row)" in text
+    assert "Nothing new" not in text
+    assert "snapshot" not in text
+    assert buttons(payload) == [slack.DEFAULT_DASHBOARD_URL]
+
+
+def test_failed_check_is_called_out() -> None:
+    payload = slack.build_digest(Digest(TUESDAY, (CheckResult(FEED, error="boom"),)), DASH)
+    text = body(payload)
+    assert "No new incidents since yesterday, but some checks could not run" in text
+    assert "We could not check *Single feed stalls* today" in text
+    assert str(payload["text"]).endswith("0 new incidents, 1 check could not run")
+
+
+def test_example_without_link_subject_or_type() -> None:
+    line = slack._example(hit(subject=None, link=None, feed_type=None), CheckResult(FEED))
+    assert line == "• Pub &lt;0&gt;: unnamed (10 days without new data)"
+
+
+def test_examples_cap_with_more_link() -> None:
+    hits = tuple(hit(n) for n in range(slack.MAX_EXAMPLES + 3))
+    text = body(slack.build_digest(Digest(TUESDAY, (CheckResult(FEED, hits),))))
+    assert text.count("• ") == slack.MAX_EXAMPLES
+    assert "…and 3 more on the dashboard" in text
+
+
+def test_exactly_cap_has_no_more_line() -> None:
+    hits = tuple(hit(n) for n in range(slack.MAX_EXAMPLES))
+    assert "more on the dashboard" not in body(
+        slack.build_digest(Digest(TUESDAY, (CheckResult(FEED, hits),)))
+    )
 
 
 @pytest.mark.parametrize(
     ("results", "empty"),
     [
         ((), True),
-        ((CheckResult(CHECK),), True),
-        ((CheckResult(CHECK, (hit(),)),), False),
-        ((CheckResult(CHECK, error="boom"),), False),
+        ((CheckResult(FEED),), True),
+        ((CheckResult(FEED, (hit(),)),), False),
+        ((CheckResult(FEED, error="boom"),), False),
     ],
     ids=["no-checks", "no-hits", "one-hit", "failed-check"],
 )
@@ -67,33 +124,12 @@ def test_is_empty(results: tuple[CheckResult, ...], empty: bool) -> None:
     assert Digest(TUESDAY, results).is_empty is empty
 
 
-def test_failed_check_is_reported_not_zero() -> None:
-    payload = slack.build_digest(Digest(TUESDAY, (CheckResult(CHECK, error="boom"),)))
-    assert "Single feed stalls*: could not be checked (boom)" in texts(payload)
-    assert str(payload["text"]).endswith("1 check(s) failed")
-
-
-def test_hit_without_link_or_subject() -> None:
-    line = slack._hit_line(hit(subject=None, link=None, feed_type=None), "Days")
-    assert line == "• *Pub &lt;0&gt;* · unnamed · Days: 10"
-
-
-def test_truncation_at_cap() -> None:
-    hits = tuple(hit(n) for n in range(slack.MAX_HITS + 3))
-    body = texts(slack.build_digest(Digest(TUESDAY, (CheckResult(CHECK, hits),))))
-    assert body.count("• ") == slack.MAX_HITS
-    assert "and 3 more" in body
-
-
-def test_exactly_cap_is_not_truncated() -> None:
-    hits = tuple(hit(n) for n in range(slack.MAX_HITS))
-    assert "more" not in texts(slack.build_digest(Digest(TUESDAY, (CheckResult(CHECK, hits),))))
-
-
 def test_api_down() -> None:
-    payload = slack.build_api_down("timed out", TUESDAY)
-    assert "Admin API is down" in str(payload["blocks"])
-    assert "timed out" in str(payload["text"])
+    payload = slack.build_api_down("timed out <x>", TUESDAY, DASH)
+    assert "Admin API is down" in body(payload)
+    assert "checks did not run" in body(payload)
+    assert "timed out &lt;x&gt;" in body(payload)
+    assert buttons(payload) == [DASH]
 
 
 def test_post_ok() -> None:
@@ -105,7 +141,7 @@ def test_post_ok() -> None:
 
     slack.post("https://hooks.test/x", {"text": "hi"}, httpx.MockTransport(handler))
     assert seen[0].method == "POST"
-    assert b'"text":"hi"' in seen[0].content.replace(b" ", b"")
+    assert json.loads(seen[0].content) == {"text": "hi"}
 
 
 def test_post_rejected_does_not_leak_url() -> None:

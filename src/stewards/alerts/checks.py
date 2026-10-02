@@ -37,6 +37,12 @@ class Check:
 
     link_field: str = "feed_url"
 
+    value_text: str = "{value} days"
+    """How one incident's figure reads in the message, e.g. "12 days"."""
+
+    def describe(self, value: int) -> str:
+        return self.value_text.format(value=value)
+
     def matches_value(self, value: object, today: date) -> bool:
         return isinstance(value, int) and value in matching_values(self.threshold, today)
 
@@ -63,6 +69,7 @@ CHECKS: tuple[Check, ...] = (
         field_label="Days stalled",
         threshold=5,
         link_field="detail.dataset_url",
+        value_text="{value} days without new data",
     ),
     Check(
         id="single_feed_stall",
@@ -72,6 +79,7 @@ CHECKS: tuple[Check, ...] = (
         field_label="Days stalled",
         threshold=10,
         feed_types=frozenset({"Slot", "ScheduledSession"}),
+        value_text="{value} days without new data",
     ),
     Check(
         id="feed_ingestion_error",
@@ -80,5 +88,6 @@ CHECKS: tuple[Check, ...] = (
         field="days_open",
         field_label="Consecutive failures",
         threshold=10,
+        value_text="{value} failed runs in a row",
     ),
 )
