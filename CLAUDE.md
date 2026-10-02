@@ -51,6 +51,11 @@ Run the app against the live API in dev mode with auth disabled:
 STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true uv run streamlit run src/stewards/app.py
 ```
 
+A weekday Slack digest runs outside the app: `.github/workflows/incident-alerts.yml` runs
+`python -m stewards.alerts` at 10:00 `Europe/London`, whose rules are `alerts/checks.CHECKS`
+(one `Check` per condition). The runner builds its own admin-style `StewardsClient` and reads
+through the uncached `repository._fetch_*` functions, so it never calls `client.get` itself.
+
 Also built out: the overview and the cross-monitor contact queue. Runbooks are **not** in
 the app: they live in `docs/` and are published to GitHub Pages by
 `.github/workflows/pages.yml`. The sidebar's Documentation row is an external
@@ -75,6 +80,8 @@ src/stewards/
   api/errors.py              ApiUnavailable | ApiUnauthorized | ApiNotFound | ApiContractError
   api/models.py              pydantic models mirroring the API contract
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
+  alerts/                    the Slack digest: checks.py (the rules), evaluate.py,
+                             slack.py (all Streamlit-free), __main__.py (the runner)
   monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
                              / Source + MONITOR_REGISTRY (registry order is card and
                              sidebar order)
