@@ -43,6 +43,19 @@ class Digest:
     def total(self) -> int:
         return sum(len(r.hits) for r in self.results)
 
+    @property
+    def failed(self) -> int:
+        return sum(r.error is not None for r in self.results)
+
+    @property
+    def is_empty(self) -> bool:
+        """Nothing to tell anyone: no hits, and every check actually ran.
+
+        A failed check is not empty — its zero is unknown, not reassuring — so it still
+        produces a message.
+        """
+        return self.total == 0 and self.failed == 0
+
 
 def uk_today(now: datetime) -> date:
     return now.astimezone(UK).date()

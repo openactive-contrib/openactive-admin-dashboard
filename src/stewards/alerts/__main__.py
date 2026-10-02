@@ -1,5 +1,7 @@
 """`python -m stewards.alerts [--dry-run]`: check the admin API, post one Slack digest.
 
+A day with no incidents and no failed checks posts nothing.
+
 Reads `ADMIN_API_BASE_URL`, `ADMIN_API_TOKEN` and `SLACK_WEBHOOK_URL` from the environment.
 Exits 1 when the API is down (after saying so in Slack) or when Slack rejects the post.
 """
@@ -83,10 +85,14 @@ def run(
             print(f"Admin API is down: {exc}", file=sys.stderr)
             return 1
         digest = collect(client, today)
-        send(slack.build_digest(digest))
+        if not digest.is_empty:
+            send(slack.build_digest(digest))
     finally:
         client.close()
-    print(f"Digest for {today.isoformat()}: {digest.total} incident(s)")
+    print(
+        f"Digest for {today.isoformat()}: {digest.total} incident(s), "
+        f"{digest.failed} failed check(s)" + (", nothing sent" if digest.is_empty else "")
+    )
     return 0
 
 

@@ -54,6 +54,20 @@ def test_happy_path_posts_one_digest() -> None:
 
 
 @respx.mock
+def test_no_incidents_posts_nothing(capsys: pytest.CaptureFixture[str]) -> None:
+    respx.get(f"{BASE}/admin/summary").respond(json=load_sample("admin_summary_partial"))
+    for monitor_id in MONITORS:
+        respx.get(f"{BASE}/admin/{monitor_id.replace('_', '-')}-incidents").respond(
+            json=load_sample("incidents_empty")
+        )
+    slack_route = respx.post(WEBHOOK).respond(200)
+
+    assert runner.run(ENV, now=TUESDAY) == 0
+    assert not slack_route.called
+    assert "nothing sent" in capsys.readouterr().out
+
+
+@respx.mock
 def test_monday_widens_the_window() -> None:
     mock_api(respx.mock)
     slack_route = respx.post(WEBHOOK).respond(200)
