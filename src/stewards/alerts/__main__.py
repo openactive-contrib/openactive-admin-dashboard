@@ -2,7 +2,8 @@
 
 A day with no incidents and no failed checks posts nothing.
 
-Reads `ADMIN_API_BASE_URL`, `ADMIN_API_TOKEN` and `SLACK_WEBHOOK_URL` from the environment.
+Reads `ADMIN_API_BASE_URL`, `ADMIN_API_TOKEN` and `SLACK_WEBHOOK_URL` from the environment,
+and optionally `DASHBOARD_URL` (defaults to the production dashboard).
 Exits 1 when the API is down (after saying so in Slack) or when Slack rejects the post.
 """
 
@@ -49,14 +50,16 @@ def admin_settings(env: Mapping[str, str]) -> Settings:
 
 def collect(client: StewardsClient, today: date, checks: Sequence[Check] = CHECKS) -> Digest:
     results = []
+    snapshot: date | None = None
     for check in checks:
         try:
             page = _fetch_incidents(check.monitor_id, client, as_of=today)
         except ApiError as exc:
             results.append(CheckResult(check=check, error=str(exc)))
             continue
+        snapshot = snapshot or page.meta.snapshot_date
         results.append(select(check, page.data, today))
-    return Digest(today=today, results=tuple(results))
+    return Digest(today=today, results=tuple(results), snapshot_date=snapshot)
 
 
 def run(
@@ -68,6 +71,7 @@ def run(
     slack_transport: httpx.BaseTransport | None = None,
 ) -> int:
     today = uk_today(now)
+    dashboard = env.get("DASHBOARD_URL", "").strip() or slack.DEFAULT_DASHBOARD_URL
     webhook = "" if dry_run else _require(env, "SLACK_WEBHOOK_URL")
     client = StewardsClient(admin_settings(env), api_transport)
 
@@ -81,12 +85,12 @@ def run(
         try:
             _fetch_summary(client, as_of=today)
         except ApiError as exc:
-            send(slack.build_api_down(str(exc), today))
+            send(slack.build_api_down(str(exc), today, dashboard))
             print(f"Admin API is down: {exc}", file=sys.stderr)
             return 1
         digest = collect(client, today)
         if not digest.is_empty:
-            send(slack.build_digest(digest))
+            send(slack.build_digest(digest, dashboard))
     finally:
         client.close()
     print(

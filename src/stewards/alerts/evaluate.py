@@ -38,6 +38,8 @@ class CheckResult:
 class Digest:
     today: date
     results: tuple[CheckResult, ...] = field(default_factory=tuple)
+    snapshot_date: date | None = None
+    """The batch snapshot the incidents came from; the data is daily, never live."""
 
     @property
     def total(self) -> int:
