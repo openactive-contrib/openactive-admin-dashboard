@@ -1,0 +1,49 @@
+name: Incident alerts
+
+# Weekdays at 10:00 UK time: check the admin API is up, then post one Slack digest of the
+# incidents that crossed a threshold since the last run. The rules are
+# src/stewards/alerts/checks.py.
+on:
+  schedule:
+    - cron: "0 10 * * 1-5"
+      timezone: "Europe/London"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the Slack payload in the log instead of posting it
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: incident-alerts
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    name: Slack digest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --locked
+
+      - env:
+          ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL }}
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            uv run python -m stewards.alerts --dry-run
+          else
+            uv run python -m stewards.alerts
+          fi
