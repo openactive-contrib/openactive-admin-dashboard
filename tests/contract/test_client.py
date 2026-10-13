@@ -5,6 +5,8 @@ respx only — nothing here touches the network.
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -22,6 +24,9 @@ from stewards.config import Settings
 API_PREFIX = prefix(Style.CONTRACT)
 BASE = "https://api.test"
 URL = f"{BASE}{API_PREFIX}/summary"
+
+ROW_PATH = "/publisher-notifications/pn_dummy-leisure"
+ROW_URL = f"{BASE}{API_PREFIX}{ROW_PATH}"
 
 
 @pytest.fixture
@@ -127,3 +132,68 @@ def test_get_client_is_cached_and_resettable(monkeypatch: pytest.MonkeyPatch) ->
     finally:
         reset_client()
         config.get_settings.cache_clear()
+
+
+# --- writes -------------------------------------------------------------------------------
+
+
+@respx.mock
+def test_patch_sends_the_body_as_json_and_returns_the_saved_row(
+    client: StewardsClient,
+) -> None:
+    body = {"id": "pn_dummy-leisure", "status": "in_progress"}
+    route = respx.patch(ROW_URL).mock(return_value=httpx.Response(200, json={"data": body}))
+
+    assert client.patch(ROW_PATH, body) == {"data": body}
+
+    request = route.calls.last.request
+    assert request.headers["Content-Type"] == "application/json"
+    assert json.loads(request.content) == body
+
+
+@respx.mock
+def test_delete_accepts_an_empty_204(client: StewardsClient) -> None:
+    route = respx.delete(ROW_URL).mock(return_value=httpx.Response(204))
+
+    assert client.delete(ROW_PATH) is None
+    assert route.called
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (401, ApiUnauthorized),
+        (403, ApiUnauthorized),
+        (404, ApiNotFound),
+        (400, ApiContractError),
+        (500, ApiUnavailable),
+    ],
+)
+@pytest.mark.parametrize("method", ["patch", "delete"])
+@respx.mock
+def test_writes_raise_the_same_typed_errors_as_reads(
+    client: StewardsClient, method: str, status: int, error: type[Exception]
+) -> None:
+    respx.route(method=method.upper(), url=ROW_URL).mock(return_value=httpx.Response(status))
+    call = (
+        (lambda: client.patch(ROW_PATH, {"id": "pn_dummy-leisure"}))
+        if method == "patch"
+        else (lambda: client.delete(ROW_PATH))
+    )
+    with pytest.raises(error):
+        call()
+
+
+@respx.mock
+def test_a_write_timeout_raises_unavailable(client: StewardsClient) -> None:
+    respx.patch(ROW_URL).mock(side_effect=httpx.ReadTimeout("too_slow"))
+    with pytest.raises(ApiUnavailable, match="timed out"):
+        client.patch(ROW_PATH, {"id": "pn_dummy-leisure"})
+
+
+@respx.mock
+def test_a_write_body_is_never_in_an_exception_message(client: StewardsClient) -> None:
+    respx.patch(ROW_URL).mock(return_value=httpx.Response(500))
+    with pytest.raises(ApiUnavailable) as caught:
+        client.patch(ROW_PATH, {"contact": "dummy.publisher@example.org"})
+    assert "example.org" not in str(caught.value)

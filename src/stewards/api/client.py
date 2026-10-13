@@ -43,7 +43,11 @@ def build_client(
 
 
 class StewardsClient:
-    """Thin GET-only wrapper mapping HTTP outcomes onto typed exceptions."""
+    """Thin wrapper mapping HTTP outcomes onto typed exceptions.
+
+    Reads are GET. The only writes are PATCH and DELETE on publisher notifications: every
+    other resource this app touches is read-only.
+    """
 
     def __init__(
         self, settings: Settings, transport: httpx.BaseTransport | None = None
@@ -115,6 +119,14 @@ class StewardsClient:
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         return self._json(self._send("GET", path, params=params), path)
+
+    def patch(self, path: str, body: dict[str, Any]) -> Any:
+        """Send `body` as the whole replacement for a resource, and return its new state."""
+        return self._json(self._send("PATCH", path, json=body), path)
+
+    def delete(self, path: str) -> None:
+        """Remove a resource. The API answers 204 with no body, so nothing is parsed."""
+        self._send("DELETE", path)
 
     def close(self) -> None:
         self._client.close()
