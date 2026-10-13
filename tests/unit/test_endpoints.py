@@ -187,3 +187,45 @@ def test_every_style_routes_every_read() -> None:
         assert endpoints.custom_properties(style, "feed_custom_properties", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
         assert endpoints.contact_queue(style, as_of=AS_OF).path
+
+
+# --- publisher notifications --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("style", "root"),
+    [
+        (Style.ADMIN, "/admin/publisher-notifications"),
+        (Style.CONTRACT, "/publisher-notifications"),
+    ],
+)
+def test_publisher_notification_routes_in_both_shapes(style: Style, root: str) -> None:
+    assert endpoints.publisher_notifications(style) == endpoints.Endpoint(
+        root, {"page": 1, "page_size": 500}
+    )
+    assert endpoints.publisher_notification_summary(style) == endpoints.Endpoint(
+        f"{root}/summary"
+    )
+    assert endpoints.publisher_notification(style, "pn_dummy-leisure") == endpoints.Endpoint(
+        f"{root}/pn_dummy-leisure"
+    )
+
+
+def test_the_notification_list_pages_and_sends_no_snapshot_date() -> None:
+    endpoint = endpoints.publisher_notifications(Style.ADMIN, page=3, page_size=100)
+    assert endpoint.params == {"page": 3, "page_size": 100}
+    assert "as_of" not in endpoint.params
+
+
+@pytest.mark.parametrize(
+    ("notification_id", "segment"),
+    [
+        ("pn_dummy-leisure", "pn_dummy-leisure"),
+        ("pn/with?odd chars", "pn%2Fwith%3Fodd%20chars"),
+    ],
+)
+def test_a_notification_id_is_one_encoded_path_segment(
+    notification_id: str, segment: str
+) -> None:
+    path = endpoints.publisher_notification(Style.ADMIN, notification_id).path
+    assert path == f"/admin/publisher-notifications/{segment}"
