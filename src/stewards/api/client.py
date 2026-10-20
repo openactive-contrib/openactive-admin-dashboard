@@ -17,12 +17,14 @@ from stewards.config import Settings, get_settings
 
 log = logging.getLogger(__name__)
 
-TIMEOUT = httpx.Timeout(10.0, connect=3.0)
+TIMEOUT = httpx.Timeout(30.0, connect=3.0)
 RETRIES = 2
 
 
 def build_client(
-    settings: Settings, transport: httpx.BaseTransport | None = None
+    settings: Settings,
+    transport: httpx.BaseTransport | None = None,
+    timeout: httpx.Timeout = TIMEOUT,
 ) -> httpx.Client:
     """Construct the httpx client. The token is never logged.
 
@@ -37,7 +39,7 @@ def build_client(
     return httpx.Client(
         base_url=f"{settings.api_base_url}{endpoints.prefix(settings.api_style)}",
         headers=headers,
-        timeout=TIMEOUT,
+        timeout=timeout,
         transport=transport,
     )
 
@@ -46,10 +48,13 @@ class StewardsClient:
     """Thin GET-only wrapper mapping HTTP outcomes onto typed exceptions."""
 
     def __init__(
-        self, settings: Settings, transport: httpx.BaseTransport | None = None
+        self,
+        settings: Settings,
+        transport: httpx.BaseTransport | None = None,
+        timeout: httpx.Timeout = TIMEOUT,
     ) -> None:
         self._settings = settings
-        self._client = build_client(settings, transport)
+        self._client = build_client(settings, transport, timeout)
 
     @property
     def settings(self) -> Settings:

@@ -1,11 +1,11 @@
 name: Incident alerts
 
-# Weekdays at 10:00 UK time: check the admin API is up, then post one Slack digest of the
+# Weekdays at 10:12 UK time: check the admin API is up, then post one Slack digest of the
 # incidents that crossed a threshold since the last run. The rules are
 # src/stewards/alerts/checks.py.
 on:
   schedule:
-    - cron: "0 10 * * 1-5"
+    - cron: "12 10 * * 1-5"
       timezone: "Europe/London"
   workflow_dispatch:
     inputs:
