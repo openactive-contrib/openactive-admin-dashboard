@@ -23,9 +23,14 @@ from stewards.alerts.checks import CHECKS, Check
 from stewards.alerts.evaluate import CheckResult, Digest, select, uk_today
 from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style
-from stewards.api.errors import ApiError
+from stewards.api.errors import ApiError, ApiUnavailable
 from stewards.api.repository import _fetch_incidents, _fetch_summary
 from stewards.config import Settings
+
+# The digest runs unattended and has no cache in front of it, so a slow cold read would
+# otherwise become a false "API is down" alert. The dashboard keeps the client's default.
+TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+SUMMARY_ATTEMPTS = 3
 
 
 class MissingConfig(RuntimeError):
@@ -62,6 +67,18 @@ def collect(client: StewardsClient, today: date, checks: Sequence[Check] = CHECK
     return Digest(today=today, results=tuple(results), snapshot_date=snapshot)
 
 
+def check_api(client: StewardsClient, today: date, attempts: int = SUMMARY_ATTEMPTS) -> None:
+    """Read `/summary`, retrying a timeout or 5xx; a 401 or contract error fails at once."""
+    for attempt in range(1, attempts + 1):
+        try:
+            _fetch_summary(client, as_of=today)
+            return
+        except ApiUnavailable as exc:
+            print(f"Attempt {attempt}/{attempts}: {exc}", file=sys.stderr)
+            if attempt == attempts:
+                raise
+
+
 def run(
     env: Mapping[str, str],
     *,
@@ -73,7 +90,7 @@ def run(
     today = uk_today(now)
     dashboard = env.get("DASHBOARD_URL", "").strip() or slack.DEFAULT_DASHBOARD_URL
     webhook = "" if dry_run else _require(env, "SLACK_WEBHOOK_URL")
-    client = StewardsClient(admin_settings(env), api_transport)
+    client = StewardsClient(admin_settings(env), api_transport, TIMEOUT)
 
     def send(payload: dict[str, object]) -> None:
         if dry_run:
@@ -83,7 +100,7 @@ def run(
 
     try:
         try:
-            _fetch_summary(client, as_of=today)
+            check_api(client, today)
         except ApiError as exc:
             send(slack.build_api_down(str(exc), today, dashboard))
             print(f"Admin API is down: {exc}", file=sys.stderr)
