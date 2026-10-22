@@ -11,7 +11,10 @@ from stewards.api.models import PublisherNotification, PublisherNotificationSumm
 from stewards.monitors.publisher_notifications import (
     COLUMNS,
     FOLLOW_UP_DAYS,
+    NOTES_MAX,
+    STATUSES,
     alert_reasons,
+    apply_edits,
     apply_filters,
     filter_options,
     has_alert,
@@ -156,3 +159,87 @@ def test_problem_frame_marks_past_threshold() -> None:
 
 def test_problem_frame_of_an_empty_row_is_empty() -> None:
     assert problem_frame(row()).empty
+
+
+# --- editing ------------------------------------------------------------------------------
+
+
+def edit(target: PublisherNotification | None = None, **changes: Any) -> Any:
+    """`apply_edits` with valid defaults, so each test changes only what it is about."""
+    fields: dict[str, Any] = {
+        "status": "in_progress",
+        "stakeholder": "Council",
+        "contact": "bookings@example.org",
+        "date_contacted": TODAY,
+        "notes": "Emailed about the stalled feed.",
+        "today": TODAY,
+    }
+    return apply_edits(target or row(), **{**fields, **changes})
+
+
+def test_valid_edit_returns_a_body_and_no_errors() -> None:
+    body, errors = edit()
+    assert errors == []
+    assert body is not None
+    assert (body.status, body.contact) == ("in_progress", "bookings@example.org")
+
+
+def test_edit_keeps_every_field_the_form_does_not_show() -> None:
+    original = row(
+        publisher_id="dummy-leisure",
+        problem_count=2,
+        monitors=["dataset_stall"],
+        oldest_days_open=12,
+        problems=[problem("dataset_stall", 7)],
+    )
+    body, _ = edit(original, status="closed")
+
+    assert body is not None
+    assert body.problems == original.problems_raw
+    assert body.monitors == ("dataset_stall",)
+    assert (body.problem_count, body.oldest_days_open) == (2, 12)
+    assert body.publisher_id == "dummy-leisure"
+
+
+def test_blank_boxes_are_saved_as_null() -> None:
+    body, _ = edit(stakeholder="   ", contact="", notes=None)
+    assert body is not None
+    assert (body.stakeholder, body.contact, body.notes) == (None, None, None)
+
+
+def test_text_is_trimmed() -> None:
+    body, _ = edit(contact="  bookings@example.org ")
+    assert body is not None
+    assert body.contact == "bookings@example.org"
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"status": "done"}, "Status must be one of"),
+        ({"contact": "Jo Bloggs"}, "Contact must be an email address"),
+        ({"contact": "a@b"}, "Contact must be an email address"),
+        ({"date_contacted": date(2026, 10, 14)}, "cannot be in the future"),
+        ({"notes": "x" * (NOTES_MAX + 1)}, "2,000 characters or fewer"),
+    ],
+)
+def test_invalid_edit_is_refused(changes: dict[str, Any], message: str) -> None:
+    body, errors = edit(**changes)
+    assert body is None
+    assert len(errors) == 1
+    assert message in errors[0]
+
+
+def test_every_problem_is_reported_at_once() -> None:
+    _, errors = edit(status="done", contact="nope", notes="x" * (NOTES_MAX + 1))
+    assert len(errors) == 3
+
+
+def test_notes_at_the_limit_are_allowed() -> None:
+    body, errors = edit(notes="x" * NOTES_MAX)
+    assert errors == []
+    assert body is not None
+
+
+def test_statuses_are_the_workflow_three() -> None:
+    assert STATUSES == ("open", "in_progress", "closed")

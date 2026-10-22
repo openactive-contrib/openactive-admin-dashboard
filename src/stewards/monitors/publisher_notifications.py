@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from datetime import date
 
@@ -14,6 +15,7 @@ from stewards.alerts.checks import CHECKS, Check
 from stewards.api.models import (
     NotificationProblem,
     PublisherNotification,
+    PublisherNotificationBody,
     PublisherNotificationSummary,
 )
 from stewards.monitors.registry import RAG_KINDS, Col, ColKind, get_monitor
@@ -220,3 +222,64 @@ def problem_frame(row: PublisherNotification) -> pd.DataFrame:
         for problem in row.problems
     ]
     return pd.DataFrame(lines, columns=list(PROBLEM_COLUMNS))
+
+
+# --- editing ------------------------------------------------------------------------------
+
+#: The statuses a steward can choose, in the order the dropdown shows them.
+STATUSES: tuple[str, ...] = ("open", "in_progress", "closed")
+
+NOTES_MAX = 2000
+
+#: Deliberately loose: something@something.something, with no spaces. Real checking is
+#: sending the email; this only catches a name typed into the wrong box.
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def _clean(value: str | None) -> str | None:
+    """Trimmed text, or None for a blank box, so the API stores NULL, not an empty string."""
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def apply_edits(
+    row: PublisherNotification,
+    *,
+    status: str,
+    stakeholder: str | None,
+    contact: str | None,
+    date_contacted: date | None,
+    notes: str | None,
+    today: date,
+) -> tuple[PublisherNotificationBody | None, list[str]]:
+    """The full PATCH body with the form's five fields applied, or the reasons it is invalid.
+
+    Every other field is copied from `row`, because the API overwrites every column.
+    """
+    errors: list[str] = []
+    contact = _clean(contact)
+    notes = _clean(notes)
+
+    if status not in STATUSES:
+        errors.append(f"Status must be one of: {', '.join(STATUSES)}.")
+    if contact is not None and not _EMAIL.fullmatch(contact):
+        errors.append("Contact must be an email address.")
+    if date_contacted is not None and date_contacted > today:
+        errors.append("Date contacted cannot be in the future.")
+    if notes is not None and len(notes) > NOTES_MAX:
+        errors.append(f"Notes must be {NOTES_MAX:,} characters or fewer (now {len(notes):,}).")
+
+    if errors:
+        return None, errors
+
+    body = row.to_body().model_copy(
+        update={
+            "status": status,
+            "stakeholder": _clean(stakeholder),
+            "contact": contact,
+            "date_contacted": date_contacted,
+            "notes": notes,
+        }
+    )
+    return body, []
