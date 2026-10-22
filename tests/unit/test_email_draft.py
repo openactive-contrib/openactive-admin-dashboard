@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from stewards.api.models import Incident, PublisherNotification
 from stewards.monitors.email_draft import (
@@ -478,3 +478,15 @@ def test_publisher_draft_keeps_the_house_tone() -> None:
     )
     assert "!" not in draft
     assert f"{REPLY_WINDOW_DAYS}" not in draft.split("\n")[0]
+
+
+def test_draft_key_changes_with_the_row_and_with_a_save() -> None:
+    from stewards.components.email_draft import draft_key
+
+    first = notification(STALL_PROBLEM)
+    saved = first.model_copy(update={"updated_at": datetime(2026, 10, 13, 9, 30)})
+    other = first.model_copy(update={"id": "pn_other"})
+
+    assert draft_key(first) != draft_key(saved)
+    assert draft_key(first) != draft_key(other)
+    assert draft_key(first) == draft_key(notification(STALL_PROBLEM))

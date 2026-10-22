@@ -57,6 +57,29 @@ def test_email_popover_renders_a_copyable_draft() -> None:
     assert "22 days" in body
 
 
+def _editable_draft_script(draft: str) -> None:
+    from stewards.components.email_draft import render_editable_draft
+
+    render_editable_draft(draft, key="notification-draft-test")
+
+
+def test_editable_draft_shows_the_draft_in_a_text_box() -> None:
+    app = run(_editable_draft_script, "Hello Dummy Leisure team,")
+    assert app.text_area[0].value == "Hello Dummy Leisure team,"
+
+
+def test_editable_draft_keeps_the_stewards_edits() -> None:
+    app = run(_editable_draft_script, "Hello Dummy Leisure team,")
+    app.text_area[0].input("Hi Sam,").run()
+    assert app.text_area[0].value == "Hi Sam,"
+
+
+def test_an_empty_draft_says_why_instead_of_an_empty_box() -> None:
+    app = run(_editable_draft_script, "")
+    assert not app.text_area
+    assert "No email to draft" in app.info[0].value
+
+
 # --- error states -----------------------------------------------------------------------
 
 
