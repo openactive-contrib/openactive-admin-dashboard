@@ -775,6 +775,13 @@ class PublisherNotificationPage(ApiModel):
     meta: Meta
 
 
+class PublisherNotificationDocument(ApiModel):
+    """One row, as PATCH returns it."""
+
+    data: PublisherNotification
+    meta: Meta
+
+
 class PublisherNotificationSummary(ApiModel):
     """Count across the whole list, from its own endpoint. Null is not zero."""
 

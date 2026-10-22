@@ -5,6 +5,7 @@ Every test exercises the plain `_fetch_*` function, which needs no Streamlit run
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import httpx
@@ -12,6 +13,7 @@ import pytest
 import respx
 
 from fixture_loader import load_sample
+from stewards.api import repository
 from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
@@ -25,6 +27,8 @@ from stewards.api.models import (
     CustomPropertyResponse,
     FeedQualityResponse,
     IncidentPage,
+    PublisherNotificationBody,
+    PublisherNotificationPage,
     SiteMappingPage,
     SummaryResponse,
     TrendResponse,
@@ -32,6 +36,7 @@ from stewards.api.models import (
 from stewards.api.repository import (
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
+    _delete_publisher_notification,
     _fetch_contact_queue,
     _fetch_coverage,
     _fetch_coverage_snapshots,
@@ -39,18 +44,22 @@ from stewards.api.repository import (
     _fetch_custom_property_summaries,
     _fetch_incidents,
     _fetch_monitor_trends,
+    _fetch_publisher_notification_summary,
+    _fetch_publisher_notifications,
     _fetch_quality,
     _fetch_quality_summaries,
     _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
     _fetch_trend_points,
+    _update_publisher_notification,
 )
 from stewards.config import Settings
 
 API_PREFIX = prefix(Style.CONTRACT)
 BASE = f"https://api.test{API_PREFIX}"
 INCIDENTS = f"{BASE}/monitors/single_feed_stall/incidents"
+NOTIFICATIONS = f"{BASE}/publisher-notifications"
 
 
 @pytest.fixture
@@ -713,3 +722,138 @@ def test_custom_property_summaries_of_nothing_is_an_empty_mapping(
     client: StewardsClient,
 ) -> None:
     assert _fetch_custom_property_summaries((), client) == {}
+
+
+# --- publisher notifications --------------------------------------------------------------
+
+
+@respx.mock
+def test_notifications_reads_every_page(client: StewardsClient) -> None:
+    route = respx.get(NOTIFICATIONS).mock(
+        side_effect=[
+            httpx.Response(200, json=load_sample("publisher_notifications_page1")),
+            httpx.Response(200, json=load_sample("publisher_notifications_page2")),
+        ]
+    )
+    page = _fetch_publisher_notifications(client=client)
+
+    assert isinstance(page, PublisherNotificationPage)
+    assert [row.id for row in page.data] == [
+        "pn_dummy-leisure",
+        "pn_dummy-never-contacted",
+        "pn_dummy-closed",
+    ]
+    pages = [call.request.url.params["page"] for call in route.calls]
+    assert pages == ["1", "2"]
+    assert "as_of" not in route.calls[0].request.url.params
+
+
+@respx.mock
+def test_notification_with_no_problems_still_loads(client: StewardsClient) -> None:
+    respx.get(NOTIFICATIONS).mock(
+        side_effect=[
+            httpx.Response(200, json=load_sample("publisher_notifications_page1")),
+            httpx.Response(200, json=load_sample("publisher_notifications_page2")),
+        ]
+    )
+    closed = _fetch_publisher_notifications(client=client).data[-1]
+
+    assert closed.problems == ()
+    assert closed.problems_raw is None
+
+
+@respx.mock
+def test_notifications_malformed_row_is_a_contract_error(client: StewardsClient) -> None:
+    respx.get(NOTIFICATIONS).mock(
+        return_value=httpx.Response(200, json=load_sample("publisher_notifications_malformed"))
+    )
+    with pytest.raises(ApiContractError, match="publisher-notifications"):
+        _fetch_publisher_notifications(client=client)
+
+
+@respx.mock
+def test_notifications_bad_token_is_unauthorised(client: StewardsClient) -> None:
+    respx.get(NOTIFICATIONS).mock(return_value=httpx.Response(403))
+    with pytest.raises(ApiUnauthorized):
+        _fetch_publisher_notifications(client=client)
+
+
+@respx.mock
+def test_notification_summary_returns_counts(client: StewardsClient) -> None:
+    respx.get(f"{NOTIFICATIONS}/summary").mock(
+        return_value=httpx.Response(200, json=load_sample("publisher_notifications_summary"))
+    )
+    counts = _fetch_publisher_notification_summary(client=client).data
+
+    assert (counts.publishers, counts.never_contacted, counts.alerts) == (3, 1, 2)
+
+
+@respx.mock
+def test_save_sends_the_evidence_back_untouched(client: StewardsClient) -> None:
+    respx.get(NOTIFICATIONS).mock(
+        side_effect=[
+            httpx.Response(200, json=load_sample("publisher_notifications_page1")),
+            httpx.Response(200, json=load_sample("publisher_notifications_page2")),
+        ]
+    )
+    row = _fetch_publisher_notifications(client=client).data[0]
+    route = respx.patch(f"{NOTIFICATIONS}/{row.id}").mock(
+        return_value=httpx.Response(200, json=load_sample("publisher_notification_row"))
+    )
+    body = row.to_body().model_copy(update={"status": "in_progress"})
+
+    saved = _update_publisher_notification(body, client=client)
+
+    sent = json.loads(route.calls[0].request.content)
+    assert sent["problems"] == row.problems_raw
+    assert sent["monitors"] == list(row.monitors)
+    assert sent["status"] == "in_progress"
+    assert saved.status == "in_progress"
+
+
+@respx.mock
+def test_delete_sends_one_request(client: StewardsClient) -> None:
+    route = respx.delete(f"{NOTIFICATIONS}/pn_dummy-leisure").mock(
+        return_value=httpx.Response(204)
+    )
+    _delete_publisher_notification("pn_dummy-leisure", client=client)
+
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_delete_missing_row_is_not_found(client: StewardsClient) -> None:
+    respx.delete(f"{NOTIFICATIONS}/pn_gone").mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _delete_publisher_notification("pn_gone", client=client)
+
+
+def test_save_clears_the_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    cleared: list[str] = []
+    saved_row = PublisherNotificationPage.model_validate(
+        load_sample("publisher_notifications_page1")
+    ).data[0]
+    monkeypatch.setattr(repository, "_update_publisher_notification", lambda body: saved_row)
+    monkeypatch.setattr(
+        repository, "clear_publisher_notification_cache", lambda: cleared.append("yes")
+    )
+
+    repository.update_publisher_notification(PublisherNotificationBody(id=saved_row.id))
+
+    assert cleared == ["yes"]
+
+
+def test_failed_save_keeps_the_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    cleared: list[str] = []
+
+    def boom(body: PublisherNotificationBody) -> None:
+        raise ApiUnavailable("down")
+
+    monkeypatch.setattr(repository, "_update_publisher_notification", boom)
+    monkeypatch.setattr(
+        repository, "clear_publisher_notification_cache", lambda: cleared.append("yes")
+    )
+
+    with pytest.raises(ApiUnavailable):
+        repository.update_publisher_notification(PublisherNotificationBody(id="pn_x"))
+    assert cleared == []
