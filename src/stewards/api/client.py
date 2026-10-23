@@ -45,7 +45,11 @@ def build_client(
 
 
 class StewardsClient:
-    """Thin GET-only wrapper mapping HTTP outcomes onto typed exceptions."""
+    """Thin wrapper mapping HTTP outcomes onto typed exceptions.
+
+    Reads are GET. The only writes are PATCH and DELETE on publisher notifications: every
+    other resource this app touches is read-only.
+    """
 
     def __init__(
         self,
@@ -76,9 +80,21 @@ class StewardsClient:
             return params
         return {**(params or {}), token_param: self._settings.api_token}
 
-    def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+    ) -> httpx.Response:
+        """Send one request and turn every failure into a typed `ApiError`.
+
+        Never logs `params` or `json`: the first can carry the token, and a write body can
+        carry a contact address. Every message names the path only.
+        """
         try:
-            response = self._client.get(path, params=self._query(params))
+            response = self._client.request(method, path, params=self._query(params), json=json)
         except httpx.TimeoutException as exc:
             raise ApiUnavailable(f"The monitoring API timed out on {path}") from exc
         except httpx.TransportError as exc:
@@ -90,10 +106,14 @@ class StewardsClient:
         if status == 404:
             raise ApiNotFound(f"No such resource: {path}")
         if status >= 500:
-            raise ApiUnavailable(f"The monitoring API returned {status} on {path}")
+            raise ApiUnavailable(f"The monitoringAPI returned {status} on {path}")
         if status >= 400:
             raise ApiContractError(f"The monitoring API returned {status} on {path}")
+        return response
 
+    @staticmethod
+    def _json(response: httpx.Response, path: str) -> Any:
+        """The parsed body, or a contract error if it is not JSON."""
         try:
             return response.json()
         except ValueError as exc:
@@ -101,6 +121,17 @@ class StewardsClient:
             raise ApiContractError(
                 f"The monitoring API returned a non-JSON body on {path}"
             ) from exc
+
+    def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        return self._json(self._send("GET", path, params=params), path)
+
+    def patch(self, path: str, body: dict[str, Any]) -> Any:
+        """Send `body` as the whole replacement for a resource, and return its new state."""
+        return self._json(self._send("PATCH", path, json=body), path)
+
+    def delete(self, path: str) -> None:
+        """Remove a resource. The API answers 204 with no body, so nothing is parsed."""
+        self._send("DELETE", path)
 
     def close(self) -> None:
         self._client.close()

@@ -81,6 +81,8 @@ def test_days_label() -> None:
         ("monitoring", Tone.AMBER, "Monitoring"),
         ("new", Tone.GREY, "New"),
         ("open", Tone.GREY, "Open"),
+        ("in_progress", Tone.AMBER, "In progress"),
+        ("closed", Tone.GREEN, "Closed"),
         ("resolved", Tone.GREEN, "Resolved"),
         # The quality assessment's own vocabulary, which it sends upper case.
         ("OK", Tone.GREEN, "OK"),

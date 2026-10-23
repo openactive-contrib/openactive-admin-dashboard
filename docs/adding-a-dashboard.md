@@ -126,7 +126,7 @@ Settle these before writing anything. Every one of them is a field on the regist
 | Headline KPI | `kpi_sum_field` | `None` (default) makes the first KPI a count of incidents. Set it to make the KPI the **sum** of that field — the headline figure for a monitor that measures a quantity rather than counting faults. |
 | Filters | `filters` | One selectbox per `FilterSpec`; options are the distinct values in the snapshot. A `part.<name>` field filters the breakdown rows. |
 | KPI labels | `kpi_labels` | Three labels: count, publishers affected, past threshold. |
-| Queue summary field | `summary_field` | Which field identifies the row in the cross-monitor contact queue. Defaults to `feed_name`. It also joins the page's search haystack, so a monitor identified by something other than a feed name is searchable by it. |
+| Queue summary field | `summary_field` | Which field identifies the row in the email draft's subject line. Defaults to `feed_name`. It also joins the page's search haystack, so a monitor identified by something other than a feed name is searchable by it. |
 | Threshold toggle | `has_threshold_filter` | `True` (default) adds the "Past threshold only" toggle to the filter row. Set `False` for an informational monitor where the threshold means nothing. |
 | Threshold help | `threshold_help` | Help text on that toggle. The default names the day count, which only makes sense for a monitor whose incidents have an age. |
 | Schedule | `schedule` | Free text shown as a meta chip, e.g. `daily 04:00 UTC · suppress 1 day`. |
@@ -201,7 +201,6 @@ speaks is `STEWARDS_API_STYLE`; no page or component ever builds a URL.
 | quality snapshot | `GET /api/v1/monitors/<id>/quality` | `GET /admin/<id-with-hyphens>?as_of=<date>` (no suffix: the snapshot is the resource) |
 | coverage snapshot | `GET /api/v1/monitors/<id>/coverage` | `GET /admin/<id-with-hyphens>?as_of=<date>` (no suffix, same reason) |
 | coverage rows | `GET /api/v1/monitors/<id>/mappings?page=1&page_size=1000` | `GET /admin/<rows-id-with-hyphens>?as_of=<date>&page=1&page_size=1000` |
-| contact queue | `GET /api/v1/contact-queue` | `GET /admin/contact-queue?as_of=<date>` |
 
 So under `admin`, `single_feed_stall` reads `/admin/single-feed-stall-incidents`: the path
 is derived from the monitor id, and a new monitor needs no routing change. `as_of` is the
@@ -229,7 +228,6 @@ logged: every error message names the path, which carries no query string.
 | coverage snapshot | a coverage monitor's figures and chart | `fetch_coverage(id)` |
 | coverage rows | that monitor's table | `fetch_site_mappings(id, rows_id)` |
 | coverage snapshot, every coverage monitor | their home-page cards | `fetch_coverage_snapshots(ids)` |
-| contact queue | the cross-monitor queue | `fetch_contact_queue()` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
 
@@ -434,11 +432,12 @@ Which figures reach the page:
 The rows endpoint has its own name, so the registry entry declares `rows_id`. Deriving a
 suffix from the monitor id would point the read at a path that does not exist.
 
-### Contact queue
+### Publisher notification list
 
-`/contact-queue` returns the union of every monitor's incidents at or past the threshold, in
-the same incident shape. Rows whose `monitor_id` this build does not register are dropped
-from the table and named in a caption, so the app never renders a row it cannot explain.
+`/admin/publisher-notifications` holds stored steward rows, one per publisher, each carrying
+its problems as incident-shaped JSON. A new monitor needs nothing here unless it should
+alert: add a `Check` to `alerts/checks.CHECKS` and both the Slack digest and the list's
+alert rule pick it up. Its email wording comes from `_OBSERVATIONS` as usual.
 
 ### Failure handling
 
@@ -540,7 +539,7 @@ Conventions that matter:
   `tests/smoke/test_pages.py` guards this.
 - The numeric prefix is stripped from the route: `views/20_zero_future.py` serves
   `/zero_future`.
-- Prefix ranges follow the sidebar groups: `00–09` cross-cutting (overview, contact queue),
+- Prefix ranges follow the sidebar groups: `00–09` cross-cutting (overview, publisher notification list),
   `10s` availability, `20s` content, `30s` coverage and quality. Leave gaps.
 
 ## 6. The email draft, if the default sentence is not good enough
@@ -670,7 +669,6 @@ STEWARDS_USE_SAMPLE_DATA=true STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
 | Request path | File |
 |---|---|
 | `…/summary` | `summary.json` |
-| `…/contact-queue` | `contact_queue.json` |
 | `…/monitors/<id>/incidents` | `<id>_incidents.json` |
 | `…/monitors/<id>/trend` | `<id>_trend.json` |
 
@@ -687,8 +685,6 @@ new monitor needs **two new files, and two edits to existing ones**:
 3. **`summary.json`** — append a `MonitorCount` for the new id to `data.monitors`, with a
    `sparkline` of at least two points. Without this the card renders at zero and the
    overview smoke test that counts one sparkline per monitor fails.
-4. **`contact_queue.json`** — optional, but add a row or two for the new monitor if you want
-   it represented in the cross-monitor queue.
 
 Keep `meta.snapshot_date` at `2026-08-21` across every sample payload: the smoke tests assert
 that date, and mixed snapshot dates would make the app contradict itself on screen.
@@ -790,7 +786,7 @@ they are the ones that will fail:
 |---|---|
 | `tests/smoke/test_pages.py` | add the new view filename to `PAGES` and `MONITOR_PAGES` |
 | `tests/unit/test_overview.py` | `test_sidebar_counts_maps_every_reported_monitor` asserts the exact count dict from `summary.json` |
-| `tests/smoke/test_pages.py` | `test_contact_queue_lists_the_cross_monitor_union` asserts the queue row count and the exact set of monitor names |
+| `tests/smoke/test_pages.py` | `test_notification_list_hides_closed_rows_by_default` asserts the publishers listed and the stored-source header |
 
 ### The bar
 

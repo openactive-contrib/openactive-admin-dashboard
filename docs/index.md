@@ -17,6 +17,8 @@ say what to do about it.
 
 - [Single-feed stalls]({% link single-feed-stalls-runbook.md %}) — a feed whose `modified`
   timestamp stops advancing while the endpoint still returns 200.
+- [Publisher notification list]({% link publisher-notification-list.md %}) — who needs
+  contacting about open problems, and how to record that you did.
 
 Figures in the dashboard come from a daily BigQuery batch, so every page there states the
 snapshot date it was built from.

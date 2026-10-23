@@ -1,0 +1,3 @@
+from stewards.components.publisher_notifications_page import render_publisher_notifications_page
+
+render_publisher_notifications_page()

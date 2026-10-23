@@ -1,8 +1,9 @@
 # CLAUDE.md — OpenActive Data Stewards Dashboard
 
 Internal Streamlit app for the ODI tech team. Monitors data health/quality for ~170
-OpenActive publishers. **Read-only.** Data arrives from a RESTful API over a daily BigQuery
-batch — never present it as live.
+OpenActive publishers. **Read-only, with one scoped exception** (the publisher notification
+list, hard rule 5). Data arrives from a RESTful API over a daily BigQuery batch — never
+present it as live.
 
 `BUILD_BRIEF.md` holds the settled product decisions and the full API contract; do not
 re-decide anything settled there. `Data Stewards Dashboard.dc.html` is the approved UI
@@ -38,8 +39,9 @@ one paginated read of every feed publishing a property outside the OpenActive vo
 a fleet-wide `summary` block beside the rows, no history and no `/summary` entry; it is
 informational like the coverage monitor.
 
-The app also requests `/admin/contact-queue`; that is not deployed yet, so it 404s and that
-page renders the typed "endpoint is not live" state rather than failing. A missing **trend**
+The publisher notification list reads and writes `/admin/publisher-notifications`: stored
+steward rows, not the daily batch, so its page names its own source and its reads are cached
+for 30 seconds rather than an hour. A missing **trend**
 costs only the chart: `repository.fetch_trend_points` swallows the error, so the monitor's own page
 still renders its KPIs, filters and table, and the overview falls back to the summary
 sparkline. `api/endpoints.py` holds both URL shapes — `contract` (the versioned
@@ -56,7 +58,7 @@ A weekday Slack digest runs outside the app: `.github/workflows/incident-alerts.
 (one `Check` per condition). The runner builds its own admin-style `StewardsClient` and reads
 through the uncached `repository._fetch_*` functions, so it never calls `client.get` itself.
 
-Also built out: the overview and the cross-monitor contact queue. Runbooks are **not** in
+Also built out: the overview and the publisher notification list. Runbooks are **not** in
 the app: they live in `docs/` and are published to GitHub Pages by
 `.github/workflows/pages.yml`. The sidebar's Documentation row is an external
 `st.page_link` to `STEWARDS_DOCS_URL`, which opens in a new tab.
@@ -97,13 +99,15 @@ src/stewards/
   monitors/schema_drift.py   the fourth: a custom-property snapshot -> feed rows, list
                              filters, figures, property chart, property table, card
   monitors/overview.py       tiles, tile state, sidebar labels
-  monitors/contact_queue.py  the cross-monitor union, shaped
+  monitors/publisher_notifications.py
+                             the notification list: alert rule, table, filters, KPIs,
+                             edit validation, sidebar pill
   monitors/trend.py          30-snapshot series
-  monitors/email_draft.py    the publisher email draft
+  monitors/email_draft.py    the publisher email drafts (one incident, or one publisher)
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
                              quality_page, coverage_page, schema_drift_page, overview_page,
-                             contact_queue_page
+                             publisher_notifications_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/
@@ -135,6 +139,13 @@ tests/
    draft is the only output; what it says about an incident comes off the registry entry
    (`entity`, `email_fields`, `summary_field`), never a monitor id in the renderer. CSV export was removed from the header on request — do not
    reintroduce a download button without being asked.
+
+   **The one exception is the publisher notification list** (`/admin/publisher-notifications`):
+   stewards may PATCH and DELETE its rows, and nothing else. `client.patch`/`client.delete`
+   exist for it alone. PATCH overwrites every column, so a save always starts from
+   `PublisherNotification.to_body()` and changes only the form's five fields; `problems`
+   goes back exactly as read. Every write clears the list's 30-second cache. There is no
+   create in the app. Do not add writes to any other resource without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
    snapshot). A page that failed to load renders `render_error_header`
@@ -186,7 +197,7 @@ which page renderer it gets. Four exist:
 None are interchangeable: a quality, coverage or schema drift row has no `first_detected`,
 `days_open` or `past_threshold`, and folding any into an `Incident` would mean inventing all three; and a
 coverage monitor's figures do not arrive beside its rows, so it cannot be one request. Such a
-monitor has no trend, no contact threshold, no email draft and no place in the contact queue,
+monitor has no trend, no contact threshold, no email draft and no place on the publisher notification list,
 and its page puts the snapshot's own figures and charts where the KPIs and the trend chart
 would be.
 Everything the registry already drove is unchanged: `columns` and `ColKind` format and

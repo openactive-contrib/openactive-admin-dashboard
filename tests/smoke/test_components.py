@@ -57,6 +57,29 @@ def test_email_popover_renders_a_copyable_draft() -> None:
     assert "22 days" in body
 
 
+def _editable_draft_script(draft: str) -> None:
+    from stewards.components.email_draft import render_editable_draft
+
+    render_editable_draft(draft, key="notification-draft-test")
+
+
+def test_editable_draft_shows_the_draft_in_a_text_box() -> None:
+    app = run(_editable_draft_script, "Hello Dummy Leisure team,")
+    assert app.text_area[0].value == "Hello Dummy Leisure team,"
+
+
+def test_editable_draft_keeps_the_stewards_edits() -> None:
+    app = run(_editable_draft_script, "Hello Dummy Leisure team,")
+    app.text_area[0].input("Hi Sam,").run()
+    assert app.text_area[0].value == "Hi Sam,"
+
+
+def test_an_empty_draft_says_why_instead_of_an_empty_box() -> None:
+    app = run(_editable_draft_script, "")
+    assert not app.text_area
+    assert "No email to draft" in app.info[0].value
+
+
 # --- error states -----------------------------------------------------------------------
 
 
@@ -124,31 +147,6 @@ def test_a_monitor_page_reports_the_failure_instead_of_an_empty_table() -> None:
     assert any("unavailable" in error.value for error in app.error)
     assert not app.dataframe
     assert any("Single-feed stalls" in m.value for m in app.markdown)
-
-
-def _contact_queue_error_script() -> None:
-    import streamlit as st
-
-    from stewards.api import repository
-    from stewards.api.errors import ApiUnauthorized
-    from stewards.components.contact_queue_page import render_contact_queue_page
-
-    def boom(*_args: object, **_kwargs: object) -> None:
-        raise ApiUnauthorized("token expired")
-
-    st.cache_data.clear()
-    original = repository.fetch_contact_queue
-    repository.fetch_contact_queue = boom  # type: ignore[assignment]
-    try:
-        render_contact_queue_page()
-    finally:
-        repository.fetch_contact_queue = original
-        st.cache_data.clear()
-
-
-def test_the_contact_queue_reports_an_auth_failure() -> None:
-    app = run(_contact_queue_error_script)
-    assert any("credentials" in error.value for error in app.error)
 
 
 def _overview_error_script() -> None:
@@ -229,42 +227,6 @@ def test_counts_the_api_does_not_report_render_as_unknown(payload) -> None:
     assert any("does not report" in info.value for info in app.info)
 
 
-# --- the contact queue with an unrenderable monitor -------------------------------------
-
-
-def _unknown_monitor_script() -> None:
-    import streamlit as st
-
-    from stewards.api import repository
-    from stewards.api.models import Incident, IncidentPage, Meta
-    from stewards.components.contact_queue_page import render_contact_queue_page
-
-    meta = Meta(snapshot_date="2026-08-21", generated_at="2026-08-21T06:12:04Z", total=1)
-    incident = Incident(
-        monitor_id="orphan_children",
-        publisher_id="pub_gll",
-        publisher_name="Better (GLL)",
-        first_detected="2026-08-05",
-        days_open=16,
-        past_threshold=True,
-        status="contact_due",
-    )
-    st.cache_data.clear()
-    original = repository.fetch_contact_queue
-    repository.fetch_contact_queue = lambda: IncidentPage(data=(incident,), meta=meta)  # type: ignore[assignment]
-    try:
-        render_contact_queue_page()
-    finally:
-        repository.fetch_contact_queue = original
-        st.cache_data.clear()
-
-
-def test_the_queue_says_which_monitors_it_cannot_render_yet() -> None:
-    app = run(_unknown_monitor_script)
-    assert any("orphan_children" in info.value for info in app.info)
-    assert not app.dataframe
-
-
 # --- the layout header ------------------------------------------------------------------
 
 
@@ -284,6 +246,26 @@ def test_the_header_renders_no_download_button() -> None:
     markdown = " ".join(m.value for m in app.markdown)
     assert "Snapshot `2026-08-21 06:00`" in markdown
     assert "BigQuery · daily batch" in markdown
+
+
+def _stored_source_header_script() -> None:
+    from stewards.api.models import Meta
+    from stewards.components import layout
+
+    meta = Meta(snapshot_date="2026-10-13", generated_at="2026-10-13T09:30:00Z")
+    layout.render_header(
+        "Publishers",
+        "Publisher notification list",
+        meta,
+        source="Stored work list · updated as you save",
+    )
+
+
+def test_the_header_names_a_stored_source_instead_of_the_daily_batch() -> None:
+    app = run(_stored_source_header_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Stored work list · updated as you save" in markdown
+    assert "daily batch" not in markdown
 
 
 # --- the empty trend chart --------------------------------------------------------------
@@ -353,7 +335,7 @@ def _navigation_script() -> None:
 
     nav.build_navigation()
     assert nav.page_for("overview") is not None
-    assert nav.page_for("contact_queue") is not None
+    assert nav.page_for("publisher_notifications") is not None
     assert nav.page_for("no_such_monitor") is None
     for monitor in MONITOR_REGISTRY:
         page = nav.page_for(monitor.id)
@@ -369,7 +351,7 @@ def _url_path_script() -> None:
     # Streamlit strips the numeric ordering prefix, so these are the real deep links.
     expected = {
         "overview": "",
-        "contact_queue": "contact_queue",
+        "publisher_notifications": "publisher_notifications",
         "single_feed_stall": "single_feed_stalls",
         "feed_ingestion_error": "feed_ingestion_errors",
     }
@@ -395,7 +377,7 @@ def _sidebar_script() -> None:
     nav.build_navigation()
     nav.render_sidebar(
         {
-            "contact_queue": NavBadge("10", Tone.RED),
+            "publisher_notifications": NavBadge("10", Tone.RED),
             "single_feed_stall": NavBadge("23", Tone.RED),
             "feed_ingestion_error": NavBadge("9", Tone.AMBER),
         }
@@ -1094,3 +1076,119 @@ def test_a_read_that_raises_still_clears_the_card_and_a_second_card_can_open() -
     app = run(_failed_read_script)
     assert [e.value for e in app.error] == ["failed"]
     assert not app.get("spinner")
+
+
+# --- the notification edit form -----------------------------------------------------------
+
+
+def _edit_form_script(fail: bool) -> None:
+    from datetime import date
+
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiUnavailable
+    from stewards.api.models import PublisherNotificationBody, PublisherNotificationPage
+    from stewards.components.publisher_notifications_page import render_edit_form
+
+    page = PublisherNotificationPage.model_validate(
+        load_sample("publisher_notifications_page1")
+    )
+    row = page.data[0]
+
+    def save(body: PublisherNotificationBody) -> object:
+        if fail:
+            raise ApiUnavailable("down")
+        st.session_state["saved_body"] = body.to_payload()
+        return row
+
+    original = repository.update_publisher_notification
+    repository.update_publisher_notification = save  # type: ignore[assignment]
+    try:
+        render_edit_form(row, date(2026, 10, 13))
+    finally:
+        repository.update_publisher_notification = original
+
+
+def _field(widgets: object, label: str) -> object:
+    return next(w for w in widgets if w.label == label)  # type: ignore[attr-defined]
+
+
+def test_saving_sends_the_edit_and_keeps_the_evidence() -> None:
+    app = run(_edit_form_script, False)
+    _field(app.selectbox, "Status").set_value("in_progress")
+    _field(app.text_input, "Stakeholder").input("Council")
+    app.button[0].click().run()
+
+    sent = app.session_state["saved_body"]
+    assert sent["status"] == "in_progress"
+    assert sent["stakeholder"] == "Council"
+    assert sent["problems"]  # the evidence went back with the edit
+    assert app.session_state["pn_flash"] == "Saved Dummy Leisure."
+
+
+def test_an_invalid_edit_is_refused_and_not_sent() -> None:
+    app = run(_edit_form_script, False)
+    _field(app.text_input, "Contact").input("not an email")
+    app.button[0].click().run()
+
+    assert any("email address" in e.value for e in app.error)
+    assert "saved_body" not in app.session_state
+
+
+def test_a_failed_save_says_so_and_does_not_confirm() -> None:
+    app = run(_edit_form_script, True)
+    app.button[0].click().run()
+
+    assert app.error
+    assert "pn_flash" not in app.session_state
+
+
+# --- deleting a notification ----------------------------------------------------------------
+
+
+def _delete_script(fail: bool) -> None:
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.api.models import PublisherNotificationPage
+    from stewards.components.publisher_notifications_page import delete_row
+
+    row = PublisherNotificationPage.model_validate(
+        load_sample("publisher_notifications_page1")
+    ).data[0]
+
+    def remove(notification_id: str) -> None:
+        if fail:
+            raise ApiNotFound("gone")
+        st.session_state.setdefault("deleted", []).append(notification_id)
+
+    original = repository.delete_publisher_notification
+    repository.delete_publisher_notification = remove  # type: ignore[assignment]
+    try:
+        # A button stands in for the dialog's Delete, so the rerun does not delete again.
+        if st.button("Delete"):
+            delete_row(row)
+    finally:
+        repository.delete_publisher_notification = original
+
+
+def test_deleting_removes_the_row_once_and_confirms() -> None:
+    app = run(_delete_script, False)
+    assert "deleted" not in app.session_state  # nothing happens until confirmed
+
+    app.button[0].click().run()
+
+    assert app.session_state["deleted"] == ["pn_dummy-leisure"]
+    assert app.session_state["pn_flash"] == "Deleted Dummy Leisure."
+
+
+def test_a_failed_delete_says_so_and_does_not_confirm() -> None:
+    app = run(_delete_script, True)
+    app.button[0].click().run()
+
+    assert app.error
+    assert "pn_flash" not in app.session_state

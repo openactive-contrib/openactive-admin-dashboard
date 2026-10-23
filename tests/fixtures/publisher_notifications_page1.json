@@ -1,0 +1,85 @@
+{
+    "data": [
+        {
+            "id": "pn_dummy-leisure",
+            "publisher_id": "pub_dummy-leisure",
+            "publisher_name": "Dummy Leisure",
+            "problem_count": 2,
+            "monitors": [
+                "single_feed_stall",
+                "feed_ingestion_error"
+            ],
+            "oldest_days_open": 12,
+            "status": "open",
+            "stakeholder": "Alex Example",
+            "contact": "dummy.leisure@example.org",
+            "date_contacted": "2026-10-01",
+            "notes": "Sent the stall email. Waiting for a reply.",
+            "problems": [
+                {
+                    "monitor_id": "single_feed_stall",
+                    "feed_id": "dummy-leisure-scheduled-sessions",
+                    "feed_name": "scheduled-sessions",
+                    "feed_type": "ScheduledSession",
+                    "feed_url": "https://example.org/openactive/scheduled-sessions",
+                    "first_detected": "2026-10-01",
+                    "days_open": 12,
+                    "detail": {
+                        "last_modified": "2026-10-01"
+                    }
+                },
+                {
+                    "monitor_id": "feed_ingestion_error",
+                    "feed_id": "dummy-leisure-facility-uses",
+                    "feed_name": "facility-uses",
+                    "feed_type": "FacilityUse",
+                    "feed_url": "https://example.org/openactive/facility-uses",
+                    "first_detected": "2026-10-09",
+                    "days_open": 4,
+                    "detail": {
+                        "error_code": "HTTP_503",
+                        "error_message": "Service Unavailable",
+                        "last_completed": "2026-10-08"
+                    }
+                }
+            ],
+            "created_at": "2026-10-01T09:00:00Z",
+            "updated_at": "2026-10-01T09:30:00Z"
+        },
+        {
+            "id": "pn_dummy-never-contacted",
+            "publisher_id": "pub_dummy-sports",
+            "publisher_name": "Dummy Sports Trust",
+            "problem_count": 1,
+            "monitors": [
+                "dataset_stall"
+            ],
+            "oldest_days_open": 5,
+            "status": "open",
+            "stakeholder": null,
+            "contact": "dummy.sports@example.org",
+            "date_contacted": null,
+            "notes": null,
+            "problems": [
+                {
+                    "monitor_id": "dataset_stall",
+                    "first_detected": "2026-10-08",
+                    "days_open": 5,
+                    "dataset_name": "Dummy Sports Trust sessions",
+                    "dataset_url": "https://example.org/openactive",
+                    "feed_count": 3,
+                    "last_modified": "2026-10-08"
+                }
+            ],
+            "created_at": "2026-10-08T09:00:00Z",
+            "updated_at": "2026-10-08T09:00:00Z"
+        }
+    ],
+    "meta": {
+        "snapshot_date": "2026-10-13",
+        "generated_at": "2026-10-13T09:15:00Z",
+        "total": 3,
+        "page": 1,
+        "page_size": 2
+    }
+}

@@ -49,6 +49,10 @@ _STATUS_TONES = {
     # The admin API reports every incident as simply `open`: it tracks detection, not the
     # contact conversation, so the token carries no workflow state and stays grey.
     "open": Tone.GREY,
+    # The publisher notification list's own workflow: a steward is working the row, or
+    # has finished with it.
+    "in_progress": Tone.AMBER,
+    "closed": Tone.GREEN,
     # The quality assessment reports the state of the feed itself rather than of a contact
     # conversation, and sends its tokens upper case — see the case folding below.
     "ok": Tone.GREEN,
@@ -67,6 +71,8 @@ _STATUS_LABELS = {
     "on_target": "On target",
     "new": "New",
     "open": "Open",
+    "in_progress": "In progress",
+    "closed": "Closed",
     "ok": "OK",
     "warning": "Warning",
     "error": "Error",

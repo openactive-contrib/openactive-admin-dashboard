@@ -186,7 +186,7 @@ def test_nav_badges_carry_the_count_and_the_tile_tone(summary: SummaryResponse) 
     badges = nav_badges(summary.data)
     assert badges["single_feed_stall"] == NavBadge("23", Tone.RED)
     assert badges["feed_ingestion_error"] == NavBadge("9", Tone.RED)
-    assert badges["contact_queue"] == NavBadge("10", Tone.RED)
+    assert "contact_queue" not in badges
 
 
 def test_a_monitor_with_nothing_open_gets_no_badge() -> None:
@@ -200,10 +200,6 @@ def test_a_monitor_with_nothing_open_gets_no_badge() -> None:
     badges = nav_badges(summary)
     assert "single_feed_stall" not in badges
     assert badges["feed_ingestion_error"] == NavBadge("4", Tone.AMBER)
-
-
-def test_no_contact_queue_badge_when_nothing_is_past_threshold() -> None:
-    assert "contact_queue" not in nav_badges(Summary(publishers_monitored=170))
 
 
 def test_an_all_clear_snapshot_has_no_badges_at_all(payload) -> None:
