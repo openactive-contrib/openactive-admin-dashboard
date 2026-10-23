@@ -155,6 +155,8 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
             st.dataframe(problems, hide_index=True, width="stretch")
         render_edit_form(row, today)
         render_editable_draft(draft_publisher_email(row, today), key=draft_key(row))
+        if st.button("Delete row", icon=":material/delete:", key=f"pn_delete_{row.id}"):
+            _confirm_delete(row)
 
 
 def render_edit_form(row: PublisherNotification, today: date) -> None:
@@ -221,3 +223,32 @@ def render_edit_form(row: PublisherNotification, today: date) -> None:
     st.session_state[FLASH_KEY] = f"Saved {row.publisher_name or row.id}."
     st.session_state.pop(TABLE_KEY, None)
     st.rerun()
+
+
+def delete_row(row: PublisherNotification) -> bool:
+    """Delete the row, then reload the page. False, with the error shown, if it failed."""
+    try:
+        repository.delete_publisher_notification(row.id)
+    except ApiError as exc:
+        render_api_error(exc)
+        return False
+
+    st.session_state[FLASH_KEY] = f"Deleted {row.publisher_name or row.id}."
+    st.session_state.pop(TABLE_KEY, None)
+    st.rerun()
+    return True
+
+
+@st.dialog("Delete this row?")
+def _confirm_delete(row: PublisherNotification) -> None:
+    """Ask before deleting. Nothing is removed until the steward confirms."""
+    st.markdown(
+        f"This permanently removes **{row.publisher_name or row.id}** from the notification "
+        "list, including its problems and notes. It cannot be undone."
+    )
+    st.caption(f"Row id: `{row.id}`")
+    cancel_col, delete_col = st.columns(2)
+    if cancel_col.button("Cancel", key="pn_delete_cancel", width="stretch"):
+        st.rerun()
+    if delete_col.button("Delete", type="primary", key="pn_delete_confirm", width="stretch"):
+        delete_row(row)

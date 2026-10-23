@@ -1204,3 +1204,52 @@ def test_a_failed_save_says_so_and_does_not_confirm() -> None:
 
     assert app.error
     assert "pn_flash" not in app.session_state
+
+
+# --- deleting a notification ----------------------------------------------------------------
+
+
+def _delete_script(fail: bool) -> None:
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.api.models import PublisherNotificationPage
+    from stewards.components.publisher_notifications_page import delete_row
+
+    row = PublisherNotificationPage.model_validate(
+        load_sample("publisher_notifications_page1")
+    ).data[0]
+
+    def remove(notification_id: str) -> None:
+        if fail:
+            raise ApiNotFound("gone")
+        st.session_state.setdefault("deleted", []).append(notification_id)
+
+    original = repository.delete_publisher_notification
+    repository.delete_publisher_notification = remove  # type: ignore[assignment]
+    try:
+        # A button stands in for the dialog's Delete, so the rerun does not delete again.
+        if st.button("Delete"):
+            delete_row(row)
+    finally:
+        repository.delete_publisher_notification = original
+
+
+def test_deleting_removes_the_row_once_and_confirms() -> None:
+    app = run(_delete_script, False)
+    assert "deleted" not in app.session_state  # nothing happens until confirmed
+
+    app.button[0].click().run()
+
+    assert app.session_state["deleted"] == ["pn_dummy-leisure"]
+    assert app.session_state["pn_flash"] == "Deleted Dummy Leisure."
+
+
+def test_a_failed_delete_says_so_and_does_not_confirm() -> None:
+    app = run(_delete_script, True)
+    app.button[0].click().run()
+
+    assert app.error
+    assert "pn_flash" not in app.session_state
