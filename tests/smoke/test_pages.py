@@ -16,6 +16,7 @@ VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 PAGES = [
     "00_overview.py",
     "01_contact_queue.py",
+    "01_publisher_notifications.py",
     "10_dataset_stalls.py",
     "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
@@ -82,7 +83,12 @@ def test_page_renders_without_exception(name: str) -> None:
     assert not app.exception, [e.value for e in app.exception]
 
 
-@pytest.mark.parametrize("name", PAGES)
+#: Every page over the daily batch. The notification list is stored rows, not a batch
+#: snapshot, and states its own source; its test is further down.
+BATCH_PAGES = [name for name in PAGES if name != "01_publisher_notifications.py"]
+
+
+@pytest.mark.parametrize("name", BATCH_PAGES)
 def test_every_page_states_the_snapshot(name: str) -> None:
     """Hard rule: no data page may read as live."""
     text = text_of(run(name))
@@ -335,6 +341,23 @@ def test_contact_queue_lists_the_cross_monitor_union() -> None:
     frame = app.dataframe[0].value
     assert len(frame) == 10
     assert set(frame["Monitor"]) == {"Single-feed stalls", "Feed ingestion errors"}
+
+
+def test_notification_list_hides_closed_rows_by_default() -> None:
+    app = run("01_publisher_notifications.py")
+    assert not app.exception, [e.value for e in app.exception]
+    frame = app.dataframe[0].value
+    assert set(frame["Publisher"]) == {"Dummy Leisure", "Dummy Sports Trust"}
+    text = text_of(app)
+    assert "Snapshot 2026-10-13" in text
+    assert "Stored work list · updated as you save" in text
+    assert "BigQuery · daily batch" not in text
+
+
+def test_notification_list_shows_closed_rows_on_request() -> None:
+    app = run("01_publisher_notifications.py")
+    app.toggle(key="pn_show_closed").set_value(True).run()
+    assert len(app.dataframe[0].value) == 3
 
 
 # --- the entry point ---------------------------------------------------------------------
