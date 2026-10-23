@@ -56,7 +56,9 @@ def render_publisher_notifications_page() -> None:
     if selected is not None:
         _render_detail(selected, today)
     layout.render_footer(
-        QUERY, note="These rows are stored; the daily batch does not rewrite them."
+        QUERY,
+        note="These rows are stored; the daily batch does not rewrite them.",
+        actions="draft publisher email, update row, delete row",
     )
 
 
