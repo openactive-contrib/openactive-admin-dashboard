@@ -19,7 +19,6 @@ from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style
 from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
-    _fetch_contact_queue,
     _fetch_coverage,
     _fetch_custom_properties,
     _fetch_incidents,
@@ -203,17 +202,6 @@ def test_the_live_summary_reports_only_the_counts_it_computes(
     assert (stalls.count, stalls.past_threshold_count) == (126, 119)
 
 
-@respx.mock
-def test_the_contact_queue_comes_from_the_admin_root(client: StewardsClient) -> None:
-    route = respx.get(f"{BASE}/admin/contact-queue").mock(
-        return_value=httpx.Response(200, json=load_sample("contact_queue"))
-    )
-    page = _fetch_contact_queue(client, as_of=AS_OF)
-
-    assert page.data
-    assert route.calls.last.request.url.params["token"] == "test-token"
-
-
 # --- endpoints that are not deployed yet --------------------------------------------------
 
 
@@ -222,14 +210,11 @@ def test_an_endpoint_that_is_not_deployed_yet_surfaces_as_not_found(
     client: StewardsClient,
 ) -> None:
     """What every unbuilt endpoint does today: the server 404s, the page says so."""
-    for path in ("/admin/feed-ingestion-error-incidents", "/admin/contact-queue"):
-        respx.get(f"{BASE}{path}").mock(
-            return_value=httpx.Response(404, json={"error": "unknown report"})
-        )
+    respx.get(f"{BASE}/admin/feed-ingestion-error-incidents").mock(
+        return_value=httpx.Response(404, json={"error": "unknown report"})
+    )
     with pytest.raises(ApiNotFound):
         _fetch_incidents("feed_ingestion_error", client, as_of=AS_OF)
-    with pytest.raises(ApiNotFound):
-        _fetch_contact_queue(client, as_of=AS_OF)
 
 
 # --- the quality snapshot -----------------------------------------------------------------

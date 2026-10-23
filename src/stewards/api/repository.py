@@ -346,14 +346,6 @@ def _fetch_custom_property_summaries(
     return summaries
 
 
-def _fetch_contact_queue(
-    client: StewardsClient | None = None, as_of: date | None = None
-) -> IncidentPage:
-    client = client or get_client()
-    endpoint = endpoints.contact_queue(client.style, as_of=as_of or date.today())
-    return _parse(IncidentPage, client.get(endpoint.path, endpoint.params), endpoint.path)
-
-
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward rows, not the daily batch, and the only resource this app writes. Reads are
@@ -480,11 +472,6 @@ def fetch_custom_property_summaries(
     monitor_ids: tuple[str, ...],
 ) -> dict[str, CustomPropertySummary]:
     return _fetch_custom_property_summaries(monitor_ids)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_contact_queue() -> IncidentPage:
-    return _fetch_contact_queue()
 
 
 @st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)

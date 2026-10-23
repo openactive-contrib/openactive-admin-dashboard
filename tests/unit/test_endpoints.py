@@ -140,11 +140,8 @@ def test_admin_coverage_mappings_use_the_rows_id_not_the_monitor_id() -> None:
 # --- endpoints a shape does not have ------------------------------------------------------
 
 
-def test_contract_summary_and_queue_are_unqualified() -> None:
+def test_contract_summary_is_unqualified() -> None:
     assert endpoints.summary(Style.CONTRACT, as_of=AS_OF) == endpoints.Endpoint("/summary")
-    assert endpoints.contact_queue(Style.CONTRACT, as_of=AS_OF) == endpoints.Endpoint(
-        "/contact-queue"
-    )
 
 
 # --- custom properties --------------------------------------------------------------------
@@ -165,12 +162,9 @@ def test_admin_custom_properties_are_the_monitor_slug_itself() -> None:
     assert endpoint.params == {"as_of": "2026-09-02", "page": 1, "page_size": 500}
 
 
-def test_admin_summary_and_queue_sit_under_admin_and_name_the_snapshot() -> None:
+def test_admin_summary_sits_under_admin_and_names_the_snapshot() -> None:
     assert endpoints.summary(Style.ADMIN, as_of=AS_OF) == endpoints.Endpoint(
         "/admin/summary", {"as_of": "2026-09-02"}
-    )
-    assert endpoints.contact_queue(Style.ADMIN, as_of=AS_OF) == endpoints.Endpoint(
-        "/admin/contact-queue", {"as_of": "2026-09-02"}
     )
 
 
@@ -186,7 +180,6 @@ def test_every_style_routes_every_read() -> None:
         ).path
         assert endpoints.custom_properties(style, "feed_custom_properties", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
-        assert endpoints.contact_queue(style, as_of=AS_OF).path
 
 
 # --- publisher notifications --------------------------------------------------------------

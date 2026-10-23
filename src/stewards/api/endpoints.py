@@ -102,13 +102,6 @@ def summary(style: Style, *, as_of: date) -> Endpoint:
     return Endpoint("/summary")
 
 
-def contact_queue(style: Style, *, as_of: date) -> Endpoint:
-    """The cross-monitor union of incidents at or past the threshold."""
-    if style is Style.ADMIN:
-        return Endpoint(f"{ADMIN_ROOT}/contact-queue", {"as_of": as_of.isoformat()})
-    return Endpoint("/contact-queue")
-
-
 def coverage(style: Style, monitor_id: str, *, as_of: date) -> Endpoint:
     """A monitor's coverage snapshot: this run's figures for a whole estate, and no rows.
 

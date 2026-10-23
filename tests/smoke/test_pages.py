@@ -15,7 +15,6 @@ VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 
 PAGES = [
     "00_overview.py",
-    "01_contact_queue.py",
     "01_publisher_notifications.py",
     "10_dataset_stalls.py",
     "11_single_feed_stalls.py",
@@ -293,7 +292,7 @@ def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
 
     app = run("00_overview.py")
-    assert len(app.button) == 1  # only the contact-queue call to action; tiles use page links
+    assert len(app.button) == 1  # only the banner's call to action; tiles use page links
     text = text_of(app)
     for monitor in MONITOR_REGISTRY:
         assert monitor.name in text
@@ -334,13 +333,6 @@ def test_each_tile_says_which_way_its_series_is_moving() -> None:
 def test_overview_banner_names_the_threshold() -> None:
     app = run("00_overview.py")
     assert any("7-day" in warning.value for warning in app.warning)
-
-
-def test_contact_queue_lists_the_cross_monitor_union() -> None:
-    app = run("01_contact_queue.py")
-    frame = app.dataframe[0].value
-    assert len(frame) == 10
-    assert set(frame["Monitor"]) == {"Single-feed stalls", "Feed ingestion errors"}
 
 
 def test_notification_list_hides_closed_rows_by_default() -> None:

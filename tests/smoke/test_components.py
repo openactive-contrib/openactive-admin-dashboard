@@ -149,31 +149,6 @@ def test_a_monitor_page_reports_the_failure_instead_of_an_empty_table() -> None:
     assert any("Single-feed stalls" in m.value for m in app.markdown)
 
 
-def _contact_queue_error_script() -> None:
-    import streamlit as st
-
-    from stewards.api import repository
-    from stewards.api.errors import ApiUnauthorized
-    from stewards.components.contact_queue_page import render_contact_queue_page
-
-    def boom(*_args: object, **_kwargs: object) -> None:
-        raise ApiUnauthorized("token expired")
-
-    st.cache_data.clear()
-    original = repository.fetch_contact_queue
-    repository.fetch_contact_queue = boom  # type: ignore[assignment]
-    try:
-        render_contact_queue_page()
-    finally:
-        repository.fetch_contact_queue = original
-        st.cache_data.clear()
-
-
-def test_the_contact_queue_reports_an_auth_failure() -> None:
-    app = run(_contact_queue_error_script)
-    assert any("credentials" in error.value for error in app.error)
-
-
 def _overview_error_script() -> None:
     import streamlit as st
 
@@ -250,42 +225,6 @@ def test_counts_the_api_does_not_report_render_as_unknown(payload) -> None:
     assert not app.success  # nothing is known to be clear
     assert not app.warning
     assert any("does not report" in info.value for info in app.info)
-
-
-# --- the contact queue with an unrenderable monitor -------------------------------------
-
-
-def _unknown_monitor_script() -> None:
-    import streamlit as st
-
-    from stewards.api import repository
-    from stewards.api.models import Incident, IncidentPage, Meta
-    from stewards.components.contact_queue_page import render_contact_queue_page
-
-    meta = Meta(snapshot_date="2026-08-21", generated_at="2026-08-21T06:12:04Z", total=1)
-    incident = Incident(
-        monitor_id="orphan_children",
-        publisher_id="pub_gll",
-        publisher_name="Better (GLL)",
-        first_detected="2026-08-05",
-        days_open=16,
-        past_threshold=True,
-        status="contact_due",
-    )
-    st.cache_data.clear()
-    original = repository.fetch_contact_queue
-    repository.fetch_contact_queue = lambda: IncidentPage(data=(incident,), meta=meta)  # type: ignore[assignment]
-    try:
-        render_contact_queue_page()
-    finally:
-        repository.fetch_contact_queue = original
-        st.cache_data.clear()
-
-
-def test_the_queue_says_which_monitors_it_cannot_render_yet() -> None:
-    app = run(_unknown_monitor_script)
-    assert any("orphan_children" in info.value for info in app.info)
-    assert not app.dataframe
 
 
 # --- the layout header ------------------------------------------------------------------
@@ -396,7 +335,7 @@ def _navigation_script() -> None:
 
     nav.build_navigation()
     assert nav.page_for("overview") is not None
-    assert nav.page_for("contact_queue") is not None
+    assert nav.page_for("publisher_notifications") is not None
     assert nav.page_for("no_such_monitor") is None
     for monitor in MONITOR_REGISTRY:
         page = nav.page_for(monitor.id)
@@ -412,7 +351,7 @@ def _url_path_script() -> None:
     # Streamlit strips the numeric ordering prefix, so these are the real deep links.
     expected = {
         "overview": "",
-        "contact_queue": "contact_queue",
+        "publisher_notifications": "publisher_notifications",
         "single_feed_stall": "single_feed_stalls",
         "feed_ingestion_error": "feed_ingestion_errors",
     }
@@ -438,7 +377,7 @@ def _sidebar_script() -> None:
     nav.build_navigation()
     nav.render_sidebar(
         {
-            "contact_queue": NavBadge("10", Tone.RED),
+            "publisher_notifications": NavBadge("10", Tone.RED),
             "single_feed_stall": NavBadge("23", Tone.RED),
             "feed_ingestion_error": NavBadge("9", Tone.AMBER),
         }

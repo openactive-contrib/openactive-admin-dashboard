@@ -1,4 +1,4 @@
-"""The landing page: fleet KPIs, the contact-queue banner, and one tile per monitor."""
+"""The landing page: fleet KPIs, the threshold banner, and one tile per monitor."""
 
 from __future__ import annotations
 

@@ -37,7 +37,6 @@ from stewards.api.repository import (
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
     _delete_publisher_notification,
-    _fetch_contact_queue,
     _fetch_coverage,
     _fetch_coverage_snapshots,
     _fetch_custom_properties,
@@ -282,35 +281,6 @@ def test_a_failing_trend_endpoint_does_not_raise(client: StewardsClient) -> None
 
 def test_no_monitors_means_no_requests(client: StewardsClient) -> None:
     assert _fetch_monitor_trends((), client) == {}
-
-
-# --- contact queue ---------------------------------------------------------------------
-
-
-@respx.mock
-def test_contact_queue_returns_the_cross_monitor_union(client: StewardsClient) -> None:
-    respx.get(f"{BASE}/contact-queue").mock(
-        return_value=httpx.Response(200, json=load_sample("contact_queue"))
-    )
-    page = _fetch_contact_queue(client)
-    assert len(page.data) == 10
-    assert {i.monitor_id for i in page.data} == {"single_feed_stall", "feed_ingestion_error"}
-    assert all(i.past_threshold for i in page.data)
-
-
-@respx.mock
-def test_empty_contact_queue_is_not_an_error(client: StewardsClient, payload) -> None:
-    respx.get(f"{BASE}/contact-queue").mock(
-        return_value=httpx.Response(200, json=payload("incidents_empty"))
-    )
-    assert _fetch_contact_queue(client).data == ()
-
-
-@respx.mock
-def test_contact_queue_failure_is_typed(client: StewardsClient) -> None:
-    respx.get(f"{BASE}/contact-queue").mock(return_value=httpx.Response(500))
-    with pytest.raises(ApiUnavailable):
-        _fetch_contact_queue(client)
 
 
 # --- a trend endpoint a deployment has not built ------------------------------------------
