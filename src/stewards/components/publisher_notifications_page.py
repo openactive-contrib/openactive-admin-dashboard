@@ -27,6 +27,12 @@ SOURCE = "Stored work list · updated as you save"
 #: The "no filter" choice in a dropdown. `apply_filters` reads an empty string as "any".
 ANY = ""
 
+#: Widget key of the table, so a save can clear the selection: the row may move.
+TABLE_KEY = "table_publisher_notifications"
+
+#: Survives the rerun after a save, so the confirmation is shown on the fresh page.
+FLASH_KEY = "pn_flash"
+
 
 def render_publisher_notifications_page() -> None:
     try:
@@ -40,6 +46,9 @@ def render_publisher_notifications_page() -> None:
 
     today = date.today()
     layout.render_header(CRUMB, TITLE, summary.meta, source=SOURCE)
+    flash = st.session_state.pop(FLASH_KEY, None)
+    if flash:
+        st.success(flash, icon=":material/check_circle:")
     _render_blurb()
     _render_kpis(summary.data)
     rows = _render_filters(list(listing.data))
@@ -112,7 +121,7 @@ def _render_table(
         pn.tone_frame(ordered),
         columns=pn.COLUMN_SPECS,
         rag_columns=pn.RAG_COLUMNS,
-        key="table_publisher_notifications",
+        key=TABLE_KEY,
         empty_message="No publishers match these filters.",
     )
     if position is None or position >= len(ordered):
@@ -144,5 +153,71 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
             st.info("No problems are recorded on this row.")
         else:
             st.dataframe(problems, hide_index=True, width="stretch")
-
+        render_edit_form(row, today)
         render_editable_draft(draft_publisher_email(row, today), key=draft_key(row))
+
+
+def render_edit_form(row: PublisherNotification, today: date) -> None:
+    """Edit the five steward fields and save the whole row back."""
+    # Keyed by row and last save: a new row, or a saved one, starts from its stored values.
+    prefix = f"pn_edit_{draft_key(row)}"
+    with st.form(prefix, border=False):
+        st.markdown("**Update this row**")
+        status_col, stakeholder_col, contact_col, date_col = st.columns(4)
+        status = status_col.selectbox(
+            "Status",
+            pn.STATUSES,
+            index=pn.STATUSES.index(row.status) if row.status in pn.STATUSES else None,
+            format_func=status_label,
+            placeholder="Choose a status",
+            key=f"{prefix}_status",
+        )
+        stakeholder = stakeholder_col.text_input(
+            "Stakeholder", value=row.stakeholder or "", key=f"{prefix}_stakeholder"
+        )
+        contact = contact_col.text_input(
+            "Contact", value=row.contact or "", key=f"{prefix}_contact"
+        )
+        picked = date_col.date_input(
+            "Date contacted",
+            value=row.date_contacted,
+            max_value=today,
+            format="YYYY-MM-DD",
+            key=f"{prefix}_date",
+        )
+        notes = st.text_area(
+            "Notes",
+            value=row.notes or "",
+            max_chars=pn.NOTES_MAX,
+            key=f"{prefix}_notes",
+        )
+        submitted = st.form_submit_button("Save", type="primary")
+
+    if not submitted:
+        return
+
+    # `date_input` can in principle return a range; this one is a single date or empty.
+    contacted = picked if isinstance(picked, date) else None
+    body, errors = pn.apply_edits(
+        row,
+        status=status or "",
+        stakeholder=stakeholder,
+        contact=contact,
+        date_contacted=contacted,
+        notes=notes,
+        today=today,
+    )
+    if body is None:
+        for error in errors:
+            st.error(error)
+        return
+
+    try:
+        repository.update_publisher_notification(body)
+    except ApiError as exc:
+        render_api_error(exc)
+        return
+
+    st.session_state[FLASH_KEY] = f"Saved {row.publisher_name or row.id}."
+    st.session_state.pop(TABLE_KEY, None)
+    st.rerun()

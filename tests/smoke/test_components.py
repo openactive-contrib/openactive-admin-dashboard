@@ -1137,3 +1137,70 @@ def test_a_read_that_raises_still_clears_the_card_and_a_second_card_can_open() -
     app = run(_failed_read_script)
     assert [e.value for e in app.error] == ["failed"]
     assert not app.get("spinner")
+
+
+# --- the notification edit form -----------------------------------------------------------
+
+
+def _edit_form_script(fail: bool) -> None:
+    from datetime import date
+
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.errors import ApiUnavailable
+    from stewards.api.models import PublisherNotificationBody, PublisherNotificationPage
+    from stewards.components.publisher_notifications_page import render_edit_form
+
+    page = PublisherNotificationPage.model_validate(
+        load_sample("publisher_notifications_page1")
+    )
+    row = page.data[0]
+
+    def save(body: PublisherNotificationBody) -> object:
+        if fail:
+            raise ApiUnavailable("down")
+        st.session_state["saved_body"] = body.to_payload()
+        return row
+
+    original = repository.update_publisher_notification
+    repository.update_publisher_notification = save  # type: ignore[assignment]
+    try:
+        render_edit_form(row, date(2026, 10, 13))
+    finally:
+        repository.update_publisher_notification = original
+
+
+def _field(widgets: object, label: str) -> object:
+    return next(w for w in widgets if w.label == label)  # type: ignore[attr-defined]
+
+
+def test_saving_sends_the_edit_and_keeps_the_evidence() -> None:
+    app = run(_edit_form_script, False)
+    _field(app.selectbox, "Status").set_value("in_progress")
+    _field(app.text_input, "Stakeholder").input("Council")
+    app.button[0].click().run()
+
+    sent = app.session_state["saved_body"]
+    assert sent["status"] == "in_progress"
+    assert sent["stakeholder"] == "Council"
+    assert sent["problems"]  # the evidence went back with the edit
+    assert app.session_state["pn_flash"] == "Saved Dummy Leisure."
+
+
+def test_an_invalid_edit_is_refused_and_not_sent() -> None:
+    app = run(_edit_form_script, False)
+    _field(app.text_input, "Contact").input("not an email")
+    app.button[0].click().run()
+
+    assert any("email address" in e.value for e in app.error)
+    assert "saved_body" not in app.session_state
+
+
+def test_a_failed_save_says_so_and_does_not_confirm() -> None:
+    app = run(_edit_form_script, True)
+    app.button[0].click().run()
+
+    assert app.error
+    assert "pn_flash" not in app.session_state
