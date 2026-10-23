@@ -28,8 +28,9 @@ of the queue.
 2. Check the dataset-wide stall monitor. If every feed for the publisher is stalled, treat it
    as one incident rather than several.
 3. Re-run the feed fetch manually and compare the raw payload against the stored snapshot.
-4. At day 7 the incident enters the contact queue. Use the draft email action and record the
-   contact date.
+4. At day 10 on a Slot or ScheduledSession feed the publisher is flagged on the
+   [publisher notification list]({% link publisher-notification-list.md %}). Draft the email
+   there, then set the status and date contacted.
 
 Do not chase a stall inside the first 48 hours. Roughly a third of them self-resolve when the
 publisher's next scheduled export runs.
