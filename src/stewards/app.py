@@ -18,6 +18,7 @@ from stewards.components.overview_page import tile_cards
 from stewards.components.surface import inject_card_styles
 from stewards.config import ConfigError, get_settings
 from stewards.monitors.overview import NavBadge, nav_badges
+from stewards.monitors.publisher_notifications import alerts_badge
 from stewards.monitors.registry import Source, monitor_ids
 
 st.set_page_config(
@@ -36,13 +37,26 @@ def _nav_badges() -> dict[str, NavBadge]:
     """
     try:
         summary = repository.fetch_summary().data
+        badges = nav_badges(
+            summary,
+            repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
+            tile_cards(),
+        )
     except ApiError:
-        return {}
-    return nav_badges(
-        summary,
-        repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS)),
-        tile_cards(),
-    )
+        badges = {}
+    notification_badge = _notification_badge()
+    if notification_badge is not None:
+        badges["publisher_notifications"] = notification_badge
+    return badges
+
+
+def _notification_badge() -> NavBadge | None:
+    """The notification list's pill, read on its own so either API failing spares the other."""
+    try:
+        summary = repository.fetch_publisher_notification_summary().data
+    except ApiError:
+        return None
+    return alerts_badge(summary)
 
 
 def main() -> None:

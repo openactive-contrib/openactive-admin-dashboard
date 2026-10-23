@@ -93,8 +93,8 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
     if summary.past_threshold is None:
         st.info(
             f"This snapshot does not report how many incidents have passed the "
-            f"{threshold_days}-day contact threshold. Open the contact queue to see the "
-            "incidents themselves.",
+            f"{threshold_days}-day contact threshold. Open the notification list to see "
+            "which publishers need contacting.",
             icon=":material/info:",
         )
         return
@@ -108,13 +108,13 @@ def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
     with banner:
         st.warning(
             f"**{summary.past_threshold} incidents have passed the {threshold_days}-day "
-            "contact threshold.** Incidents open longer than the threshold move into the "
-            "publisher contact queue, ordered by days open.",
+            "contact threshold.** The publisher notification list tracks who has been "
+            "contacted about them, and who still needs to be.",
             icon=":material/schedule:",
         )
     with action:
-        if st.button("Review contact queue", width="stretch", type="primary"):
-            nav.switch_to("contact_queue")
+        if st.button("Open notification list", width="stretch", type="primary"):
+            nav.switch_to("publisher_notifications")
 
 
 def tile_cards() -> Cards:

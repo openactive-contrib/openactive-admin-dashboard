@@ -360,6 +360,15 @@ def test_notification_list_shows_closed_rows_on_request() -> None:
     assert len(app.dataframe[0].value) == 3
 
 
+def test_the_sidebar_shows_the_notification_alert_count() -> None:
+    app = AppTest.from_file(str(APP_FILE), default_timeout=60)
+    app.run()
+    assert not app.exception, [e.value for e in app.exception]
+    # The summary fixture reports 2 alerts.
+    markdown = " ".join(m.value for m in app.markdown)
+    assert ":red-badge[2]" in markdown
+
+
 # --- the entry point ---------------------------------------------------------------------
 
 APP_FILE = VIEWS_DIR.parent / "app.py"

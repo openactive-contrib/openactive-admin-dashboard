@@ -8,12 +8,14 @@ from typing import Any
 import pytest
 
 from stewards.api.models import PublisherNotification, PublisherNotificationSummary
+from stewards.monitors.overview import NavBadge
 from stewards.monitors.publisher_notifications import (
     COLUMNS,
     FOLLOW_UP_DAYS,
     NOTES_MAX,
     STATUSES,
     alert_reasons,
+    alerts_badge,
     apply_edits,
     apply_filters,
     filter_options,
@@ -243,3 +245,16 @@ def test_notes_at_the_limit_are_allowed() -> None:
 
 def test_statuses_are_the_workflow_three() -> None:
     assert STATUSES == ("open", "in_progress", "closed")
+
+
+# --- sidebar ------------------------------------------------------------------------------
+
+
+def test_alerts_badge_is_a_red_count() -> None:
+    badge = alerts_badge(PublisherNotificationSummary(alerts=1200))
+    assert badge == NavBadge("1,200", Tone.RED)
+
+
+@pytest.mark.parametrize("alerts", [0, None])
+def test_no_badge_when_nothing_needs_attention(alerts: int | None) -> None:
+    assert alerts_badge(PublisherNotificationSummary(alerts=alerts)) is None

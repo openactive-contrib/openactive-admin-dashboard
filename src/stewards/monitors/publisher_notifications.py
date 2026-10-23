@@ -18,6 +18,7 @@ from stewards.api.models import (
     PublisherNotificationBody,
     PublisherNotificationSummary,
 )
+from stewards.monitors.overview import NavBadge
 from stewards.monitors.registry import RAG_KINDS, Col, ColKind, get_monitor
 from stewards.monitors.thresholds import Tone, days_label, days_tone, status_label, status_tone
 from stewards.monitors.transforms import EMPTY
@@ -283,3 +284,13 @@ def apply_edits(
         }
     )
     return body, []
+
+
+# --- sidebar ------------------------------------------------------------------------------
+
+
+def alerts_badge(summary: PublisherNotificationSummary) -> NavBadge | None:
+    """The sidebar pill: rows needing attention today. None when there are none to show."""
+    if summary.alerts is None or summary.alerts <= 0:
+        return None
+    return NavBadge(f"{summary.alerts:,}", Tone.RED)
