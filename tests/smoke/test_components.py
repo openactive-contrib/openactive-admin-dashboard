@@ -309,6 +309,26 @@ def test_the_header_renders_no_download_button() -> None:
     assert "BigQuery · daily batch" in markdown
 
 
+def _stored_source_header_script() -> None:
+    from stewards.api.models import Meta
+    from stewards.components import layout
+
+    meta = Meta(snapshot_date="2026-10-13", generated_at="2026-10-13T09:30:00Z")
+    layout.render_header(
+        "Publishers",
+        "Publisher notification list",
+        meta,
+        source="Stored work list · updated as you save",
+    )
+
+
+def test_the_header_names_a_stored_source_instead_of_the_daily_batch() -> None:
+    app = run(_stored_source_header_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Stored work list · updated as you save" in markdown
+    assert "daily batch" not in markdown
+
+
 # --- the empty trend chart --------------------------------------------------------------
 
 
