@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
-from stewards.api.models import Incident
-from stewards.monitors.email_draft import REPLY_WINDOW_DAYS, draft_email, subject_line
+from stewards.api.models import Incident, PublisherNotification
+from stewards.monitors.email_draft import (
+    REPLY_WINDOW_DAYS,
+    draft_email,
+    draft_publisher_email,
+    subject_line,
+)
 from stewards.monitors.registry import get_monitor
 from stewards.monitors.transforms import EMPTY
 
@@ -368,3 +373,120 @@ def test_the_future_decline_draft_falls_back_to_the_detection_date() -> None:
     monitor = get_monitor("dataset_future_decline")
     draft = draft_email(monitor, future_decline_incident(detail={}), SNAPSHOT)
     assert "2026-08-12 fewer items" in draft
+
+    # --- one email per publisher --------------------------------------------------------------
+
+
+NOTIFICATION_SNAPSHOT = date(2026, 10, 13)
+
+PUBLISHER_GOLDEN = """\
+Subject: OpenActive data check: Dummy Leisure — 2 issues
+
+Hello Dummy Leisure team,
+
+We monitor the OpenActive feeds you publish as part of the open data service.
+In our snapshot of 2026-10-13, we found 2 issues with your data.
+
+1. Single-feed stalls: the feed still responds with HTTP 200, but the most recent \
+modified timestamp has not advanced for 12 days. The last change we recorded was 2026-09-30.
+Feed: scheduled-sessions
+Feed type: ScheduledSession
+Endpoint: https://opendata.dummy-leisure.example.org/scheduled-sessions
+First detected: 2026-09-30 (12 days open)
+
+2. Feed ingestion errors: our daily crawl has failed to ingest the feed on 10 consecutive \
+days, either because the endpoint did not respond correctly or because the page it returned \
+could not be parsed. The last successful ingestion was 2026-10-02.
+Feed: slots
+Feed type: Slot
+Endpoint: https://opendata.dummy-leisure.example.org/slots
+First detected: 2026-10-03 (10 days open)
+
+Could you look into each of these,
+and let us know by 2026-10-18 if you need help investigating.
+
+No action is needed on our side once each is fixed; the checks clear themselves
+on the next daily snapshot.
+
+Thank you,
+The ODI data stewards team"""
+
+
+def notification(*problems: dict[str, object]) -> PublisherNotification:
+    return PublisherNotification.model_validate(
+        {
+            "id": "pn_dummy-leisure",
+            "publisher_id": "dummy-leisure",
+            "publisher_name": "Dummy Leisure",
+            "status": "open",
+            "problems": list(problems),
+        }
+    )
+
+
+STALL_PROBLEM: dict[str, object] = {
+    "monitor_id": "single_feed_stall",
+    "feed_name": "scheduled-sessions",
+    "feed_type": "ScheduledSession",
+    "feed_url": "https://opendata.dummy-leisure.example.org/scheduled-sessions",
+    "first_detected": "2026-09-30",
+    "days_open": 12,
+    "detail": {"last_modified": "2026-09-30"},
+}
+
+INGESTION_PROBLEM: dict[str, object] = {
+    "monitor_id": "feed_ingestion_error",
+    "feed_name": "slots",
+    "feed_type": "Slot",
+    "feed_url": "https://opendata.dummy-leisure.example.org/slots",
+    "first_detected": "2026-10-03",
+    "days_open": 10,
+    # Top level rather than under `detail`, as hand-typed rows often are: it is folded in.
+    "last_completed": "2026-10-02",
+}
+
+
+def test_publisher_draft_matches_the_golden_copy() -> None:
+    row = notification(STALL_PROBLEM, INGESTION_PROBLEM)
+    assert draft_publisher_email(row, NOTIFICATION_SNAPSHOT) == PUBLISHER_GOLDEN
+
+
+def test_one_problem_reads_exactly_like_the_single_incident_draft() -> None:
+    row = notification(STALL_PROBLEM)
+    incident = row.problems[0].as_incident(row.publisher_id, row.publisher_name)
+    expected = draft_email(get_monitor("single_feed_stall"), incident, NOTIFICATION_SNAPSHOT)
+    assert draft_publisher_email(row, NOTIFICATION_SNAPSHOT) == expected
+
+
+def test_unknown_monitors_are_left_out_of_the_email() -> None:
+    mystery = {"monitor_id": "not_a_monitor", "days_open": 3}
+    row = notification(STALL_PROBLEM, mystery)
+    draft = draft_publisher_email(row, NOTIFICATION_SNAPSHOT)
+    assert "not_a_monitor" not in draft
+    assert "1." not in draft
+
+
+def test_no_describable_problems_gives_no_draft() -> None:
+    assert draft_publisher_email(notification(), NOTIFICATION_SNAPSHOT) == ""
+    mystery = {"monitor_id": "not_a_monitor"}
+    assert draft_publisher_email(notification(mystery), NOTIFICATION_SNAPSHOT) == ""
+
+
+def test_publisher_draft_keeps_the_house_tone() -> None:
+    draft = draft_publisher_email(
+        notification(STALL_PROBLEM, INGESTION_PROBLEM), NOTIFICATION_SNAPSHOT
+    )
+    assert "!" not in draft
+    assert f"{REPLY_WINDOW_DAYS}" not in draft.split("\n")[0]
+
+
+def test_draft_key_changes_with_the_row_and_with_a_save() -> None:
+    from stewards.components.email_draft import draft_key
+
+    first = notification(STALL_PROBLEM)
+    saved = first.model_copy(update={"updated_at": datetime(2026, 10, 13, 9, 30)})
+    other = first.model_copy(update={"id": "pn_other"})
+
+    assert draft_key(first) != draft_key(saved)
+    assert draft_key(first) != draft_key(other)
+    assert draft_key(first) == draft_key(notification(STALL_PROBLEM))

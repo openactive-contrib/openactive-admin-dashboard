@@ -28,9 +28,15 @@ def render_header(
     crumb: str,
     title: str,
     meta: Meta,
+    *,
+    source: str = SOURCE_LINE,
 ) -> None:
-    """The header bar: breadcrumb and title left, snapshot provenance right."""
-    lines = (f"Snapshot `{meta.snapshot_date.isoformat()} {SNAPSHOT_TIME}`", SOURCE_LINE)
+    """The header bar: breadcrumb and title left, snapshot provenance right.
+
+    `source` names where the figures come from. Every daily-batch page keeps the default;
+    a page over stored rows that change as stewards save must not claim a daily batch.
+    """
+    lines = (f"Snapshot `{meta.snapshot_date.isoformat()} {SNAPSHOT_TIME}`", source)
 
     with card("header"):
         titles, provenance = st.columns([5, 3], vertical_alignment="center")

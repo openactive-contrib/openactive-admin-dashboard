@@ -1,8 +1,8 @@
 # OpenActive Data Stewards Dashboard
 
 Internal Streamlit app for the ODI tech team to monitor the health and quality of data
-published by the ~170 OpenActive publishers. Read-only, behind Google SSO, restricted to the
-`theodi.org` workspace.
+published by the ~170 OpenActive publishers. Read-only apart from the publisher notification
+list, behind Google SSO, restricted to the `theodi.org` workspace.
 
 Data comes from the stewards REST API, which fronts a **daily BigQuery batch** — every page
 states the snapshot date rather than implying live data.
@@ -23,8 +23,8 @@ STEWARDS_ENV=dev STEWARDS_DISABLE_AUTH=true \
 ```
 
 Endpoints that a deployment has not implemented yet report themselves as not live on the
-page that needs them; nothing else on the app is affected. Today that is the fleet summary,
-the contact queue and every monitor except single-feed stalls.
+page that needs them; nothing else on the app is affected. Today that is the fleet summary
+and every monitor except single-feed stalls.
 
 ## Develop
 
@@ -69,5 +69,6 @@ up once by hand — the full procedure, plus rollback, is `docs/deployment.md`.
 - `Data Stewards Dashboard.dc.html` — the approved UI mockup
 
 Two of the eight monitors are built (`single_feed_stall`, `feed_ingestion_error`), plus the
-overview, and the cross-monitor contact queue. The rest follow their API endpoints. Runbooks
+overview, and the publisher notification list — the one page that writes, and only to its
+own stored rows. The rest follow their API endpoints. Runbooks
 are published separately from `docs/` to GitHub Pages.

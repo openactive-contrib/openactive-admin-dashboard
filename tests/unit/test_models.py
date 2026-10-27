@@ -15,8 +15,11 @@ from pydantic import ValidationError
 from stewards.api.models import (
     DetailModel,
     Incident,
+    NotificationProblem,
     OrphanedChildrenDetail,
     OrphanKind,
+    PublisherNotification,
+    PublisherNotificationSummary,
     StallDetail,
 )
 
@@ -187,3 +190,112 @@ def test_a_dataset_reports_the_api_fraction_as_a_percentage(
         assert detail.orphan_percent is None
     else:
         assert detail.orphan_percent == pytest.approx(expected)
+
+
+# --- publisher notifications --------------------------------------------------------------
+
+
+def notification(**overrides: object) -> PublisherNotification:
+    base: dict[str, object] = {
+        "id": "pn_dummy-leisure",
+        "publisher_id": "pub_dummy-leisure",
+        "publisher_name": "Dummy Leisure",
+        "problem_count": 2,
+        "monitors": ["single_feed_stall", "feed_ingestion_error"],
+        "oldest_days_open": 12,
+        "status": "open",
+        "contact": "dummy.publisher@example.org",
+        "date_contacted": "2026-10-01",
+        "problems": [
+            {
+                "monitor_id": "single_feed_stall",
+                "feed_name": "scheduled-sessions",
+                "feed_type": "ScheduledSessions",
+                "days_open": 12,
+                "detail": {"last_modified": "2026-09-24"},
+            }
+        ],
+    }
+    return PublisherNotification.model_validate({**base, **overrides})
+
+
+def test_a_problem_folds_its_undeclared_evidence_into_detail() -> None:
+    problem = NotificationProblem.model_validate(
+        {"monitor_id": "feed_ingestion_error", "last_completed": "2026-10-01"}
+    )
+    assert problem.detail == {"last_completed": "2026-10-01"}
+
+
+def test_a_problem_reads_as_an_incident_of_its_own_monitor() -> None:
+    row = notification()
+    incident = row.problems[0].as_incident(row.publisher_id, row.publisher_name)
+
+    assert incident.monitor_id == "single_feed_stall"
+    assert incident.publisher_name == "Dummy Leisure"
+    assert incident.days_open == 12
+    assert StallDetail.model_validate(incident.detail).last_modified == date(2026, 9, 24)
+
+
+@pytest.mark.parametrize(
+    "problems",
+    [None, "not json", {"not": "a list"}, 42],
+    ids=["null", "bad-string", "object", "number"],
+)
+def test_unusable_problems_leave_the_row_readable(problems: object) -> None:
+    row = notification(problems=problems)
+    assert row.problems == ()
+    assert row.publisher_name == "Dummy Leisure"
+
+
+def test_problems_sent_as_a_json_string_are_decoded() -> None:
+    row = notification(problems='[{"monitor_id": "dataset_stall", "days_open": 5}]')
+    assert [p.monitor_id for p in row.problems] == ["dataset_stall"]
+
+
+def test_items_in_problems_that_are_not_objects_are_skipped() -> None:
+    row = notification(problems=[{"monitor_id": "dataset_stall"}, "stray", 7])
+    assert len(row.problems) == 1
+
+
+def test_null_columns_fall_back_to_their_defaults() -> None:
+    row = notification(monitors=None, publisher_name=None, status=None)
+    assert row.monitors == ()
+    assert row.publisher_name == ""
+    assert row.status == ""
+
+
+def test_a_row_without_an_id_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        PublisherNotification.model_validate({"publisher_name": "No Id"})
+
+
+def test_the_save_body_carries_every_field_and_the_evidence_untouched() -> None:
+    raw = [{"monitor_id": "single_feed_stall", "unknown_to_us": {"kept": True}}]
+    row = notification(problems=raw)
+
+    payload = row.to_body().to_payload()
+
+    assert payload["problems"] == raw
+    assert payload["monitors"] == ["single_feed_stall", "feed_ingestion_error"]
+    assert payload["date_contacted"] == "2026-10-01"
+    assert payload["contact"] == "dummy.publisher@example.org"
+    assert set(payload) == {
+        "id",
+        "publisher_id",
+        "publisher_name",
+        "problem_count",
+        "monitors",
+        "oldest_days_open",
+        "status",
+        "stakeholder",
+        "contact",
+        "date_contacted",
+        "notes",
+        "problems",
+    }
+
+
+def test_summary_counts_stay_unknown_when_not_reported() -> None:
+    summary = PublisherNotificationSummary.model_validate({"publishers": 7})
+    assert summary.publishers == 7
+    assert summary.alerts is None

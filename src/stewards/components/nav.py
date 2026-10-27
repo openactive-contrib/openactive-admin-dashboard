@@ -33,7 +33,7 @@ ASSET_DIR = APP_DIR / "assets"
 LOGO = ASSET_DIR / "openactive-logo.png"
 
 OVERVIEW_PAGE = "views/00_overview.py"
-CONTACT_QUEUE_PAGE = "views/01_contact_queue.py"
+PUBLISHER_NOTIFICATIONS_PAGE = "views/01_publisher_notifications.py"
 
 OVERVIEW_SECTION = "Overview"
 
@@ -58,10 +58,12 @@ def build_navigation() -> StreamlitPage:
     _pages["overview"] = st.Page(
         APP_DIR / OVERVIEW_PAGE, title="Monitor overview", default=True
     )
-    _pages["contact_queue"] = st.Page(APP_DIR / CONTACT_QUEUE_PAGE, title="Contact queue")
+    _pages["publisher_notifications"] = st.Page(
+        APP_DIR / PUBLISHER_NOTIFICATIONS_PAGE, title="Publisher notification list"
+    )
     _sections[OVERVIEW_SECTION] = [
         ("overview", _pages["overview"]),
-        ("contact_queue", _pages["contact_queue"]),
+        ("publisher_notifications", _pages["publisher_notifications"]),
     ]
 
     for group in groups():
@@ -117,7 +119,7 @@ def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
 
 
 def page_for(key: str) -> StreamlitPage | None:
-    """Look up a built page by monitor id, or by `overview`/`contact_queue`/`docs`."""
+    """Look up a built page by monitor id, or by `overview`/`publisher_notifications`/`docs`."""
     return _pages.get(key)
 
 

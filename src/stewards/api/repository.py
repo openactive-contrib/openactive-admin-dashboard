@@ -30,6 +30,11 @@ from stewards.api.models import (
     FeedQualityResponse,
     FeedQualitySummary,
     IncidentPage,
+    PublisherNotification,
+    PublisherNotificationBody,
+    PublisherNotificationDocument,
+    PublisherNotificationPage,
+    PublisherNotificationSummaryResponse,
     SiteMapping,
     SiteMappingPage,
     SummaryResponse,
@@ -341,12 +346,75 @@ def _fetch_custom_property_summaries(
     return summaries
 
 
-def _fetch_contact_queue(
-    client: StewardsClient | None = None, as_of: date | None = None
-) -> IncidentPage:
+# --- publisher notifications --------------------------------------------------------------
+#
+# Stored steward rows, not the daily batch, and the only resource this app writes. Reads are
+# cached briefly so a widget click does not query BigQuery, and every write clears them so a
+# save is visible on the very next run.
+
+NOTIFICATIONS_TTL = 30
+
+
+def _fetch_publisher_notifications(
+    client: StewardsClient | None = None,
+) -> PublisherNotificationPage:
+    """Every row on the list, paging inside this function as `_fetch_incidents` does."""
     client = client or get_client()
-    endpoint = endpoints.contact_queue(client.style, as_of=as_of or date.today())
-    return _parse(IncidentPage, client.get(endpoint.path, endpoint.params), endpoint.path)
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.publisher_notifications(client.style, page=page, page_size=PAGE_SIZE)
+
+    endpoint = request(1)
+    first = _parse(
+        PublisherNotificationPage, client.get(endpoint.path, endpoint.params), endpoint.path
+    )
+
+    rows: list[PublisherNotification] = list(first.data)
+    page = 1
+    while len(rows) < first.meta.total and rows and page < MAX_PAGES:
+        page += 1
+        nxt_endpoint = request(page)
+        nxt = _parse(
+            PublisherNotificationPage,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
+        )
+        if not nxt.data:
+            break
+        rows.extend(nxt.data)
+    if len(rows) < first.meta.total:
+        log.warning("Fetched %d od %d publisher notifications", len(rows), first.meta.total)
+    return PublisherNotificationPage(data=tuple(rows), meta=first.meta)
+
+
+def _fetch_publisher_notification_summary(
+    client: StewardsClient | None = None,
+) -> PublisherNotificationSummaryResponse:
+    client = client or get_client()
+    endpoint = endpoints.publisher_notification_summary(client.style)
+    return _parse(
+        PublisherNotificationSummaryResponse,
+        client.get(endpoint.path, endpoint.params),
+        endpoint.path,
+    )
+
+
+def _update_publisher_notification(
+    body: PublisherNotificationBody, client: StewardsClient | None = None
+) -> PublisherNotification:
+    """Save the whole row. The API overwrites every column, so `body` must be complete."""
+    client = client or get_client()
+    endpoint = endpoints.publisher_notification(client.style, body.id)
+    payload = client.patch(endpoint.path, body.to_payload())
+    return _parse(PublisherNotificationDocument, payload, endpoint.path).data
+
+
+def _delete_publisher_notification(
+    notification_id: str, client: StewardsClient | None = None
+) -> None:
+    client = client or get_client()
+    endpoint = endpoints.publisher_notification(client.style, notification_id)
+    client.delete(endpoint.path)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
@@ -406,6 +474,28 @@ def fetch_custom_property_summaries(
     return _fetch_custom_property_summaries(monitor_ids)
 
 
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_contact_queue() -> IncidentPage:
-    return _fetch_contact_queue()
+@st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)
+def fetch_publisher_notifications() -> PublisherNotificationPage:
+    return _fetch_publisher_notifications()
+
+
+@st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)
+def fetch_publisher_notification_summary() -> PublisherNotificationSummaryResponse:
+    return _fetch_publisher_notification_summary()
+
+
+def clear_publisher_notification_cache() -> None:
+    """Forget the cached list and counts, so the next run reads what was just written."""
+    fetch_publisher_notifications.clear()
+    fetch_publisher_notification_summary.clear()
+
+
+def update_publisher_notification(body: PublisherNotificationBody) -> PublisherNotification:
+    saved = _update_publisher_notification(body)
+    clear_publisher_notification_cache()
+    return saved
+
+
+def delete_publisher_notification(notification_id: str) -> None:
+    _delete_publisher_notification(notification_id)
+    clear_publisher_notification_cache()

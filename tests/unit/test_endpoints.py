@@ -140,11 +140,8 @@ def test_admin_coverage_mappings_use_the_rows_id_not_the_monitor_id() -> None:
 # --- endpoints a shape does not have ------------------------------------------------------
 
 
-def test_contract_summary_and_queue_are_unqualified() -> None:
+def test_contract_summary_is_unqualified() -> None:
     assert endpoints.summary(Style.CONTRACT, as_of=AS_OF) == endpoints.Endpoint("/summary")
-    assert endpoints.contact_queue(Style.CONTRACT, as_of=AS_OF) == endpoints.Endpoint(
-        "/contact-queue"
-    )
 
 
 # --- custom properties --------------------------------------------------------------------
@@ -165,12 +162,9 @@ def test_admin_custom_properties_are_the_monitor_slug_itself() -> None:
     assert endpoint.params == {"as_of": "2026-09-02", "page": 1, "page_size": 500}
 
 
-def test_admin_summary_and_queue_sit_under_admin_and_name_the_snapshot() -> None:
+def test_admin_summary_sits_under_admin_and_names_the_snapshot() -> None:
     assert endpoints.summary(Style.ADMIN, as_of=AS_OF) == endpoints.Endpoint(
         "/admin/summary", {"as_of": "2026-09-02"}
-    )
-    assert endpoints.contact_queue(Style.ADMIN, as_of=AS_OF) == endpoints.Endpoint(
-        "/admin/contact-queue", {"as_of": "2026-09-02"}
     )
 
 
@@ -186,4 +180,45 @@ def test_every_style_routes_every_read() -> None:
         ).path
         assert endpoints.custom_properties(style, "feed_custom_properties", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
-        assert endpoints.contact_queue(style, as_of=AS_OF).path
+
+
+# --- publisher notifications --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("style", "root"),
+    [
+        (Style.ADMIN, "/admin/publisher-notifications"),
+        (Style.CONTRACT, "/publisher-notifications"),
+    ],
+)
+def test_publisher_notification_routes_in_both_shapes(style: Style, root: str) -> None:
+    assert endpoints.publisher_notifications(style) == endpoints.Endpoint(
+        root, {"page": 1, "page_size": 500}
+    )
+    assert endpoints.publisher_notification_summary(style) == endpoints.Endpoint(
+        f"{root}/summary"
+    )
+    assert endpoints.publisher_notification(style, "pn_dummy-leisure") == endpoints.Endpoint(
+        f"{root}/pn_dummy-leisure"
+    )
+
+
+def test_the_notification_list_pages_and_sends_no_snapshot_date() -> None:
+    endpoint = endpoints.publisher_notifications(Style.ADMIN, page=3, page_size=100)
+    assert endpoint.params == {"page": 3, "page_size": 100}
+    assert "as_of" not in endpoint.params
+
+
+@pytest.mark.parametrize(
+    ("notification_id", "segment"),
+    [
+        ("pn_dummy-leisure", "pn_dummy-leisure"),
+        ("pn/with?odd chars", "pn%2Fwith%3Fodd%20chars"),
+    ],
+)
+def test_a_notification_id_is_one_encoded_path_segment(
+    notification_id: str, segment: str
+) -> None:
+    path = endpoints.publisher_notification(Style.ADMIN, notification_id).path
+    assert path == f"/admin/publisher-notifications/{segment}"

@@ -108,10 +108,5 @@ def summary() -> SummaryResponse:
 
 
 @pytest.fixture
-def contact_queue_page() -> IncidentPage:
-    return IncidentPage.model_validate(load_sample("contact_queue"))
-
-
-@pytest.fixture
 def empty_page() -> IncidentPage:
     return IncidentPage.model_validate(fixture("incidents_empty"))

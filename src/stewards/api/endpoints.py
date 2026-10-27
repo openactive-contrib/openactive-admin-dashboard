@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
+from urllib.parse import quote
 
 
 class Style(StrEnum):
@@ -101,13 +102,6 @@ def summary(style: Style, *, as_of: date) -> Endpoint:
     return Endpoint("/summary")
 
 
-def contact_queue(style: Style, *, as_of: date) -> Endpoint:
-    """The cross-monitor union of incidents at or past the threshold."""
-    if style is Style.ADMIN:
-        return Endpoint(f"{ADMIN_ROOT}/contact-queue", {"as_of": as_of.isoformat()})
-    return Endpoint("/contact-queue")
-
-
 def coverage(style: Style, monitor_id: str, *, as_of: date) -> Endpoint:
     """A monitor's coverage snapshot: this run's figures for a whole estate, and no rows.
 
@@ -168,3 +162,35 @@ def custom_properties(
     return Endpoint(
         f"/monitors/{monitor_id}/properties", {"page": page, "page_size": page_size}
     )
+
+
+# --- publisher notifications --------------------------------------------------------------
+#
+# Stored steward work rows rather than a daily snapshot: the same in both shapes, and no
+# `as_of`, because a row is whatever was last saved, not a replay of a day's batch. These are
+# the only resources the app writes to.
+
+NOTIFICATIONS = "publisher-notifications"
+
+
+def _notifications_root(style: Style) -> str:
+    return f"{ADMIN_ROOT}/{NOTIFICATIONS}" if style is Style.ADMIN else f"/{NOTIFICATIONS}"
+
+
+def publisher_notifications(style: Style, *, page: int = 1, page_size: int = 500) -> Endpoint:
+    """One page of the publisher notification list"""
+    return Endpoint(_notifications_root(style), {"page": page, "page_size": page_size})
+
+
+def publisher_notification_summary(style: Style) -> Endpoint:
+    """Counts across the whole list, not the current page - its own resource by design."""
+    return Endpoint(f"{_notifications_root(style)}/summary")
+
+
+def publisher_notification(style: Style, notification_id: str) -> Endpoint:
+    """One row, for PATCH and DELETE.
+
+    The id is percent-encoded with no safe characters: it is typed by hand into BigQuery, so
+    a `/` or `?` in it must not turn into a different path or a query string.
+    """
+    return Endpoint(f"{_notifications_root(style)}/{quote(notification_id, safe='')}")

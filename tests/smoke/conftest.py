@@ -55,9 +55,6 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         mock.get(f"{BASE}/summary").mock(
             return_value=httpx.Response(200, json=load_sample("summary"))
         )
-        mock.get(f"{BASE}/contact-queue").mock(
-            return_value=httpx.Response(200, json=load_sample("contact_queue"))
-        )
         for monitor_id in MONITOR_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/incidents").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_incidents"))
@@ -87,6 +84,18 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
             )
+        notifications = f"{BASE}/publisher-notifications"
+        mock.get(notifications, params={"page": "1"}).mock(
+            return_value=httpx.Response(200, json=load_sample("publisher_notifications_page1"))
+        )
+        mock.get(notifications, params={"page": "2"}).mock(
+            return_value=httpx.Response(200, json=load_sample("publisher_notifications_page2"))
+        )
+        mock.get(f"{notifications}/summary").mock(
+            return_value=httpx.Response(
+                200, json=load_sample("publisher_notifications_summary")
+            )
+        )
         yield
 
     client_module.reset_client()

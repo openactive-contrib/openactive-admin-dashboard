@@ -7,6 +7,8 @@ monitor declares in the registry (see `monitors.registry.Monitor.detail_model`).
 
 from __future__ import annotations
 
+import json
+from collections.abc import Container
 from datetime import date, datetime
 from typing import Any
 
@@ -209,6 +211,28 @@ class FutureDeclineDetail(FutureDeclineWindow):
         return self.current_total
 
 
+def fold_extras_into_detail(payload: Any, declared: Container[str]) -> Any:
+    """Move top-level keys a model does not declare into its `detail` dict.
+
+    A monitor's own measurements arrive beside the shared incident fields rather than
+    nested, and `extra="ignore"` would drop them silently. Folding them in means a
+    registry entry reaches them through the ordinary `detail.<name>` column path,
+    validated by the monitor's own detail model, so no shared code learns their names.
+    Keys already present in `detail` win: the nested value is the explicit one.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    detail = payload.get("detail")
+    if detail is not None and not isinstance(detail, dict):
+        # Malformed rather than absent. Replacing it here would turn a broken payload
+        # into a plausible one; the field rejects it and the page says the shape is off.
+        return payload
+    extras = {k: v for k, v in payload.items() if k not in declared}
+    if not extras and detail is not None:
+        return payload
+    return {**payload, "detail": {**extras, **(detail or {})}}
+
+
 class Incident(ApiModel):
     monitor_id: str
     publisher_id: str
@@ -241,25 +265,7 @@ class Incident(ApiModel):
     @model_validator(mode="before")
     @classmethod
     def _fold_extras_into_detail(cls, payload: Any) -> Any:
-        """Move top-level keys this model does not declare into `detail`.
-
-        A monitor's own measurements arrive beside the shared incident fields rather than
-        nested, and `extra="ignore"` would drop them silently. Folding them in means a
-        registry entry reaches them through the ordinary `detail.<name>` column path,
-        validated by the monitor's own detail model, so no shared code learns their names.
-        Keys already present in `detail` win: the nested value is the explicit one.
-        """
-        if not isinstance(payload, dict):
-            return payload
-        detail = payload.get("detail")
-        if detail is not None and not isinstance(detail, dict):
-            # Malformed rather than absent. Replacing it here would turn a broken payload
-            # into a plausible one; the field rejects it and the page says the shape is off.
-            return payload
-        extras = {k: v for k, v in payload.items() if k not in cls.model_fields}
-        if not extras and detail is not None:
-            return payload
-        return {**payload, "detail": {**extras, **(detail or {})}}
+        return fold_extras_into_detail(payload, cls.model_fields)
 
 
 class IncidentPage(ApiModel):
@@ -646,3 +652,168 @@ class CustomPropertyResponse(ApiModel):
     data: tuple[CustomPropertyFeed, ...] = ()
     summary: CustomPropertySummary = Field(default_factory=CustomPropertySummary)
     meta: Meta
+
+
+# --- publisher notifications --------------------------------------------------------------
+#
+# Stored steward work rows, read and written through `/admin/publisher-notifications`. One
+# row is one publisher. `problems` is the evidence the email draft is built from: JSON that
+# looks like monitor incidents, typed by hand in v1, so it is parsed tolerantly.
+
+
+class NotificationProblem(ApiModel):
+    """One problem on a publisher's row: the incident fields the email needs, plus evidence."""
+
+    monitor_id: str = ""
+    feed_id: str | None = None
+    feed_name: str | None = None
+    feed_type: str | None = None
+    feed_url: str | None = None
+    first_detected: date | None = None
+    days_open: int | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fold_extras_into_detail(cls, payload: Any) -> Any:
+        return fold_extras_into_detail(payload, cls.model_fields)
+
+    def as_incident(self, publisher_id: str, publisher_name: str) -> Incident:
+        """This problem as an `Incident`, so the existing email and field code read it.
+
+        A problem carries no workflow flags, the row owns those, so the two that
+        `Incident` requires are filled with neutral values the email never prints.
+        """
+        return Incident(
+            monitor_id=self.monitor_id,
+            publisher_id=publisher_id,
+            publisher_name=publisher_name,
+            first_detected=self.first_detected,
+            days_open=self.days_open,
+            past_threshold=False,
+            status="open",
+            feed_id=self.feed_id,
+            feed_name=self.feed_name,
+            feed_type=self.feed_type,
+            feed_url=self.feed_url,
+            detail=self.detail,
+        )
+
+
+def _decode_problems(raw: Any) -> Any:
+    """`problems` as JSON data: decoded if it arrived as a string, None if that fails."""
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except ValueError:
+            return None
+    return raw
+
+
+class PublisherNotification(ApiModel):
+    """One publisher on the notification list."""
+
+    id: str
+    publisher_id: str = ""
+    publisher_name: str = ""
+    problem_count: int | None = None
+    monitors: tuple[str, ...] = ()
+    oldest_days_open: int | None = None
+    status: str = ""
+    stakeholder: str | None = None
+    contact: str | None = None
+    date_contacted: date | None = None
+    notes: str | None = None
+    problems: tuple[NotificationProblem, ...] = ()
+
+    #: `problems` exactly as the API sent it. A save sends this back untouched, because the
+    #: API overwrites every column on PATCH and the evidence must survive a status change.
+    problems_raw: Any = None
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _tolerate_nulls_and_problems(cls, payload: Any) -> Any:
+        """Nulls fall back to defaults, and `problems` never takes the page down.
+
+        A null, a JSON string, or anything that is not a list of objects leaves the row
+        with no parsed problems rather than failing the whole list.
+        """
+        if not isinstance(payload, dict):
+            return payload
+        raw = _decode_problems(payload.get("problems"))
+        listed = raw if isinstance(raw, list) else []
+        items = [item for item in listed if isinstance(item, dict)]
+        return {
+            **{key: value for key, value in payload.items() if value is not None},
+            "problems": items,
+            "problems_raw": raw,
+        }
+
+    def to_body(self) -> PublisherNotificationBody:
+        """Every writable field, as the API expects it on PATCH. Edits are applied on top."""
+        return PublisherNotificationBody(
+            id=self.id,
+            publisher_id=self.publisher_id or None,
+            publisher_name=self.publisher_name or None,
+            problem_count=self.problem_count,
+            monitors=self.monitors,
+            oldest_days_open=self.oldest_days_open,
+            status=self.status or None,
+            stakeholder=self.stakeholder,
+            contact=self.contact,
+            date_contacted=self.date_contacted,
+            notes=self.notes,
+            problems=self.problems_raw,
+        )
+
+
+class PublisherNotificationPage(ApiModel):
+    data: tuple[PublisherNotification, ...] = ()
+    meta: Meta
+
+
+class PublisherNotificationDocument(ApiModel):
+    """One row, as PATCH returns it."""
+
+    data: PublisherNotification
+    meta: Meta
+
+
+class PublisherNotificationSummary(ApiModel):
+    """Count across the whole list, from its own endpoint. Null is not zero."""
+
+    publishers: int | None = None
+    open: int | None = None
+    in_progress: int | None = None
+    closed: int | None = None
+    never_contacted: int | None = None
+    alerts: int | None = None
+
+
+class PublisherNotificationSummaryResponse(ApiModel):
+    data: PublisherNotificationSummary = Field(default_factory=PublisherNotificationSummary)
+    meta: Meta
+
+
+class PublisherNotificationBody(ApiModel):
+    """The whole writable row, sent on PATCH. Every field is sent and an omitted one is NULL."""
+
+    id: str
+    publisher_id: str | None = None
+    publisher_name: str | None = None
+    problem_count: int | None = None
+    monitors: tuple[str, ...] = ()
+    oldest_days_open: int | None = None
+    status: str | None = None
+    stakeholder: str | None = None
+    contact: str | None = None
+    date_contacted: date | None = None
+    notes: str | None = None
+    problems: Any = None
+
+    def to_payload(self) -> dict[str, Any]:
+        """JSON-ready: dates as ISO strings, tuples as lists, `problems` untouched."""
+        return self.model_dump(mode="json")

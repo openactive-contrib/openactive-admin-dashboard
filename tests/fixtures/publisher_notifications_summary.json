@@ -1,0 +1,17 @@
+{
+    "data": {
+        "publishers": 3,
+        "open": 2,
+        "in_progress": 0,
+        "closed": 1,
+        "never_contacted": 1,
+        "alerts": 2
+    },
+    "meta": {
+        "snapshot_date": "2026-10-13",
+        "generated_at": "2026-10-13T09:15:02Z",
+        "total": 1,
+        "page": 1,
+        "page_size": 1
+    }
+}

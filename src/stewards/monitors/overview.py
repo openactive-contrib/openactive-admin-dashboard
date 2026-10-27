@@ -196,7 +196,7 @@ class NavBadge:
 def nav_badges(
     summary: Summary, trends: Trends | None = None, cards: Cards | None = None
 ) -> dict[str, NavBadge]:
-    """Badge per sidebar item, keyed by monitor id plus `contact_queue`.
+    """Badge per sidebar item, keyed by monitor id.
 
     A monitor with nothing open gets no badge, so the sidebar shows only what needs
     attention. Tone comes from the same assessment as the tile, over the same series, so the
@@ -204,8 +204,6 @@ def nav_badges(
     card, which supplies the verdict with it.
     """
     badges: dict[str, NavBadge] = {}
-    if summary.past_threshold is not None and summary.past_threshold > 0:
-        badges["contact_queue"] = NavBadge(str(summary.past_threshold), Tone.RED)
     for monitor in MONITOR_REGISTRY:
         card = (cards or {}).get(monitor.id)
         if card is not None:
