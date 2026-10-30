@@ -14,6 +14,7 @@ import respx
 from stewards.api.client import StewardsClient, get_client, reset_client
 from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
+    ApiConflict,
     ApiContractError,
     ApiNotFound,
     ApiUnauthorized,
@@ -25,7 +26,9 @@ API_PREFIX = prefix(Style.CONTRACT)
 BASE = "https://api.test"
 URL = f"{BASE}{API_PREFIX}/summary"
 
-ROW_PATH = "/publisher-notifications/pn_dummy-leisure"
+LIST_PATH = "/publisher-notifications"
+LIST_URL = f"{BASE}{API_PREFIX}{LIST_PATH}"
+ROW_PATH = f"{LIST_PATH}/pn_dummy-leisure"
 ROW_URL = f"{BASE}{API_PREFIX}{ROW_PATH}"
 
 
@@ -152,6 +155,20 @@ def test_patch_sends_the_body_as_json_and_returns_the_saved_row(
 
 
 @respx.mock
+def test_post_sends_the_body_as_json_and_returns_the_created_row(
+    client: StewardsClient,
+) -> None:
+    body = {"id": "pn_dummy-leisure", "status": "open"}
+    route = respx.post(LIST_URL).mock(return_value=httpx.Response(201, json={"data": body}))
+
+    assert client.post(LIST_PATH, body) == {"data": body}
+
+    request = route.calls.last.request
+    assert request.headers["Content-Type"] == "application/json"
+    assert json.loads(request.content) == body
+
+
+@respx.mock
 def test_delete_accepts_an_empty_204(client: StewardsClient) -> None:
     route = respx.delete(ROW_URL).mock(return_value=httpx.Response(204))
 
@@ -165,23 +182,25 @@ def test_delete_accepts_an_empty_204(client: StewardsClient) -> None:
         (401, ApiUnauthorized),
         (403, ApiUnauthorized),
         (404, ApiNotFound),
+        (409, ApiConflict),
         (400, ApiContractError),
         (500, ApiUnavailable),
     ],
 )
-@pytest.mark.parametrize("method", ["patch", "delete"])
+@pytest.mark.parametrize("method", ["post", "patch", "delete"])
 @respx.mock
 def test_writes_raise_the_same_typed_errors_as_reads(
     client: StewardsClient, method: str, status: int, error: type[Exception]
 ) -> None:
-    respx.route(method=method.upper(), url=ROW_URL).mock(return_value=httpx.Response(status))
-    call = (
-        (lambda: client.patch(ROW_PATH, {"id": "pn_dummy-leisure"}))
-        if method == "patch"
-        else (lambda: client.delete(ROW_PATH))
-    )
+    url = LIST_URL if method == "post" else ROW_URL
+    respx.route(method=method.upper(), url=url).mock(return_value=httpx.Response(status))
+    calls = {
+        "post": lambda: client.post(LIST_PATH, {"id": "pn_dummy-leisure"}),
+        "patch": lambda: client.patch(ROW_PATH, {"id": "pn_dummy-leisure"}),
+        "delete": lambda: client.delete(ROW_PATH),
+    }
     with pytest.raises(error):
-        call()
+        calls[method]()
 
 
 @respx.mock

@@ -52,11 +52,20 @@ class DetailModel(NullTolerantModel):
 class StallDetail(DetailModel):
     last_modified: date | None = None
 
+    #: The dataset the feed belongs to, so a feed incident lines up with the dataset-level
+    #: ones. Sent beside the shared fields and folded in here; absent from an older API.
+    dataset_url: str | None = None
+    dataset_name: str | None = None
+
 
 class FeedIngestionErrorDetail(DetailModel):
     error_code: str | None = None
     error_message: str | None = None
     last_completed: date | None = None
+
+    #: As on `StallDetail`.
+    dataset_url: str | None = None
+    dataset_name: str | None = None
 
 
 class DatasetStallFeed(DetailModel):
@@ -64,6 +73,7 @@ class DatasetStallFeed(DetailModel):
 
     feed_id: str | None = None
     feed_name: str | None = None
+    feed_type: str | None = None
     last_published: date | None = None
     consecutive_days: int | None = None
 
@@ -185,6 +195,9 @@ class FutureDeclineFeed(FutureDeclineWindow):
 
     feed_id: str | None = None
     feed_name: str | None = None
+
+    #: Never `Slot`: the batch leaves Slot feeds out of this monitor.
+    feed_type: str | None = None
     start_future: int | None = None
     current_future: int | None = None
     consecutive_declining_days: int | None = None
@@ -671,6 +684,14 @@ class NotificationProblem(ApiModel):
     feed_url: str | None = None
     first_detected: date | None = None
     days_open: int | None = None
+
+    #: Written by the daily notification job (`stewards.outreach`): which rule raised the
+    #: problem, the incident it stands for, and the day it was first recorded. A problem a
+    #: steward typed by hand has none of them.
+    rule_id: str | None = None
+    incident_key: str | None = None
+    recorded_on: date | None = None
+
     detail: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
@@ -776,7 +797,7 @@ class PublisherNotificationPage(ApiModel):
 
 
 class PublisherNotificationDocument(ApiModel):
-    """One row, as PATCH returns it."""
+    """One row, as POST and PATCH return it."""
 
     data: PublisherNotification
     meta: Meta
@@ -799,7 +820,7 @@ class PublisherNotificationSummaryResponse(ApiModel):
 
 
 class PublisherNotificationBody(ApiModel):
-    """The whole writable row, sent on PATCH. Every field is sent and an omitted one is NULL."""
+    """The whole writable row, sent on POST and PATCH. Every field is sent; omitted is NULL."""
 
     id: str
     publisher_id: str | None = None

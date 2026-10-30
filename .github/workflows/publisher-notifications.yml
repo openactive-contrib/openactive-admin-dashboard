@@ -1,0 +1,49 @@
+name: Publisher notifications
+
+# Daily at 08:07 UK time: read every monitor the decision rules need, then create and update
+# rows on the publisher notification list. The rules are src/stewards/outreach/rules.py;
+# docs/publisher-notification-job.md explains the run. Nothing is written unless every
+# monitor has today's snapshot, and a failed gate is not retried: the next run catches up.
+on:
+  schedule:
+    - cron: "7 8 * * *"
+      timezone: "Europe/London"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the rows in the log instead of writing them
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publisher-notifications
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: Update the notification list
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --locked
+
+      - env:
+          ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL }}
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            uv run python -m stewards.outreach --dry-run
+          else
+            uv run python -m stewards.outreach
+          fi
