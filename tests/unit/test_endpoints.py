@@ -59,6 +59,11 @@ def test_admin_incidents_path_carries_the_snapshot_and_the_paging_query() -> Non
     assert endpoint.params == {"as_of": "2026-09-02", "page": 1, "page_size": 500}
 
 
+def test_admin_incidents_with_no_date_ask_for_the_latest_snapshot() -> None:
+    endpoint = endpoints.incidents(Style.ADMIN, "single_feed_stall", as_of=None)
+    assert endpoint.params == {"page": 1, "page_size": 500}
+
+
 def test_incidents_paging_defaults_to_the_first_page() -> None:
     for style in Style:
         endpoint = endpoints.incidents(style, "feed_ingestion_error", as_of=AS_OF)

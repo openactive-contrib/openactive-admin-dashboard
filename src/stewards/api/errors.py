@@ -19,5 +19,9 @@ class ApiNotFound(ApiError):
     """The requested resource does not exist (404)."""
 
 
+class ApiConflict(ApiError):
+    """The write clashes with what is already stored (409), e.g. a POST of an existing id."""
+
+
 class ApiContractError(ApiError):
     """The API responded, but not in the shape this app models."""

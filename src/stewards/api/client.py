@@ -12,7 +12,13 @@ from typing import Any
 import httpx
 
 from stewards.api import endpoints
-from stewards.api.errors import ApiContractError, ApiNotFound, ApiUnauthorized, ApiUnavailable
+from stewards.api.errors import (
+    ApiConflict,
+    ApiContractError,
+    ApiNotFound,
+    ApiUnauthorized,
+    ApiUnavailable,
+)
 from stewards.config import Settings, get_settings
 
 log = logging.getLogger(__name__)
@@ -47,8 +53,9 @@ def build_client(
 class StewardsClient:
     """Thin wrapper mapping HTTP outcomes onto typed exceptions.
 
-    Reads are GET. The only writes are PATCH and DELETE on publisher notifications: every
-    other resource this app touches is read-only.
+    Reads are GET. The only writes are on publisher notifications: the app PATCHes and
+    DELETEs them, and the daily notification job (`stewards.outreach`) POSTs and PATCHes
+    them. Every other resource is read-only.
     """
 
     def __init__(
@@ -105,6 +112,8 @@ class StewardsClient:
             raise ApiUnauthorized("The monitoring API rejected this deployment's token")
         if status == 404:
             raise ApiNotFound(f"No such resource: {path}")
+        if status == 409:
+            raise ApiConflict(f"The monitoring API refused a conflicting write on {path}")
         if status >= 500:
             raise ApiUnavailable(f"The monitoringAPI returned {status} on {path}")
         if status >= 400:
@@ -124,6 +133,10 @@ class StewardsClient:
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         return self._json(self._send("GET", path, params=params), path)
+
+    def post(self, path: str, body: dict[str, Any]) -> Any:
+        """Create a resource from `body`, and return it as stored."""
+        return self._json(self._send("POST", path, json=body), path)
 
     def patch(self, path: str, body: dict[str, Any]) -> Any:
         """Send `body` as the whole replacement for a resource, and return its new state."""

@@ -73,20 +73,26 @@ def _fetch_summary(
 
 
 def _fetch_incidents(
-    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+    monitor_id: str,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+    *,
+    latest: bool = False,
 ) -> IncidentPage:
     """Fetch every open incident for a monitor, paging inside this function.
 
     Callers never loop: filtering and searching happen locally over the returned snapshot.
     `as_of` names the snapshot to answer for; it defaults to today, which is the snapshot
-    the daily batch has just written.
+    the daily batch has just written. The admin API echoes a requested `as_of` back as
+    `meta.snapshot_date` whether or not that day has landed, so `latest=True` sends no date
+    at all and lets `meta.snapshot_date` say which day the batch really has.
     """
     client = client or get_client()
-    as_of = as_of or date.today()
+    day = None if latest else (as_of or date.today())
 
     def request(page: int) -> endpoints.Endpoint:
         return endpoints.incidents(
-            client.style, monitor_id, as_of=as_of, page=page, page_size=PAGE_SIZE
+            client.style, monitor_id, as_of=day, page=page, page_size=PAGE_SIZE
         )
 
     endpoint = request(1)
@@ -397,6 +403,19 @@ def _fetch_publisher_notification_summary(
         client.get(endpoint.path, endpoint.params),
         endpoint.path,
     )
+
+
+def _create_publisher_notification(
+    body: PublisherNotificationBody, client: StewardsClient | None = None
+) -> PublisherNotification:
+    """Insert a new row. Only the daily notification job creates rows; the app never does.
+
+    The id is the caller's and must be new: the API answers 409 (`ApiConflict`) otherwise.
+    """
+    client = client or get_client()
+    path = endpoints.publisher_notifications(client.style).path
+    payload = client.post(path, body.to_payload())
+    return _parse(PublisherNotificationDocument, payload, path).data
 
 
 def _update_publisher_notification(
