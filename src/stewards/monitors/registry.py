@@ -77,6 +77,9 @@ class ColKind(StrEnum):
     STATUS = "status"
     LINK = "link"
 
+    #: A JSON document as a string, shown collapsed and expanded on click.
+    JSON = "json"
+
 
 #: Kinds that carry RAG semantics and are therefore background-shaded in the table.
 RAG_KINDS = frozenset(

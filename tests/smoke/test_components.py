@@ -1118,7 +1118,7 @@ def _field(widgets: object, label: str) -> object:
 def test_saving_sends_the_edit_and_keeps_the_evidence() -> None:
     app = run(_edit_form_script, False)
     _field(app.selectbox, "Status").set_value("in_progress")
-    _field(app.text_input, "Stakeholder").input("Council")
+    _field(app.text_input, "Responsible").input("Council")
     app.button[0].click().run()
 
     sent = app.session_state["saved_body"]

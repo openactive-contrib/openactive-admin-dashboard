@@ -7,6 +7,16 @@ title: Publisher notification list
 One row per publisher with open problems, kept by the stewards team. Unlike every other page,
 these rows are **stored**: the daily batch does not rewrite them, and your edits are saved.
 
+Rows are created and kept up to date by the
+[publisher notification job]({% link publisher-notification-job.md %}), which runs at 08:07
+each day. It adds new problems, refreshes the figures on the ones already listed, and removes
+problems whose incident has closed. It never changes the status, responsible person, contact
+or date contacted, and it leaves the notes on a new row empty for you.
+
+The **Publisher** name links to the publisher's dataset site and opens it in a new tab.
+**Created** is when the row was added, in UK time. The last column, **Problems (JSON)**, is
+the row's problems exactly as stored; click a cell to expand it.
+
 ## What needs attention
 
 A row is flagged, and sorts to the top, when its status is **Open** or **In progress** and:
@@ -25,9 +35,10 @@ on **Show closed**.
 1. Select the row. Its problems, the reasons it is flagged and a draft email appear below.
 2. Edit the draft if you need to and copy it into your mail client. The dashboard does not
    send email, and edits to the draft are not saved.
-3. Under **Update this row**, set the status, stakeholder, contact and date contacted, add a
-   note, and **Save**.
-4. When the publisher has fixed everything, set the status to **Closed**.
+3. Under **Update this row**, set the status, the person responsible, the contact and the
+   date contacted, add a note, and **Save**.
+4. When the publisher has fixed everything, set the status to **Closed**. A row whose
+   problems have all cleared is not closed for you: the job adds a note saying so.
 
 Saving changes only those five fields; the problems on the row are kept exactly as they were.
 

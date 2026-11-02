@@ -17,6 +17,7 @@ from stewards.api import repository
 from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style, prefix
 from stewards.api.errors import (
+    ApiConflict,
     ApiContractError,
     ApiNotFound,
     ApiUnauthorized,
@@ -36,6 +37,7 @@ from stewards.api.models import (
 from stewards.api.repository import (
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
+    _create_publisher_notification,
     _delete_publisher_notification,
     _fetch_coverage,
     _fetch_coverage_snapshots,
@@ -779,6 +781,48 @@ def test_save_sends_the_evidence_back_untouched(client: StewardsClient) -> None:
     assert sent["monitors"] == list(row.monitors)
     assert sent["status"] == "in_progress"
     assert saved.status == "in_progress"
+
+
+@respx.mock
+def test_create_posts_the_whole_body_to_the_list_and_returns_the_stored_row(
+    client: StewardsClient,
+) -> None:
+    route = respx.post(NOTIFICATIONS).mock(
+        return_value=httpx.Response(201, json=load_sample("publisher_notification_row"))
+    )
+    body = PublisherNotificationBody(
+        id="pn_dummy-leisure",
+        publisher_id="pub_dummy-leisure",
+        monitors=("single_feed_stall",),
+        status="open",
+        date_contacted=date(2026, 10, 13),
+        problems=[{"monitor_id": "single_feed_stall", "feed_id": "f1"}],
+    )
+
+    created = _create_publisher_notification(body, client=client)
+
+    request = route.calls.last.request
+    # The list's own path, with no paging: a POST is not a page read.
+    assert "page" not in request.url.params
+    sent = json.loads(request.content)
+    assert sent["monitors"] == ["single_feed_stall"]
+    assert sent["date_contacted"] == "2026-10-13"
+    assert sent["problems"] == [{"monitor_id": "single_feed_stall", "feed_id": "f1"}]
+    assert created.id == "pn_dummy-leisure"
+
+
+@respx.mock
+def test_create_of_an_existing_id_is_a_conflict(client: StewardsClient) -> None:
+    respx.post(NOTIFICATIONS).mock(return_value=httpx.Response(409))
+    with pytest.raises(ApiConflict):
+        _create_publisher_notification(PublisherNotificationBody(id="pn_x"), client=client)
+
+
+@respx.mock
+def test_create_with_a_malformed_reply_is_a_contract_error(client: StewardsClient) -> None:
+    respx.post(NOTIFICATIONS).mock(return_value=httpx.Response(201, json={"data": {}}))
+    with pytest.raises(ApiContractError, match="publisher-notifications"):
+        _create_publisher_notification(PublisherNotificationBody(id="pn_x"), client=client)
 
 
 @respx.mock

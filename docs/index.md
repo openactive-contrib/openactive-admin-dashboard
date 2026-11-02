@@ -19,6 +19,8 @@ say what to do about it.
   timestamp stops advancing while the endpoint still returns 200.
 - [Publisher notification list]({% link publisher-notification-list.md %}) — who needs
   contacting about open problems, and how to record that you did.
+- [Publisher notification job]({% link publisher-notification-job.md %}) — the daily job
+  that fills the notification list, and the rules it raises problems by.
 
 Figures in the dashboard come from a daily BigQuery batch, so every page there states the
 snapshot date it was built from.

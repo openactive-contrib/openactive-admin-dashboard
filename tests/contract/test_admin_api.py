@@ -75,7 +75,13 @@ def test_incidents_come_from_the_per_monitor_admin_path(
     assert first.publisher_name == "Actihire"
     assert first.days_open == 13
     assert first.status == "open"
-    assert first.detail == {"last_modified": "2026-08-20"}
+    # The dataset the feed belongs to arrives beside the shared fields and folds into
+    # `detail`, where `StallDetail` declares it.
+    assert first.detail == {
+        "last_modified": "2026-08-20",
+        "dataset_url": "https://actihire.bookteq.com/api/open-active",
+        "dataset_name": "Actihire Sessions and Facilities",
+    }
 
 
 @respx.mock

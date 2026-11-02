@@ -38,6 +38,10 @@ def column_config(columns: Sequence[Col]) -> dict[str, Any]:
                 config[col.label] = st.column_config.LinkColumn(
                     col.label, display_text=col.link_text or "feed ↗", help=col.help
                 )
+            case ColKind.JSON:
+                config[col.label] = st.column_config.JsonColumn(
+                    col.label, width="large", help=col.help
+                )
             case _:
                 config[col.label] = st.column_config.TextColumn(
                     col.label, help=col.help, width="medium" if col.primary else None

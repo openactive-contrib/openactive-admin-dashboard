@@ -54,14 +54,17 @@ def incidents(
     style: Style,
     monitor_id: str,
     *,
-    as_of: date,
+    as_of: date | None,
     page: int = 1,
     page_size: int = 500,
 ) -> Endpoint:
+    """A monitor's incidents. `as_of=None` sends no date, so the admin API answers for the
+    latest day it has ingested and says which in `meta.snapshot_date`."""
     if style is Style.ADMIN:
+        dated = {} if as_of is None else {"as_of": as_of.isoformat()}
         return Endpoint(
             f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}-incidents",
-            {"as_of": as_of.isoformat(), "page": page, "page_size": page_size},
+            {**dated, "page": page, "page_size": page_size},
         )
     return Endpoint(f"/monitors/{monitor_id}/incidents", {"page": page, "page_size": page_size})
 
@@ -178,7 +181,7 @@ def _notifications_root(style: Style) -> str:
 
 
 def publisher_notifications(style: Style, *, page: int = 1, page_size: int = 500) -> Endpoint:
-    """One page of the publisher notification list"""
+    """One page of the publisher notification list. Its path is also where a row is POSTed."""
     return Endpoint(_notifications_root(style), {"page": page, "page_size": page_size})
 
 

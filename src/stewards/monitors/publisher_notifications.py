@@ -5,13 +5,16 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Sequence
-from datetime import date
+from datetime import UTC, date, datetime
+from urllib.parse import quote
 
 import pandas as pd
 
 from stewards.alerts.checks import CHECKS, Check
+from stewards.alerts.evaluate import UK
 from stewards.api.models import (
     NotificationProblem,
     PublisherNotification,
@@ -73,15 +76,35 @@ def has_alert(row: PublisherNotification, today: date) -> bool:
 #: The oldest problem goes amber from halfway to, and red at, the lowest Slack threshold.
 OLDEST_TONE_DAYS = min(check.threshold for check in CHECKS)
 
+#: The Publisher cell holds `<dataset url>#<url-encoded name>`. Streamlit's link column opens
+#: the whole value and shows only this regex's capture, URL-decoded: the publisher's name.
+PUBLISHER_LINK_TEXT = r"^.*#(.*)$"
+
+#: What the steward-owned `stakeholder` field is called on the page.
+RESPONSIBLE = "Responsible"
+
 COLUMN_SPECS: tuple[Col, ...] = (
-    Col("alert", "Alert", ColKind.TEXT, help="Why this publisher needs attention today"),
-    Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+    Col(
+        "publisher_name",
+        "Publisher",
+        ColKind.LINK,
+        primary=True,
+        help="Opens the publisher's dataset site in a new tab",
+        link_text=PUBLISHER_LINK_TEXT,
+    ),
     Col("problem_count", "Problems", ColKind.NUMBER),
     Col("monitors", "Monitors", ColKind.TEXT),
     Col("oldest_days_open", "Oldest open", ColKind.DAYS),
     Col("status", "Status", ColKind.STATUS),
-    Col("stakeholder", "Stakeholder", ColKind.TEXT),
+    Col("stakeholder", RESPONSIBLE, ColKind.TEXT),
     Col("date_contacted", "Last contacted", ColKind.DATE),
+    Col("created_at", "Created", ColKind.TEXT, help="When the row was created, UK time"),
+    Col(
+        "problems",
+        "Problems (JSON)",
+        ColKind.JSON,
+        help="The row's problems exactly as stored. Click a cell to expand it",
+    ),
 )
 
 COLUMNS: tuple[str, ...] = tuple(col.label for col in COLUMN_SPECS)
@@ -111,7 +134,7 @@ def sort_rows(
 
 
 def filter_options(rows: Sequence[PublisherNotification]) -> tuple[list[str], list[str]]:
-    """The statuses and stakeholders present on the list, for the filter dropdowns."""
+    """The statuses and responsible people present on the list, for the filter dropdowns."""
     statuses = sorted({row.status for row in rows if row.status})
     stakeholders = sorted({row.stakeholder for row in rows if row.stakeholder})
     return statuses, stakeholders
@@ -146,20 +169,45 @@ def _date_text(value: date | None) -> str:
     return value.isoformat() if value else EMPTY
 
 
-def to_dataframe(rows: Sequence[PublisherNotification], today: date) -> pd.DataFrame:
+def created_text(value: datetime | None) -> str:
+    """`YYYY-MM-DD HH:MM` in UK time. A timestamp with no zone is read as UTC."""
+    if value is None:
+        return EMPTY
+    aware = value if value.tzinfo else value.replace(tzinfo=UTC)
+    return aware.astimezone(UK).strftime("%Y-%m-%d %H:%M")
+
+
+def problems_json(row: PublisherNotification) -> str | None:
+    """`problems` as the API stored it, as one JSON string; None when it sent none."""
+    raw = row.problems_raw
+    return None if raw is None else json.dumps(raw, ensure_ascii=False)
+
+
+def publisher_link(row: PublisherNotification) -> str:
+    """The Publisher cell: see `PUBLISHER_LINK_TEXT`.
+
+    A row with no dataset URL is a bare fragment, so the name still shows; opening it
+    opens this page again rather than somewhere wrong.
+    """
+    name = row.publisher_name or row.publisher_id
+    return f"{row.dataset_url or ''}#{quote(name, safe='')}"
+
+
+def to_dataframe(rows: Sequence[PublisherNotification]) -> pd.DataFrame:
     """One line per row, in the order given. The page sorts and filters first."""
     lines = [
         {
-            "Alert": "; ".join(alert_reasons(row, today)) or EMPTY,
-            "Publisher": row.publisher_name or row.publisher_id,
+            "Publisher": publisher_link(row),
             "Problems": row.problem_count,
             "Monitors": ", ".join(monitor_name(m) for m in row.monitors) or EMPTY,
             "Oldest open": (
                 EMPTY if row.oldest_days_open is None else days_label(row.oldest_days_open)
             ),
             "Status": status_label(row.status) if row.status else EMPTY,
-            "Stakeholder": row.stakeholder or EMPTY,
+            RESPONSIBLE: row.stakeholder or EMPTY,
             "Last contacted": _date_text(row.date_contacted),
+            "Created": created_text(row.created_at),
+            "Problems (JSON)": problems_json(row),
         }
         for row in rows
     ]

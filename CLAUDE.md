@@ -58,6 +58,15 @@ A weekday Slack digest runs outside the app: `.github/workflows/incident-alerts.
 (one `Check` per condition). The runner builds its own admin-style `StewardsClient` and reads
 through the uncached `repository._fetch_*` functions, so it never calls `client.get` itself.
 
+A daily job fills the publisher notification list the same way:
+`.github/workflows/publisher-notifications.yml` runs `python -m stewards.outreach` at 08:07
+`Europe/London`. The decision tree is `outreach/rules.RULES` (one `Rule` per notification
+path, with pre-checks naming the rules that take precedence on the same dataset);
+`decide.py` applies it, `reconcile.py` turns findings into row creates and updates, and
+`__main__.py` writes nothing unless every monitor's latest snapshot (read with no `as_of`,
+because the API echoes a requested date back) is today's and every read is complete.
+`docs/publisher-notification-job.md` is the full account.
+
 Also built out: the overview and the publisher notification list. Runbooks are **not** in
 the app: they live in `docs/` and are published to GitHub Pages by
 `.github/workflows/pages.yml`. The sidebar's Documentation row is an external
@@ -84,6 +93,8 @@ src/stewards/
   api/repository.py          typed function per endpoint (the ONLY caller of client.py)
   alerts/                    the Slack digest: checks.py (the rules), evaluate.py,
                              slack.py (all Streamlit-free), __main__.py (the runner)
+  outreach/                  the daily notification job: rules.py (the decision tree),
+                             keys.py, decide.py, reconcile.py (all pure), __main__.py
   monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
                              / Source + MONITOR_REGISTRY (registry order is card and
                              sidebar order)
@@ -141,11 +152,13 @@ tests/
    reintroduce a download button without being asked.
 
    **The one exception is the publisher notification list** (`/admin/publisher-notifications`):
-   stewards may PATCH and DELETE its rows, and nothing else. `client.patch`/`client.delete`
+   stewards may PATCH and DELETE its rows, and nothing else, and the daily job
+   (`stewards.outreach`) may POST and PATCH them. `client.post`/`client.patch`/`client.delete`
    exist for it alone. PATCH overwrites every column, so a save always starts from
    `PublisherNotification.to_body()` and changes only the form's five fields; `problems`
    goes back exactly as read. Every write clears the list's 30-second cache. There is no
-   create in the app. Do not add writes to any other resource without being asked.
+   create in the app; only the job creates rows, and it never changes status, stakeholder,
+   contact or date contacted. Do not add writes to any other resource without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
    snapshot). A page that failed to load renders `render_error_header`

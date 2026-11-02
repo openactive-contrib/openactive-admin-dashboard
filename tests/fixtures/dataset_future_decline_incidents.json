@@ -36,6 +36,7 @@
           {
             "feed_id": "better-admin-org-uk-api-openactive-better-scheduled-sessions",
             "feed_name": "scheduled-sessions",
+            "feed_type": "ScheduledSession",
             "reason": "monotonic_decline",
             "start_future": 190167,
             "current_future": 177186,
@@ -85,6 +86,7 @@
           {
             "feed_id": "better-org-uk-odi-sessions-json",
             "feed_name": "sessions.json",
+            "feed_type": "ScheduledSession",
             "reason": "monotonic_decline",
             "start_future": 123585,
             "current_future": 118157,
@@ -134,6 +136,7 @@
           {
             "feed_id": "opendata-leisurecloud-live-api-feeds-BrimhamsActive-live-scheduled-sessions",
             "feed_name": "BrimhamsActive-live-scheduled-sessions",
+            "feed_type": "ScheduledSession",
             "reason": "both",
             "start_future": 1244,
             "current_future": 956,
@@ -183,6 +186,7 @@
           {
             "feed_id": "opendata-leisurecloud-live-api-feeds-PlacesLeisure-live-session-series",
             "feed_name": "PlacesLeisure-live-session-series",
+            "feed_type": "SessionSeries",
             "reason": "sharp_drop",
             "start_future": 502,
             "current_future": 359,
@@ -232,6 +236,7 @@
           {
             "feed_id": "data-englandnetball-co-uk-sessions",
             "feed_name": "sessions",
+            "feed_type": "ScheduledSession",
             "reason": "monotonic_decline",
             "start_future": 3612,
             "current_future": 3522,
@@ -281,6 +286,7 @@
           {
             "feed_id": "api-bookwhen-com-openactive-sessionseries",
             "feed_name": "sessionseries",
+            "feed_type": "SessionSeries",
             "reason": "sharp_drop",
             "start_future": 69,
             "current_future": 54,
@@ -294,6 +300,7 @@
           {
             "feed_id": "api-bookwhen-com-openactive-courseinstances",
             "feed_name": "courseinstances",
+            "feed_type": "CourseInstance",
             "reason": "monotonic_decline",
             "start_future": 97,
             "current_future": 83,
@@ -343,6 +350,7 @@
           {
             "feed_id": "api-ourparks-org-uk-openactive-events",
             "feed_name": "events",
+            "feed_type": "Event",
             "reason": "monotonic_decline",
             "start_future": 771,
             "current_future": 747,
@@ -392,6 +400,7 @@
           {
             "feed_id": "opendata-leisurecloud-live-api-feeds-LEDCommunityLeisureLtd-live-session-series",
             "feed_name": "LEDCommunityLeisureLtd-live-session-series",
+            "feed_type": "SessionSeries",
             "reason": "sharp_drop",
             "start_future": 76,
             "current_future": 67,
@@ -436,7 +445,8 @@
         "start_total": 143,
         "current_total": 121,
         "drop": 22,
-        "drop_percent": 15.38
+        "drop_percent": 15.38,
+        "feeds": []
       }
     }
   ],

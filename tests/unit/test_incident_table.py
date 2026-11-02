@@ -23,6 +23,7 @@ ALL_KINDS = [
     Col("h", "Trend", ColKind.SPARKLINE),
     Col("i", "Status", ColKind.STATUS),
     Col("j", "Endpoint", ColKind.LINK),
+    Col("k", "Evidence", ColKind.JSON),
 ]
 
 

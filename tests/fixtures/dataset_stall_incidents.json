@@ -31,12 +31,14 @@
           {
             "feed_id": "shirleyhighschool-bookteq-com-api-open-active-slots",
             "feed_name": "slots",
+            "feed_type": "Slot",
             "last_published": "2026-09-01",
             "consecutive_days": 9
           },
           {
             "feed_id": "shirleyhighschool-bookteq-com-api-open-active-facility-uses",
             "feed_name": "facility-uses",
+            "feed_type": "FacilityUse",
             "last_published": null,
             "consecutive_days": null
           }
@@ -74,18 +76,21 @@
           {
             "feed_id": "leisuresk-example-org-openactive-session-series",
             "feed_name": "session-series",
+            "feed_type": "SessionSeries",
             "last_published": "2026-08-14",
             "consecutive_days": 7
           },
           {
             "feed_id": "leisuresk-example-org-openactive-scheduled-sessions",
             "feed_name": "scheduled-sessions",
+            "feed_type": "ScheduledSession",
             "last_published": "2026-08-12",
             "consecutive_days": 9
           },
           {
             "feed_id": "leisuresk-example-org-openactive-facility-uses",
             "feed_name": "facility-uses",
+            "feed_type": "FacilityUse",
             "last_published": null,
             "consecutive_days": null
           }
@@ -123,12 +128,14 @@
           {
             "feed_id": "conwy-example-org-openactive-session-series",
             "feed_name": "session-series",
+            "feed_type": "SessionSeries",
             "last_published": "2026-08-16",
             "consecutive_days": 5
           },
           {
             "feed_id": "conwy-example-org-openactive-scheduled-sessions",
             "feed_name": "scheduled-sessions",
+            "feed_type": "ScheduledSession",
             "last_published": "2026-08-15",
             "consecutive_days": 6
           }

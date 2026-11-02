@@ -283,6 +283,7 @@ def test_the_save_body_carries_every_field_and_the_evidence_untouched() -> None:
         "id",
         "publisher_id",
         "publisher_name",
+        "dataset_url",
         "problem_count",
         "monitors",
         "oldest_days_open",

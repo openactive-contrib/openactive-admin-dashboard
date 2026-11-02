@@ -439,6 +439,11 @@ its problems as incident-shaped JSON. A new monitor needs nothing here unless it
 alert: add a `Check` to `alerts/checks.CHECKS` and both the Slack digest and the list's
 alert rule pick it up. Its email wording comes from `_OBSERVATIONS` as usual.
 
+The daily notification job (`stewards.outreach`) writes the rows. A monitor joins it with a
+`Rule` in `outreach/rules.RULES`; see `docs/publisher-notification-job.md`. Its incidents
+need `dataset_url` (in `detail` or top level) so pre-checks can link them to the same
+dataset, and a feed-level incident needs `feed_id`.
+
 ### Failure handling
 
 Already implemented; do not add try/except in a page. `api/client.py` maps outcomes onto
