@@ -241,6 +241,7 @@ def test_the_report_lists_findings_held_back(capsys: pytest.CaptureFixture[str])
         **BRAVO_ROW,
         "id": "pn_old",
         "publisher_id": "pub_old",
+        "status": "open",
         "problems": [
             {"monitor_id": "dataset_stall", "incident_key": "dataset_stall:dataset:gone"}
         ],

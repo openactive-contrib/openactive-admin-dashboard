@@ -52,6 +52,9 @@ On every active row, the job also brings each problem it recognises up to date:
 - If the incident has closed, the problem is removed. When that leaves the row with no
   problems, the job adds the note "All problems resolved as of <date>; review and close." It
   does not change the status: closing a row is a steward's decision.
+- On an **In progress** row, a problem whose incident has closed is kept exactly as stored,
+  not removed. A steward is already talking to that publisher, so settling the problem is
+  theirs to do.
 
 Problems the job does not recognise are kept exactly as stored. That covers problems for a
 monitor the rules do not read, and anything with no feed or dataset to identify it by. The

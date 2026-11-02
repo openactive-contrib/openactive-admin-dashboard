@@ -181,6 +181,31 @@ def test_the_resolved_note_starts_the_notes_when_there_were_none() -> None:
     assert action.body.notes == "All problems resolved as of 2026-10-06; review and close."
 
 
+def test_an_in_progress_row_keeps_a_closed_problem_and_is_not_written() -> None:
+    working = row(status="in_progress", problems=[stored(STALL)], notes="Emailed.")
+    assert plan_for(snap(), working).actions == ()
+
+
+def test_an_in_progress_row_still_refreshes_open_problems_and_takes_new_ones() -> None:
+    gone = feed_incident("single_feed_stall", "f9", 30, dataset_url="https://alpha.example/c")
+    error = feed_incident(
+        "feed_ingestion_error", "f1", 12, dataset_url="https://alpha.example/b"
+    )
+    older = dataset_incident("dataset_stall", 5)
+    kept = stored(gone)
+    working = row(status=" In_Progress ", problems=[kept, stored(older)])
+    action = only(plan_for(snap(STALL, error), working))
+    assert isinstance(action, Update)
+    assert action.dropped == 0
+    assert action.refreshed == 1
+    assert not action.resolved
+    assert [f.rule.id for f in action.added] == ["http_endpoint_failure"]
+    assert action.body.problems[0] == kept
+    assert action.body.problems[1]["days_open"] == 6
+    assert action.body.problem_count == 3
+    assert action.body.status == " In_Progress "
+
+
 def test_a_closed_row_is_never_touched() -> None:
     assert plan_for(snap(), row(status="closed", problems=[stored(STALL)])) == Plan()
 

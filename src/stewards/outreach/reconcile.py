@@ -3,8 +3,10 @@
 One active row per publisher. A raised finding is appended to the publisher's active row,
 or opens a new row if there is none; a finding whose incident is already on any active row
 is not raised again. Every stored problem the job can recognise is refreshed with today's
-evidence, or dropped once its incident has closed. Problems it cannot recognise — typed by
-hand for a monitor it does not read, or with nothing to key on — are kept exactly as stored.
+evidence, or dropped once its incident has closed — except on an In progress row, where a
+steward is already talking to the publisher, so a closed problem is kept as stored for them
+to settle. Problems it cannot recognise — typed by hand for a monitor it does not read, or
+with nothing to key on — are kept exactly as stored.
 
 Closed rows are never touched, so an incident that reopens after its row was closed is
 raised again on a new row.
@@ -28,6 +30,9 @@ from stewards.outreach.decide import Finding, Snapshot
 from stewards.outreach.keys import problem_payload, stored_key
 
 NEW_ROW_STATUS = "open"
+
+#: A row a steward is working: its problems are refreshed but never dropped.
+IN_PROGRESS_STATUS = "in_progress"
 
 #: The admin API's publisher id for a dataset whose publisher it could not name. A row for
 #: it would gather unrelated datasets under no one to contact, so such a finding is reported
@@ -154,6 +159,7 @@ def _refresh(
     today: date,
 ) -> _Draft:
     draft = _Draft(row, list(raw))
+    keeps_closed = row.status.strip().lower() == IN_PROGRESS_STATUS
     for item in raw:
         problem = _parse(item)
         key = (
@@ -168,7 +174,11 @@ def _refresh(
             continue
         incident = open_by_key.get(key)
         if incident is None:
-            draft.dropped += 1
+            if keeps_closed:
+                draft.after.append(item)
+                draft.keys.add(key)
+            else:
+                draft.dropped += 1
             continue
         draft.after.append(
             problem_payload(
