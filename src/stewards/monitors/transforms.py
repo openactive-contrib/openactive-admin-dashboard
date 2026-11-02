@@ -10,6 +10,7 @@ behaves exactly as before, so `Row` costs the simple case nothing.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -129,6 +130,8 @@ def format_cell(col: Col, value: Any) -> Any:
             return EMPTY if value is None else status_label(str(value))
         case ColKind.LINK:
             return value or None
+        case ColKind.JSON:
+            return None if value is None else json.dumps(value, ensure_ascii=False)
         case _:
             return EMPTY if value in (None, "") else str(value)
 

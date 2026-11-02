@@ -10,6 +10,9 @@ with nothing to key on — are kept exactly as stored.
 
 Closed rows are never touched, so an incident that reopens after its row was closed is
 raised again on a new row.
+
+A row's `dataset_url` is its first problem's dataset. An active row stored without one has it
+filled in; one that has it keeps it, even as the problems change.
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ from stewards.api.models import (
 )
 from stewards.monitors.publisher_notifications import is_active
 from stewards.outreach.decide import Finding, Snapshot
-from stewards.outreach.keys import problem_payload, stored_key
+from stewards.outreach.keys import dataset_url, problem_payload, stored_key
 
 NEW_ROW_STATUS = "open"
 
@@ -227,11 +230,12 @@ def _skip_reason(finding: Finding, claimed: dict[str, str], blocked: set[str]) -
 
 
 def _update(draft: _Draft, today: date) -> Update | None:
-    if draft.after == draft.before:
+    url = draft.row.dataset_url or _row_dataset_url(draft)
+    if draft.after == draft.before and url == draft.row.dataset_url:
         return None
     resolved = bool(draft.before) and not draft.after
     body = draft.row.to_body().model_copy(
-        update={"problems": draft.after, **_derived(draft.after)}
+        update={"problems": draft.after, "dataset_url": url, **_derived(draft.after)}
     )
     if resolved:
         note = f"All problems resolved as of {today.isoformat()}; review and close."
@@ -247,6 +251,7 @@ def _update(draft: _Draft, today: date) -> Update | None:
 
 
 def _create(added: Sequence[Finding], today: date, taken: set[str]) -> Create:
+    """A new Open row. `notes` is left empty: it belongs to the stewards."""
     incident = added[0].incident
     problems = [
         problem_payload(f.incident, key=f.key or "", recorded_on=today, rule_id=f.rule.id)
@@ -256,12 +261,24 @@ def _create(added: Sequence[Finding], today: date, taken: set[str]) -> Create:
         id=new_row_id(incident.publisher_id, today, taken),
         publisher_id=incident.publisher_id,
         publisher_name=incident.publisher_name,
+        dataset_url=next((f.dataset_url for f in added if f.dataset_url), None),
         status=NEW_ROW_STATUS,
-        notes=f"Created by the daily notification job on {today.isoformat()}.",
         problems=problems,
         **_derived(problems),
     )
     return Create(body, tuple(added))
+
+
+def _row_dataset_url(draft: _Draft) -> str | None:
+    """The first dataset named by the row's problems as they will be saved, if any."""
+    row = draft.row
+    for item in draft.after:
+        problem = _parse(item)
+        if problem is not None:
+            url = dataset_url(problem.as_incident(row.publisher_id, row.publisher_name))
+            if url:
+                return url
+    return None
 
 
 def new_row_id(publisher_id: str, today: date, taken: set[str]) -> str:

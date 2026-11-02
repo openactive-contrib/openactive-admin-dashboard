@@ -17,6 +17,7 @@ EARLIER = date(2026, 9, 30)
 RULE = {rule.id: rule for rule in RULES}
 STALL = dataset_incident("dataset_stall", 6)
 STALL_KEY = "dataset_stall:dataset:https://alpha.example/opendata"
+ALPHA_URL = "https://alpha.example/opendata"
 
 
 def snap(*incidents: Incident) -> Snapshot:
@@ -59,7 +60,8 @@ def test_a_new_publisher_gets_a_new_open_row() -> None:
     assert body.status == "open"
     assert body.publisher_id == "pub_alpha"
     assert body.publisher_name == "Alpha Leisure"
-    assert body.notes == "Created by the daily notification job on 2026-10-06."
+    assert body.notes is None
+    assert body.dataset_url == "https://alpha.example/opendata"
     assert body.problem_count == 1
     assert body.monitors == ("dataset_stall",)
     assert body.oldest_days_open == 6
@@ -129,7 +131,7 @@ def test_an_incident_already_on_an_active_row_is_not_raised_again() -> None:
 
 def test_an_unchanged_row_is_not_written() -> None:
     same = stored(STALL, rule_id="dataset_stall")
-    plan = plan_for(snap(STALL), row(problems=[same]))
+    plan = plan_for(snap(STALL), row(problems=[same], dataset_url=ALPHA_URL))
     assert plan.actions == ()
     assert len(plan.skipped) == 1
 
@@ -182,7 +184,9 @@ def test_the_resolved_note_starts_the_notes_when_there_were_none() -> None:
 
 
 def test_an_in_progress_row_keeps_a_closed_problem_and_is_not_written() -> None:
-    working = row(status="in_progress", problems=[stored(STALL)], notes="Emailed.")
+    working = row(
+        status="in_progress", problems=[stored(STALL)], notes="Emailed.", dataset_url=ALPHA_URL
+    )
     assert plan_for(snap(), working).actions == ()
 
 
@@ -204,6 +208,36 @@ def test_an_in_progress_row_still_refreshes_open_problems_and_takes_new_ones() -
     assert action.body.problems[1]["days_open"] == 6
     assert action.body.problem_count == 3
     assert action.body.status == " In_Progress "
+
+
+# --- dataset url ---------------------------------------------------------------------------
+
+
+def test_a_row_without_a_dataset_url_has_it_filled_from_its_problems() -> None:
+    same = stored(STALL, rule_id="dataset_stall")
+    action = only(plan_for(snap(STALL), row(problems=[same], notes="Emailed.")))
+    assert isinstance(action, Update)
+    assert action.body.dataset_url == ALPHA_URL
+    assert action.body.problems == [same]
+    assert action.body.notes == "Emailed."
+
+
+def test_a_stored_dataset_url_is_kept_when_the_problems_point_elsewhere() -> None:
+    action = only(plan_for(snap(STALL), row(dataset_url="https://alpha.example/other")))
+    assert isinstance(action, Update)
+    assert action.body.dataset_url == "https://alpha.example/other"
+
+
+def test_a_row_whose_problems_name_no_dataset_stays_without_one() -> None:
+    unmanaged = {"monitor_id": "feed_quality", "feed_id": "q1"}
+    assert plan_for(snap(), row(problems=[unmanaged, "free text"])).actions == ()
+
+
+def test_a_new_row_with_no_dataset_url_leaves_it_empty() -> None:
+    error = feed_incident("feed_ingestion_error", "f1", 12, dataset_url=None)
+    action = only(plan_for(snap(error)))
+    assert isinstance(action, Create)
+    assert action.body.dataset_url is None
 
 
 def test_a_closed_row_is_never_touched() -> None:

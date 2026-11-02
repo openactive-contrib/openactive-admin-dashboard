@@ -142,6 +142,10 @@ def test_detail_model_is_per_monitor(ingestion_monitor: Monitor) -> None:
         (ColKind.SPARKLINE, (), []),
         (ColKind.LINK, "https://x/feed", "https://x/feed"),
         (ColKind.LINK, None, None),
+        (ColKind.JSON, [{"monitor_id": "dataset_stall"}], '[{"monitor_id": "dataset_stall"}]'),
+        (ColKind.JSON, [], "[]"),
+        (ColKind.JSON, None, None),
+        (ColKind.JSON, {"name": "Café"}, '{"name": "Café"}'),
     ],
 )
 def test_format_cell(kind: ColKind, value: object, expected: object) -> None:

@@ -4,6 +4,7 @@
             "id": "pn_dummy-leisure",
             "publisher_id": "pub_dummy-leisure",
             "publisher_name": "Dummy Leisure",
+            "dataset_url": "https://dummy-leisure.example.org/openactive",
             "problem_count": 2,
             "monitors": [
                 "single_feed_stall",

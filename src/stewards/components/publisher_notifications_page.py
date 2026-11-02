@@ -95,7 +95,7 @@ def _render_filters(rows: list[PublisherNotification]) -> list[PublisherNotifica
         key="pn_status",
     )
     stakeholder = stakeholder_col.selectbox(
-        "Stakeholder",
+        pn.RESPONSIBLE,
         [ANY, *stakeholders],
         format_func=lambda value: value or "Any",
         key="pn_stakeholder",
@@ -119,7 +119,7 @@ def _render_table(
         f"{len(ordered):,} publishers. Select a row to see its problems and draft an email."
     )
     position = render_table(
-        pn.to_dataframe(ordered, today),
+        pn.to_dataframe(ordered),
         pn.tone_frame(ordered),
         columns=pn.COLUMN_SPECS,
         rag_columns=pn.RAG_COLUMNS,
@@ -141,7 +141,7 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
             " · ".join(
                 [
                     f"Status: {status_label(row.status) if row.status else '—'}",
-                    f"Stakeholder: {row.stakeholder or '—'}",
+                    f"{pn.RESPONSIBLE}: {row.stakeholder or '—'}",
                     f"Contact: {row.contact or '—'}",
                     f"Last contacted: {row.date_contacted or '—'}",
                 ]
@@ -177,7 +177,7 @@ def render_edit_form(row: PublisherNotification, today: date) -> None:
             key=f"{prefix}_status",
         )
         stakeholder = stakeholder_col.text_input(
-            "Stakeholder", value=row.stakeholder or "", key=f"{prefix}_stakeholder"
+            pn.RESPONSIBLE, value=row.stakeholder or "", key=f"{prefix}_stakeholder"
         )
         contact = contact_col.text_input(
             "Contact", value=row.contact or "", key=f"{prefix}_contact"

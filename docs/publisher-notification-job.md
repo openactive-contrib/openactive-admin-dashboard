@@ -36,7 +36,10 @@ Thresholds are "or more", not "exactly", so a day the job did not run is caught 
 The list holds **one active row per publisher**. Active means Open or In progress.
 
 - A publisher with no active row gets a new **Open** row, with an id of the form
-  `pn_<publisher>-<YYYYMMDD>`.
+  `pn_<publisher>-<YYYYMMDD>`. Its `dataset_url` is the dataset of its first problem, and its
+  notes are left empty: they belong to the stewards.
+- An active row with no `dataset_url` has it filled in from its first problem that names a
+  dataset. A row that already has one keeps it.
 - A publisher with an active row has the new problem appended to it. If there is more than
   one active row, the problem goes on the oldest.
 - A problem already on any active row is not raised again.

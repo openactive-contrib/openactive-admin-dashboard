@@ -6,10 +6,14 @@ and `LineChartColumn` survive `st.dataframe` together.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 from streamlit.testing.v1 import AppTest
+
+from stewards.monitors.publisher_notifications import PUBLISHER_LINK_TEXT
 
 VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 
@@ -339,7 +343,14 @@ def test_notification_list_hides_closed_rows_by_default() -> None:
     app = run("01_publisher_notifications.py")
     assert not app.exception, [e.value for e in app.exception]
     frame = app.dataframe[0].value
-    assert set(frame["Publisher"]) == {"Dummy Leisure", "Dummy Sports Trust"}
+    shown = {
+        unquote(re.fullmatch(PUBLISHER_LINK_TEXT, cell).group(1))  # type: ignore[union-attr]
+        for cell in frame["Publisher"]
+    }
+    assert shown == {"Dummy Leisure", "Dummy Sports Trust"}
+    assert "https://dummy-leisure.example.org/openactive#Dummy%20Leisure" in set(
+        frame["Publisher"]
+    )
     text = text_of(app)
     assert "Snapshot 2026-10-13" in text
     assert "Stored work list · updated as you save" in text

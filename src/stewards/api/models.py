@@ -737,6 +737,8 @@ class PublisherNotification(ApiModel):
     id: str
     publisher_id: str = ""
     publisher_name: str = ""
+    #: The publisher's dataset site, which the Publisher cell links to. Set by the job.
+    dataset_url: str | None = None
     problem_count: int | None = None
     monitors: tuple[str, ...] = ()
     oldest_days_open: int | None = None
@@ -779,6 +781,7 @@ class PublisherNotification(ApiModel):
             id=self.id,
             publisher_id=self.publisher_id or None,
             publisher_name=self.publisher_name or None,
+            dataset_url=self.dataset_url,
             problem_count=self.problem_count,
             monitors=self.monitors,
             oldest_days_open=self.oldest_days_open,
@@ -825,6 +828,7 @@ class PublisherNotificationBody(ApiModel):
     id: str
     publisher_id: str | None = None
     publisher_name: str | None = None
+    dataset_url: str | None = None
     problem_count: int | None = None
     monitors: tuple[str, ...] = ()
     oldest_days_open: int | None = None

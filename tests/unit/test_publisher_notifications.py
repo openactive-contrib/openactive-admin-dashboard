@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date
+import json
+import re
+from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import unquote
 
 import pytest
 
@@ -13,14 +16,18 @@ from stewards.monitors.publisher_notifications import (
     COLUMNS,
     FOLLOW_UP_DAYS,
     NOTES_MAX,
+    PUBLISHER_LINK_TEXT,
     STATUSES,
     alert_reasons,
     alerts_badge,
     apply_edits,
     apply_filters,
+    created_text,
     filter_options,
     has_alert,
     problem_frame,
+    problems_json,
+    publisher_link,
     sort_rows,
     summary_stats,
     to_dataframe,
@@ -137,14 +144,56 @@ def test_filter_options_skip_blanks() -> None:
 
 def test_table_and_tones_line_up() -> None:
     rows = sort_rows(listing(), TODAY)
-    frame, tones = to_dataframe(rows, TODAY), tone_frame(rows)
+    frame, tones = to_dataframe(rows), tone_frame(rows)
 
     assert list(frame.columns) == list(COLUMNS) == list(tones.columns)
+    assert "Alert" not in frame.columns
+    assert "Responsible" in frame.columns
     assert len(frame) == len(tones) == 4
-    assert frame.iloc[0]["Alert"] == "Never contacted"
-    assert frame.iloc[2]["Alert"] == EMPTY
     assert tones.iloc[1]["Oldest open"] == Tone.RED.value
     assert tones.iloc[3]["Status"] == Tone.GREEN.value
+
+
+def test_the_publisher_cell_links_the_dataset_and_shows_the_name() -> None:
+    linked = row(publisher_name="Ice Leisure (harlow)", dataset_url="https://ice.example/oa")
+    cell = to_dataframe([linked]).iloc[0]["Publisher"]
+    assert cell == "https://ice.example/oa#Ice%20Leisure%20%28harlow%29"
+    [shown] = re.fullmatch(PUBLISHER_LINK_TEXT, cell).groups()  # type: ignore[union-attr]
+    assert unquote(shown) == "Ice Leisure (harlow)"
+
+
+def test_a_name_with_a_hash_still_shows_whole() -> None:
+    cell = publisher_link(row(publisher_name="Club #1", dataset_url="https://x.example/#a"))
+    [shown] = re.fullmatch(PUBLISHER_LINK_TEXT, cell).groups()  # type: ignore[union-attr]
+    assert unquote(shown) == "Club #1"
+
+
+def test_created_reads_in_uk_time() -> None:
+    assert created_text(datetime(2026, 10, 1, 9, 0, tzinfo=UTC)) == "2026-10-01 10:00"
+    assert created_text(datetime(2026, 11, 2, 8, 7, tzinfo=UTC)) == "2026-11-02 08:07"
+
+
+def test_created_without_a_zone_is_read_as_utc_and_missing_is_em_dash() -> None:
+    assert created_text(datetime(2026, 7, 1, 23, 30)) == "2026-07-02 00:30"
+    assert created_text(None) == EMPTY
+
+
+def test_problems_json_is_the_stored_problems_verbatim() -> None:
+    raw = [{"monitor_id": "dataset_stall", "days_open": 7, "note": "typed by hand"}, "free"]
+    assert json.loads(problems_json(row(problems=raw)) or "") == raw
+    assert problems_json(row(problems=None)) is None
+    assert problems_json(row(problems=[])) == "[]"
+
+
+def test_the_json_column_is_last_and_created_comes_before_it() -> None:
+    frame = to_dataframe([row(problems=[], created_at="2026-10-01T09:00:00Z")])
+    assert list(frame.columns)[-2:] == ["Created", "Problems (JSON)"]
+    assert frame.iloc[0]["Created"] == "2026-10-01 10:00"
+    assert frame.iloc[0]["Problems (JSON)"] == "[]"
+
+
+def test_a_row_with_no_dataset_url_is_a_bare_fragment_of_its_name() -> None:
+    assert publisher_link(row(publisher_name="", publisher_id="pub_x")) == "#pub_x"
 
 
 def test_summary_nulls_read_as_em_dash_not_zero() -> None:
