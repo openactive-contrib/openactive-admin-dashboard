@@ -20,7 +20,12 @@ notebooks:
     title: BigQuery starter
     file: 01_bigquery_starter.ipynb
     description: >-
-      Signs in to BigQuery with your Google account and reads two small tables: the size of
-      the catalogue and future opportunities over recent insight runs. Start here to check
-      your access, or as the template for a new analysis.
+      Signs in to BigQuery with your Google account and runs simple queries.
     tags: [bigquery, starter]
+  - id: london_activity_types
+    title: Activity types in London
+    file: 02_london_activity_types.ipynb
+    description: >-
+      Each activity label and the share of London's future opportunities that carries it,
+      from regular feeds. The region is a parameter.
+    tags: [bigquery, activities, geography]
