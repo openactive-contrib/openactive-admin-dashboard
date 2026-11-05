@@ -1192,3 +1192,28 @@ def test_a_failed_delete_says_so_and_does_not_confirm() -> None:
 
     assert app.error
     assert "pn_flash" not in app.session_state
+
+
+# --- the notebooks page ------------------------------------------------------------------
+
+
+def _notebooks_script(manifest: object) -> None:
+    from pathlib import Path
+
+    from stewards.components.notebooks_page import render_notebooks_page
+
+    render_notebooks_page(Path(str(manifest)))
+
+
+def test_a_missing_notebook_manifest_renders_an_error_not_an_exception(tmp_path) -> None:
+    app = run(_notebooks_script, str(tmp_path / "notebooks.yaml"))
+    assert "could not be read" in app.error[0].value
+    assert not app.get("link_button")
+
+
+def test_an_empty_notebook_manifest_says_so(tmp_path) -> None:
+    manifest = tmp_path / "notebooks.yaml"
+    manifest.write_text("repository: o/r\nnotebooks: []\n")
+    app = run(_notebooks_script, str(manifest))
+    assert "No notebooks are listed" in app.info[0].value
+    assert not app.get("link_button")

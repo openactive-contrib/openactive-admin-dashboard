@@ -72,6 +72,16 @@ the app: they live in `docs/` and are published to GitHub Pages by
 `.github/workflows/pages.yml`. The sidebar's Documentation row is an external
 `st.page_link` to `STEWARDS_DOCS_URL`, which opens in a new tab.
 
+Example notebooks live in `notebooks/` at the repository root and open in free Google Colab
+from GitHub. `notebooks/notebooks.yaml` lists them; the Reference → Notebooks page
+(`components/notebooks_page.py`, over the Streamlit-free `stewards/notebooks.py`) renders
+one card per entry with an "Open in Colab" link. It reads no API data, so its header names
+the manifest instead of a snapshot (`layout.render_reference_header`). The Docker image
+ships only the manifest. A notebook that reads BigQuery signs in with the user's own Google
+account via `google.colab.auth.authenticate_user()` — never a service account or key file;
+`tests/unit/test_notebooks.py` enforces that, and that every notebook is listed and
+committed without outputs. `notebooks/README.md` is the procedure for adding one.
+
 ## Stack
 
 - Python 3.12, Streamlit ≥ 1.40 (`st.navigation`, `st.login`, `st.dataframe` selections)
@@ -95,6 +105,7 @@ src/stewards/
                              slack.py (all Streamlit-free), __main__.py (the runner)
   outreach/                  the daily notification job: rules.py (the decision tree),
                              keys.py, decide.py, reconcile.py (all pure), __main__.py
+  notebooks.py               the notebook manifest: models, YAML parsing, Colab/GitHub URLs
   monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
                              / Source + MONITOR_REGISTRY (registry order is card and
                              sidebar order)
@@ -118,7 +129,7 @@ src/stewards/
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
                              quality_page, coverage_page, schema_drift_page, overview_page,
-                             publisher_notifications_page
+                             publisher_notifications_page, notebooks_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/

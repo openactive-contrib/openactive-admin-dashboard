@@ -28,6 +28,7 @@ PAGES = [
     "30_feed_quality.py",
     "31_active_places_coverage.py",
     "32_feed_custom_properties.py",
+    "90_notebooks.py",
 ]
 
 #: Pages rendered by `components.monitor_page` — the incident shape. The quality page has a
@@ -87,8 +88,11 @@ def test_page_renders_without_exception(name: str) -> None:
 
 
 #: Every page over the daily batch. The notification list is stored rows, not a batch
-#: snapshot, and states its own source; its test is further down.
-BATCH_PAGES = [name for name in PAGES if name != "01_publisher_notifications.py"]
+#: snapshot, and states its own source; the notebooks page reads no data at all. Both have
+#: their own tests further down.
+BATCH_PAGES = [
+    name for name in PAGES if name not in {"01_publisher_notifications.py", "90_notebooks.py"}
+]
 
 
 @pytest.mark.parametrize("name", BATCH_PAGES)
@@ -361,6 +365,38 @@ def test_notification_list_shows_closed_rows_on_request() -> None:
     app = run("01_publisher_notifications.py")
     app.toggle(key="pn_show_closed").set_value(True).run()
     assert len(app.dataframe[0].value) == 3
+
+
+def test_the_notebooks_page_links_each_notebook_to_colab() -> None:
+    from stewards.notebooks import load_manifest
+
+    manifest = load_manifest()
+    app = run("90_notebooks.py")
+    text = text_of(app)
+    assert "Snapshot" not in text  # no data behind it, so no snapshot to claim
+    assert "notebooks/notebooks.yaml" in text
+    assert manifest.readme_url() in text
+    buttons = [element.proto for element in app.get("link_button")]
+    # Icon-only buttons: the tooltip carries what the label would have said.
+    assert {(b.label, b.help) for b in buttons} == {
+        ("", "Open in Colab"),
+        ("", "View on GitHub"),
+    }
+    links = [b.url for b in buttons]
+    for notebook in manifest.notebooks:
+        assert notebook.title in text
+        assert manifest.colab_url(notebook) in links
+        assert manifest.github_url(notebook) in links
+
+
+def test_the_sidebar_lists_the_notebooks_page_under_reference() -> None:
+    app = AppTest.from_file(str(APP_FILE), default_timeout=60)
+    app.run()
+    assert not app.exception, [e.value for e in app.exception]
+    sidebar = [element.proto for element in app.sidebar.get("page_link")]
+    labels = [link.label for link in sidebar]
+    assert labels[-2:] == ["Notebooks", "Documentation"]
+    assert sidebar[-2].page.endswith("notebooks")
 
 
 def test_the_sidebar_shows_the_notification_alert_count() -> None:
