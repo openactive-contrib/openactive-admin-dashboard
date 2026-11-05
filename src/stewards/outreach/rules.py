@@ -133,7 +133,7 @@ RULES: tuple[Rule, ...] = (
         label="Orphaned child items",
         monitor_id="dataset_orphaned_children",
         when=(AtLeast("detail.orphan_share", 0.20),),
-        prechecks=("http_endpoint_failure", "single_feed_stall"),
+        prechecks=("http_endpoint_failure", "dataset_stall", "single_feed_stall"),
     ),
     Rule(
         id="future_decline",

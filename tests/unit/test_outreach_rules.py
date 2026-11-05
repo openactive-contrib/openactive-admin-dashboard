@@ -128,7 +128,11 @@ def test_a_decline_with_no_scheduled_session_feed_is_not_raised() -> None:
 
 
 def test_prechecks_follow_the_decision_tree_order() -> None:
-    assert RULE["orphaned_children"].prechecks == ("http_endpoint_failure", "single_feed_stall")
+    assert RULE["orphaned_children"].prechecks == (
+        "http_endpoint_failure",
+        "dataset_stall",
+        "single_feed_stall",
+    )
     assert RULE["future_decline"].prechecks == (
         "http_endpoint_failure",
         "dataset_stall",

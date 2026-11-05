@@ -70,6 +70,12 @@ def test_a_later_precheck_suppresses_when_the_earlier_did_not_fire() -> None:
     assert findings["orphaned_children"].suppressed_by == "single_feed_stall"
 
 
+def test_a_dataset_stall_hides_orphans() -> None:
+    findings = by_rule(decide(snapshot(orphans(), dataset_incident("dataset_stall", 6))))
+    assert findings["orphaned_children"].suppressed_by == "dataset_stall"
+    assert findings["dataset_stall"].raised
+
+
 def test_a_precheck_incident_below_its_own_threshold_does_not_suppress() -> None:
     findings = decide(snapshot(decline(), feed_incident("feed_ingestion_error", "f1", 9)))
     assert [f.rule.id for f in findings] == ["future_decline"]
