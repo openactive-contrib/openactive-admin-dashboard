@@ -16,3 +16,11 @@ notebooks:
       A minimal demo that prints a few lines of text. Use it to check that a notebook from
       this repository opens and runs in Colab.
     tags: [demo]
+  - id: bigquery_starter
+    title: BigQuery starter
+    file: 01_bigquery_starter.ipynb
+    description: >-
+      Signs in to BigQuery with your Google account and reads two small tables: the size of
+      the catalogue and future opportunities over recent insight runs. Start here to check
+      your access, or as the template for a new analysis.
+    tags: [bigquery, starter]
