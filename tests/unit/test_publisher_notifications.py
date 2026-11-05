@@ -25,6 +25,7 @@ from stewards.monitors.publisher_notifications import (
     created_text,
     filter_options,
     has_alert,
+    needs_seasonal_check,
     problem_frame,
     problems_json,
     publisher_link,
@@ -53,6 +54,12 @@ def row(**overrides: Any) -> PublisherNotification:
 
 def problem(monitor_id: str, days_open: int, feed_type: str = "Slot") -> dict[str, Any]:
     return {"monitor_id": monitor_id, "days_open": days_open, "feed_type": feed_type}
+
+
+def test_seasonal_check_only_for_a_future_decline() -> None:
+    assert needs_seasonal_check(row(problems=[problem("dataset_future_decline", 15)]))
+    assert not needs_seasonal_check(row(problems=[problem("dataset_stall", 6)]))
+    assert not needs_seasonal_check(row())
 
 
 def test_quiet_row_has_no_alert() -> None:
