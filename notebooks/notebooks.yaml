@@ -1,0 +1,18 @@
+# The notebooks listed on the dashboard's Notebooks page, in the order shown there.
+#
+# Each entry opens in free Google Colab straight from GitHub, so a notebook must be committed
+# to `branch` of `repository` before its link works. A notebook that reads BigQuery signs in
+# with the user's own Google account via `google.colab.auth.authenticate_user()` — never a
+# service account or a key file. See notebooks/README.md.
+
+repository: openactive-contrib/openactive-admin-dashboard
+branch: notebooks
+
+notebooks:
+  - id: hello_colab
+    title: Hello from Colab
+    file: 00_hello_colab.ipynb
+    description: >-
+      A minimal demo that prints a few lines of text. Use it to check that a notebook from
+      this repository opens and runs in Colab.
+    tags: [demo]
