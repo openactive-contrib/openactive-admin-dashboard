@@ -43,6 +43,8 @@ WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app src ./src
+# The Notebooks page lists this manifest; the notebooks themselves open in Colab from GitHub.
+COPY --chown=app:app notebooks/notebooks.yaml ./notebooks/notebooks.yaml
 # The theme, mirrored onto Streamlit's own tokens. Secrets are never baked in: the
 # entrypoint writes .streamlit/secrets.toml from the environment at start-up.
 COPY --chown=app:app .streamlit/config.toml ./.streamlit/config.toml

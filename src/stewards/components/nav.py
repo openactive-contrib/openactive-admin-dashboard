@@ -34,11 +34,13 @@ LOGO = ASSET_DIR / "openactive-logo.png"
 
 OVERVIEW_PAGE = "views/00_overview.py"
 PUBLISHER_NOTIFICATIONS_PAGE = "views/01_publisher_notifications.py"
+NOTEBOOKS_PAGE = "views/90_notebooks.py"
 
 OVERVIEW_SECTION = "Overview"
 
-#: The runbooks live on GitHub Pages, outside the app. `st.page_link` renders a URL as an
-#: external link, which opens in a new tab; the URL comes from `STEWARDS_DOCS_URL`.
+#: The last section. Besides its in-app pages it carries the runbooks, which live on GitHub
+#: Pages, outside the app: `st.page_link` renders a URL as an external link, which opens in a
+#: new tab; the URL comes from `STEWARDS_DOCS_URL`.
 REFERENCE_SECTION = "Reference"
 DOCS_LABEL = "Documentation"
 
@@ -76,6 +78,9 @@ def build_navigation() -> StreamlitPage:
             section.append((monitor.id, page))
         _sections[group.value] = section
 
+    _pages["notebooks"] = st.Page(APP_DIR / NOTEBOOKS_PAGE, title="Notebooks")
+    _sections[REFERENCE_SECTION] = [("notebooks", _pages["notebooks"])]
+
     return st.navigation(
         {name: [page for _, page in items] for name, items in _sections.items()},
         position="hidden",
@@ -110,16 +115,17 @@ def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
                     st.page_link(page, label=page.title)
                     if badge is not None:
                         st.badge(badge.text, color=theme.markdown_colour(badge.tone))
-        st.caption(REFERENCE_SECTION.upper())
-        st.page_link(
-            get_settings().docs_url,
-            label=DOCS_LABEL,
-            icon=":material/open_in_new:",
-        )
+            if section == REFERENCE_SECTION:
+                st.page_link(
+                    get_settings().docs_url,
+                    label=DOCS_LABEL,
+                    icon=":material/open_in_new:",
+                )
 
 
 def page_for(key: str) -> StreamlitPage | None:
-    """Look up a built page by monitor id, or by `overview`/`publisher_notifications`/`docs`."""
+    """Look up a built page by monitor id, or by `overview`/`publisher_notifications`/
+    `notebooks`."""
     return _pages.get(key)
 
 

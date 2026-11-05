@@ -50,6 +50,19 @@ def render_header(
                     st.markdown(lines[1])
 
 
+def render_reference_header(crumb: str, title: str, source: str) -> None:
+    """Header for a page that is not backed by the API, so it states no snapshot at all.
+
+    `source` still names where the page's content comes from.
+    """
+    with card("header"):
+        titles, provenance = st.columns([5, 3], vertical_alignment="center")
+        with titles:
+            _render_titles(crumb, title)
+        with provenance, st.container(key="oasnapshotsource"):
+            st.markdown(source)
+
+
 def render_error_header(crumb: str, title: str) -> None:
     """Header for a page that could not load. No snapshot caption — there is no snapshot."""
     with card("header"):
