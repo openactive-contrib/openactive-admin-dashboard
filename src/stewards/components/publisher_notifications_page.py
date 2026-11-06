@@ -14,6 +14,7 @@ from stewards.components.email_draft import draft_key, render_editable_draft
 from stewards.components.errors import render_api_error
 from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
+from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
 from stewards.monitors import publisher_notifications as pn
 from stewards.monitors.email_draft import draft_publisher_email
@@ -52,9 +53,17 @@ def render_publisher_notifications_page() -> None:
     _render_blurb()
     _render_kpis(summary.data)
     rows = _render_filters(list(listing.data))
-    selected = _render_table(rows, today)
-    if selected is not None:
-        _render_detail(selected, today)
+    ordered = pn.sort_rows(rows, today)
+    position = _render_table(ordered)
+    render_row_dialog(
+        ordered,
+        lambda row: row.id,
+        position,
+        key="pn_dialog",
+        table_key=TABLE_KEY,
+        title=lambda row: row.publisher_name or row.publisher_id or row.id,
+        render=lambda row: _render_detail(row, today),
+    )
     layout.render_footer(
         QUERY,
         note="These rows are stored; the daily batch does not rewrite them.",
@@ -111,14 +120,9 @@ def _render_filters(rows: list[PublisherNotification]) -> list[PublisherNotifica
     )
 
 
-def _render_table(
-    rows: list[PublisherNotification], today: date
-) -> PublisherNotification | None:
-    ordered = pn.sort_rows(rows, today)
-    st.caption(
-        f"{len(ordered):,} publishers. Select a row to see its problems and draft an email."
-    )
-    position = render_table(
+def _render_table(ordered: list[PublisherNotification]) -> int | None:
+    st.caption(f"{len(ordered):,} publishers. Select a row to open it.")
+    return render_table(
         pn.to_dataframe(ordered),
         pn.tone_frame(ordered),
         columns=pn.COLUMN_SPECS,
@@ -126,14 +130,10 @@ def _render_table(
         key=TABLE_KEY,
         empty_message="No publishers match these filters.",
     )
-    if position is None or position >= len(ordered):
-        return None
-    return ordered[position]
 
 
 def _render_detail(row: PublisherNotification, today: date) -> None:
     with card("notification_detail"):
-        st.markdown(f"**{row.publisher_name or row.publisher_id}**")
         reasons = pn.alert_reasons(row, today)
         if reasons:
             st.warning(" · ".join(reasons), icon=":material/notifications:")
@@ -159,8 +159,7 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
             st.dataframe(problems, hide_index=True, width="stretch")
         render_edit_form(row, today)
         render_editable_draft(draft_publisher_email(row, today), key=draft_key(row))
-        if st.button("Delete row", icon=":material/delete:", key=f"pn_delete_{row.id}"):
-            _confirm_delete(row)
+        _render_delete(row)
 
 
 def render_edit_form(row: PublisherNotification, today: date) -> None:
@@ -243,16 +242,25 @@ def delete_row(row: PublisherNotification) -> bool:
     return True
 
 
-@st.dialog("Delete this row?")
-def _confirm_delete(row: PublisherNotification) -> None:
-    """Ask before deleting. Nothing is removed until the steward confirms."""
-    st.markdown(
+def _render_delete(row: PublisherNotification) -> None:
+    """Delete, with a confirm step in the same pop-up (Streamlit can't open one pop-up
+    inside another). Nothing is removed until the steward confirms."""
+    asking = f"pn_confirm_delete_{row.id}"
+    if not st.session_state.get(asking):
+        if st.button("Delete row", icon=":material/delete:", key=f"pn_delete_{row.id}"):
+            st.session_state[asking] = True
+            st.rerun(scope="fragment")
+        return
+
+    st.error(
         f"This permanently removes **{row.publisher_name or row.id}** from the notification "
-        "list, including its problems and notes. It cannot be undone."
+        "list, including its problems and notes. It cannot be undone.",
+        icon=":material/warning:",
     )
-    st.caption(f"Row id: `{row.id}`")
     cancel_col, delete_col = st.columns(2)
     if cancel_col.button("Cancel", key="pn_delete_cancel", width="stretch"):
-        st.rerun()
+        st.session_state.pop(asking, None)
+        st.rerun(scope="fragment")
     if delete_col.button("Delete", type="primary", key="pn_delete_confirm", width="stretch"):
+        st.session_state.pop(asking, None)
         delete_row(row)
