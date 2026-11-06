@@ -183,11 +183,75 @@ def test_the_resolved_note_starts_the_notes_when_there_were_none() -> None:
     assert action.body.notes == "All problems resolved as of 2026-10-06; review and close."
 
 
-def test_an_in_progress_row_keeps_a_closed_problem_and_is_not_written() -> None:
+def test_an_in_progress_row_marks_a_closed_problem_resolved_and_keeps_it() -> None:
+    problem = stored(STALL)
     working = row(
-        status="in_progress", problems=[stored(STALL)], notes="Emailed.", dataset_url=ALPHA_URL
+        status="in_progress", problems=[problem], notes="Emailed.", dataset_url=ALPHA_URL
+    )
+    action = only(plan_for(snap(), working))
+    assert isinstance(action, Update)
+    assert action.stamped == 1
+    assert action.dropped == 0
+    assert not action.resolved
+    assert action.body.problems == [{**problem, "resolved_on": "2026-10-06"}]
+    assert action.body.problem_count == 1
+    assert action.body.monitors == ("dataset_stall",)
+    assert action.body.oldest_days_open is None
+    assert action.body.notes == "Emailed."
+    assert action.body.status == "in_progress"
+
+
+def test_a_resolved_problem_keeps_its_first_resolved_date_and_is_not_rewritten() -> None:
+    marked = {**stored(STALL), "resolved_on": "2026-10-01"}
+    working = row(
+        status="in_progress",
+        problems=[marked],
+        dataset_url=ALPHA_URL,
+        date_contacted="2026-09-30",
+        oldest_days_open=None,
+        problem_count=1,
+        monitors=["dataset_stall"],
     )
     assert plan_for(snap(), working).actions == ()
+
+
+def test_a_resolved_problem_is_dropped_once_the_publisher_has_been_told() -> None:
+    marked = {**stored(STALL), "resolved_on": "2026-10-01"}
+    for contacted in ("2026-10-01", "2026-10-03"):
+        working = row(
+            status="in_progress",
+            problems=[marked],
+            dataset_url=ALPHA_URL,
+            date_contacted=contacted,
+        )
+        action = only(plan_for(snap(), working))
+        assert isinstance(action, Update)
+        assert action.dropped == 1
+        assert action.stamped == 0
+        assert action.resolved
+        assert action.body.problems == []
+        assert action.body.status == "in_progress"
+        assert action.body.notes == "All problems resolved as of 2026-10-06; review and close."
+
+
+def test_a_resolved_problem_reopening_is_refreshed_and_loses_its_mark() -> None:
+    marked = {**stored(STALL), "resolved_on": "2026-10-01"}
+    working = row(status="in_progress", problems=[marked], dataset_url=ALPHA_URL)
+    action = only(plan_for(snap(STALL), working))
+    assert isinstance(action, Update)
+    assert action.refreshed == 1
+    assert action.stamped == 0
+    [problem] = action.body.problems
+    assert "resolved_on" not in problem
+    assert problem["recorded_on"] == EARLIER.isoformat()
+    assert action.body.oldest_days_open == 6
+
+
+def test_an_open_row_still_drops_a_closed_problem_without_marking_it() -> None:
+    action = only(plan_for(snap(), row(problems=[stored(STALL)], date_contacted="2026-10-05")))
+    assert isinstance(action, Update)
+    assert action.dropped == 1
+    assert action.stamped == 0
 
 
 def test_an_in_progress_row_still_refreshes_open_problems_and_takes_new_ones() -> None:
@@ -202,11 +266,14 @@ def test_an_in_progress_row_still_refreshes_open_problems_and_takes_new_ones() -
     assert isinstance(action, Update)
     assert action.dropped == 0
     assert action.refreshed == 1
+    assert action.stamped == 1
     assert not action.resolved
     assert [f.rule.id for f in action.added] == ["http_endpoint_failure"]
-    assert action.body.problems[0] == kept
+    assert action.body.problems[0] == {**kept, "resolved_on": "2026-10-06"}
     assert action.body.problems[1]["days_open"] == 6
     assert action.body.problem_count == 3
+    # The resolved stall stopped at 30 days; the row is as old as its open problems.
+    assert action.body.oldest_days_open == 12
     assert action.body.status == " In_Progress "
 
 

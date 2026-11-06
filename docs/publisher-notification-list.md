@@ -10,8 +10,10 @@ these rows are **stored**: the daily batch does not rewrite them, and your edits
 Rows are created and kept up to date by the
 [publisher notification job]({% link publisher-notification-job.md %}), which runs at 08:07
 each day. It adds new problems, refreshes the figures on the ones already listed, and removes
-problems whose incident has closed. It never changes the status, responsible person, contact
-or date contacted, and it leaves the notes on a new row empty for you.
+problems whose incident has closed. On an **In progress** row it does not remove a closed
+problem straight away: it marks it resolved, so you can tell the publisher (see below). It
+never changes the status, responsible person, contact or date contacted, and it leaves the
+notes on a new row empty for you.
 
 The **Publisher** name links to the publisher's dataset site and opens it in a new tab.
 **Created** is when the row was added, in UK time. The last column, **Problems (JSON)**, is
@@ -25,9 +27,14 @@ A row is flagged, and sorts to the top, when its status is **Open** or **In prog
 - the last contact was more than 5 days ago, or
 - one of its problems has passed its Slack alert threshold: a dataset-wide stall at 5 days,
   a single-feed stall on a Slot or ScheduledSession feed at 10 days, or a feed ingestion
-  error at 10 days.
+  error at 10 days, or
+- one of its problems has been resolved since the publisher was last contacted. This applies
+  to **In progress** rows only. The reason reads "<monitor> resolved on <date>: let the
+  publisher know", and the problem's **Resolved** column shows the date.
 
-The sidebar pill counts these rows. Closed rows never alert and are hidden unless you turn
+A flagged row's **Needs attention** cell is red. It names each kind of reason once: **Never
+contacted**, **Follow up**, **Past threshold** or **Tell publisher**. Select the row to see
+the full reasons. The sidebar pill counts these rows. Closed rows never alert and are hidden unless you turn
 on **Show closed**.
 
 ## Working a row
@@ -39,7 +46,10 @@ on **Show closed**.
    dashboard shows a reminder.
 3. Under **Update this row**, set the status, the person responsible, the contact and the
    date contacted, add a note, and **Save**.
-4. When the publisher has fixed everything, set the status to **Closed**. A row whose
+4. When a problem on an In progress row is marked resolved, the draft email tells the
+   publisher it has cleared. Send it, then save the row with **Date contacted** set to that
+   day or later. That clears the flag, and the next morning's run removes the problem.
+5. When the publisher has fixed everything, set the status to **Closed**. A row whose
    problems have all cleared is not closed for you: the job adds a note saying so.
 
 Saving changes only those five fields; the problems on the row are kept exactly as they were.

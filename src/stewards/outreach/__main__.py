@@ -112,20 +112,21 @@ def report(plan: Plan, today: date, *, dry_run: bool, failures: Sequence[str] = 
     if plan.actions:
         lines += [
             "",
-            "| Publisher | Row | Action | Added | Refreshed | Dropped |",
-            "|---|---|---|---|---|---|",
+            "| Publisher | Row | Action | Added | Refreshed | Marked resolved | Dropped |",
+            "|---|---|---|---|---|---|---|",
         ]
         for action in plan.actions:
             added = ", ".join(f.rule.id for f in action.added) or "-"
             if isinstance(action, Create):
                 lines.append(
-                    f"| {action.publisher_name} | {action.body.id} | create | {added} | - | - |"
+                    f"| {action.publisher_name} | {action.body.id} | create | {added} "
+                    "| - | - | - |"
                 )
             else:
                 verb = "update, all resolved" if action.resolved else "update"
                 lines.append(
                     f"| {action.publisher_name} | {action.body.id} | {verb} | {added} "
-                    f"| {action.refreshed} | {action.dropped} |"
+                    f"| {action.refreshed} | {action.stamped} | {action.dropped} |"
                 )
     if plan.skipped:
         lines += ["", "**Not raised**", ""]

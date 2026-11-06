@@ -4,9 +4,11 @@ One active row per publisher. A raised finding is appended to the publisher's ac
 or opens a new row if there is none; a finding whose incident is already on any active row
 is not raised again. Every stored problem the job can recognise is refreshed with today's
 evidence, or dropped once its incident has closed — except on an In progress row, where a
-steward is already talking to the publisher, so a closed problem is kept as stored for them
-to settle. Problems it cannot recognise — typed by hand for a monitor it does not read, or
-with nothing to key on — are kept exactly as stored.
+steward is already talking to the publisher. There a closed problem is kept, stamped with
+`resolved_on` the first day the job sees it closed, so the steward knows to tell the
+publisher; it is dropped once the row's `date_contacted` is on or after that day. Problems it
+cannot recognise — typed by hand for a monitor it does not read, or with nothing to key on —
+are kept exactly as stored.
 
 Closed rows are never touched, so an incident that reopens after its row was closed is
 raised again on a new row.
@@ -62,6 +64,8 @@ class Update:
     dropped: int = 0
     resolved: bool = False
     """The row had problems and now has none: a steward should review and close it."""
+    stamped: int = 0
+    """Problems on an In progress row seen closed for the first time today."""
 
     @property
     def publisher_name(self) -> str:
@@ -96,6 +100,7 @@ class _Draft:
     added: list[Finding] = field(default_factory=list)
     refreshed: int = 0
     dropped: int = 0
+    stamped: int = 0
 
 
 def reconcile(
@@ -177,11 +182,14 @@ def _refresh(
             continue
         incident = open_by_key.get(key)
         if incident is None:
-            if keeps_closed:
-                draft.after.append(item)
-                draft.keys.add(key)
-            else:
+            if not keeps_closed or _publisher_told(problem, row):
                 draft.dropped += 1
+                continue
+            if problem.resolved_on is None:
+                item = {**item, "resolved_on": today.isoformat()}
+                draft.stamped += 1
+            draft.after.append(item)
+            draft.keys.add(key)
             continue
         draft.after.append(
             problem_payload(
@@ -194,6 +202,15 @@ def _refresh(
         draft.keys.add(key)
         draft.refreshed += 1
     return draft
+
+
+def _publisher_told(problem: NotificationProblem, row: PublisherNotification) -> bool:
+    """A steward has contacted the publisher since the job marked this problem resolved."""
+    return (
+        problem.resolved_on is not None
+        and row.date_contacted is not None
+        and row.date_contacted >= problem.resolved_on
+    )
 
 
 def _parse(item: Any) -> NotificationProblem | None:
@@ -247,6 +264,7 @@ def _update(draft: _Draft, today: date) -> Update | None:
         draft.refreshed,
         draft.dropped,
         resolved,
+        draft.stamped,
     )
 
 
@@ -292,7 +310,11 @@ def new_row_id(publisher_id: str, today: date, taken: set[str]) -> str:
 
 
 def _derived(problems: Sequence[Any]) -> dict[str, Any]:
-    """The row's summary columns, recomputed from its problems."""
+    """The row's summary columns, recomputed from its problems.
+
+    A resolved problem still counts and still names its monitor, because it is still on the
+    row, but its `days_open` stopped at the day it closed, so it does not age the row.
+    """
     items = [item for item in problems if isinstance(item, dict)]
     monitors = dict.fromkeys(
         m for item in items if isinstance(m := item.get("monitor_id"), str) and m
@@ -300,7 +322,9 @@ def _derived(problems: Sequence[Any]) -> dict[str, Any]:
     ages = [
         d
         for item in items
-        if isinstance(d := item.get("days_open"), int) and not isinstance(d, bool)
+        if isinstance(d := item.get("days_open"), int)
+        and not isinstance(d, bool)
+        and not item.get("resolved_on")
     ]
     return {
         "problem_count": len(items),

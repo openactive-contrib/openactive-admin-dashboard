@@ -67,7 +67,9 @@ def _render_blurb() -> None:
         st.markdown(
             "One row per publisher with open problems, kept by the stewards team. Rows that "
             "need attention today come first: never contacted, no follow-up for more than "
-            f"{pn.FOLLOW_UP_DAYS} days, or a problem past its Slack alert threshold."
+            f"{pn.FOLLOW_UP_DAYS} days, a problem past its Slack alert threshold, or a "
+            "problem resolved since the publisher was last contacted. Once you have told "
+            "the publisher, save the row with that day's date contacted."
         )
 
 
@@ -119,8 +121,8 @@ def _render_table(
         f"{len(ordered):,} publishers. Select a row to see its problems and draft an email."
     )
     position = render_table(
-        pn.to_dataframe(ordered),
-        pn.tone_frame(ordered),
+        pn.to_dataframe(ordered, today),
+        pn.tone_frame(ordered, today),
         columns=pn.COLUMN_SPECS,
         rag_columns=pn.RAG_COLUMNS,
         key=TABLE_KEY,
