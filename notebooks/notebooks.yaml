@@ -6,7 +6,7 @@
 # service account or a key file. See notebooks/README.md.
 
 repository: openactive-contrib/openactive-admin-dashboard
-branch: notebooks
+branch: main
 
 notebooks:
   - id: bigquery_starter
