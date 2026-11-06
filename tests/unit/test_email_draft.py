@@ -472,6 +472,92 @@ def test_no_describable_problems_gives_no_draft() -> None:
     assert draft_publisher_email(notification(mystery), NOTIFICATION_SNAPSHOT) == ""
 
 
+RESOLVED_STALL: dict[str, object] = {**STALL_PROBLEM, "resolved_on": "2026-10-12"}
+
+RESOLVED_GOLDEN = """\
+Subject: OpenActive data check: Dummy Leisure — 1 issue resolved
+
+Hello Dummy Leisure team,
+
+We monitor the OpenActive feeds you publish as part of the open data service.
+In our snapshot of 2026-10-13, the issue we raised with you has cleared.
+
+1. Single-feed stalls
+Feed: scheduled-sessions
+Feed type: ScheduledSession
+Endpoint: https://opendata.dummy-leisure.example.org/scheduled-sessions
+Resolved: 2026-10-12
+
+No further action is needed on your side.
+
+Thank you,
+The ODI data stewards team"""
+
+MIXED_GOLDEN = """\
+Subject: OpenActive data check: Dummy Leisure — 1 open, 1 resolved
+
+Hello Dummy Leisure team,
+
+We monitor the OpenActive feeds you publish as part of the open data service.
+In our snapshot of 2026-10-13, we found 1 issue with your data.
+
+1. Feed ingestion errors: our daily crawl has failed to ingest the feed on 10 consecutive \
+days, either because the endpoint did not respond correctly or because the page it returned \
+could not be parsed. The last successful ingestion was 2026-10-02.
+Feed: slots
+Feed type: Slot
+Endpoint: https://opendata.dummy-leisure.example.org/slots
+First detected: 2026-10-03 (10 days open)
+
+Could you look into this,
+and let us know by 2026-10-18 if you need help investigating.
+
+Since we last wrote, this issue has cleared and needs no further action:
+
+1. Single-feed stalls
+Feed: scheduled-sessions
+Feed type: ScheduledSession
+Endpoint: https://opendata.dummy-leisure.example.org/scheduled-sessions
+Resolved: 2026-10-12
+
+No action is needed on our side once it is fixed; the check clears itself
+on the next daily snapshot.
+
+Thank you,
+The ODI data stewards team"""
+
+
+def test_a_row_with_only_resolved_problems_drafts_the_all_clear() -> None:
+    row = notification(RESOLVED_STALL)
+    assert draft_publisher_email(row, NOTIFICATION_SNAPSHOT) == RESOLVED_GOLDEN
+
+
+def test_open_and_resolved_problems_are_reported_in_their_own_sections() -> None:
+    row = notification(INGESTION_PROBLEM, RESOLVED_STALL)
+    assert draft_publisher_email(row, NOTIFICATION_SNAPSHOT) == MIXED_GOLDEN
+
+
+def test_several_resolved_problems_are_counted() -> None:
+    resolved_error = {**INGESTION_PROBLEM, "resolved_on": "2026-10-11"}
+    only_resolved = draft_publisher_email(
+        notification(RESOLVED_STALL, resolved_error), NOTIFICATION_SNAPSHOT
+    )
+    assert only_resolved.startswith(
+        "Subject: OpenActive data check: Dummy Leisure — 2 issues resolved"
+    )
+    assert "the 2 issues we raised with you have cleared." in only_resolved
+    assert "Resolved: 2026-10-11" in only_resolved
+
+    mixed = draft_publisher_email(
+        notification(STALL_PROBLEM, INGESTION_PROBLEM, RESOLVED_STALL, resolved_error),
+        NOTIFICATION_SNAPSHOT,
+    )
+    assert "— 2 open, 2 resolved" in mixed
+    assert "these issues have cleared and need no further action:" in mixed
+    assert "Could you look into each of these," in mixed
+    assert "the checks clear themselves" in mixed
+
+
 def test_publisher_draft_keeps_the_house_tone() -> None:
     draft = draft_publisher_email(
         notification(STALL_PROBLEM, INGESTION_PROBLEM), NOTIFICATION_SNAPSHOT

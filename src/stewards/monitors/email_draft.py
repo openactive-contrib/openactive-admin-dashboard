@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from stewards.api.models import Incident, PublisherNotification
+from stewards.api.models import Incident, NotificationProblem, PublisherNotification
 from stewards.monitors.registry import Monitor, get_monitor
 from stewards.monitors.transforms import EMPTY, parse_detail, resolve_field
 
@@ -151,20 +151,44 @@ def draft_email(
     )
 
 
-def _known_problems(row: PublisherNotification) -> list[tuple[Monitor, Incident]]:
-    """Each problem with its monitor, skipping a monitor this build does not register.
+def _known_problems(
+    row: PublisherNotification, *, resolved: bool
+) -> list[tuple[Monitor, Incident, NotificationProblem]]:
+    """The row's open or resolved problems with their monitors, skipping unknown monitors.
 
     An unknown monitor has no wording to describe it, and a guess in a publisher email is
     worse than leaving it out; the steward still sees it in the problem table.
     """
-    pairs = []
+    known = []
     for problem in row.problems:
+        if (problem.resolved_on is not None) != resolved:
+            continue
         try:
             monitor = get_monitor(problem.monitor_id)
         except KeyError:
             continue
-        pairs.append((monitor, problem.as_incident(row.publisher_id, row.publisher_name)))
-    return pairs
+        incident = problem.as_incident(row.publisher_id, row.publisher_name)
+        known.append((monitor, incident, problem))
+    return known
+
+
+def _issues(count: int) -> str:
+    return f"{count} issue" if count == 1 else f"{count} issues"
+
+
+def _resolved_sections(
+    resolved: list[tuple[Monitor, Incident, NotificationProblem]],
+) -> list[str]:
+    lines: list[str] = []
+    for number, (monitor, incident, problem) in enumerate(resolved, start=1):
+        resolved_on = problem.resolved_on.isoformat() if problem.resolved_on else EMPTY
+        lines += [
+            f"{number}. {monitor.name}",
+            *_identifying_lines(monitor, incident),
+            f"Resolved: {resolved_on}",
+            "",
+        ]
+    return lines
 
 
 def draft_publisher_email(
@@ -175,40 +199,83 @@ def draft_publisher_email(
 ) -> str:
     """One message covering every problem on the row; empty if none can be described.
 
-    A single problem reads exactly as the per-incident draft does.
+    A single open problem reads exactly as the per-incident draft does. Problems the daily
+    job has marked resolved are reported as cleared, after any that are still open.
     """
-    pairs = _known_problems(row)
-    if not pairs:
+    still_open = _known_problems(row, resolved=False)
+    resolved = _known_problems(row, resolved=True)
+    if not still_open and not resolved:
         return ""
-    if len(pairs) == 1:
-        monitor, incident = pairs[0]
+    if len(still_open) == 1 and not resolved:
+        monitor, incident, _ = still_open[0]
         return draft_email(monitor, incident, snapshot_date, sender_name=sender_name)
+
+    if not still_open:
+        cleared = (
+            "the issue we raised with you has cleared."
+            if len(resolved) == 1
+            else f"the {len(resolved)} issues we raised with you have cleared."
+        )
+        return "\n".join(
+            [
+                f"Subject: OpenActive data check: {row.publisher_name} — "
+                f"{_issues(len(resolved))} resolved",
+                "",
+                f"Hello {row.publisher_name} team,",
+                "",
+                "We monitor the OpenActive feeds you publish as part of the open data service.",
+                f"In our snapshot of {snapshot_date.isoformat()}, {cleared}",
+                "",
+                *_resolved_sections(resolved),
+                "No further action is needed on your side.",
+                "",
+                "Thank you,",
+                sender_name,
+            ]
+        )
 
     reply_by = (snapshot_date + timedelta(days=REPLY_WINDOW_DAYS)).isoformat()
     sections: list[str] = []
-    for number, (monitor, incident) in enumerate(pairs, start=1):
+    for number, (monitor, incident, _) in enumerate(still_open, start=1):
         sections += [
             f"{number}. {monitor.name}: {_observation(monitor, incident)}",
             *_identifying_lines(monitor, incident),
             f"First detected: {_first_detected(incident)}",
             "",
         ]
+    one = len(still_open) == 1
+    subject = _issues(len(still_open))
+    if resolved:
+        subject = f"{len(still_open)} open, {len(resolved)} resolved"
+    since: list[str] = []
+    if resolved:
+        since = [
+            "Since we last wrote, this issue has cleared and needs no further action:"
+            if len(resolved) == 1
+            else "Since we last wrote, these issues have cleared and need no further action:",
+            "",
+            *_resolved_sections(resolved),
+        ]
 
     return "\n".join(
         [
-            f"Subject: OpenActive data check: {row.publisher_name} — {len(pairs)} issues",
+            f"Subject: OpenActive data check: {row.publisher_name} — {subject}",
             "",
             f"Hello {row.publisher_name} team,",
             "",
             "We monitor the OpenActive feeds you publish as part of the open data service.",
-            f"In our snapshot of {snapshot_date.isoformat()}, we found {len(pairs)} issues "
-            "with your data.",
+            f"In our snapshot of {snapshot_date.isoformat()}, we found "
+            f"{_issues(len(still_open))} with your data.",
             "",
             *sections,
-            "Could you look into each of these,",
+            "Could you look into this," if one else "Could you look into each of these,",
             f"and let us know by {reply_by} if you need help investigating.",
             "",
-            "No action is needed on our side once each is fixed; the checks clear themselves",
+            *since,
+            "No action is needed on our side once it is fixed; the check clears itself"
+            if one
+            else "No action is needed on our side once each is fixed; the checks clear "
+            "themselves",
             "on the next daily snapshot.",
             "",
             "Thank you,",

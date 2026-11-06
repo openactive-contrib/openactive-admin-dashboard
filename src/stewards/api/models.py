@@ -691,6 +691,9 @@ class NotificationProblem(ApiModel):
     rule_id: str | None = None
     incident_key: str | None = None
     recorded_on: date | None = None
+    #: Also written by the job, on an In progress row only: the day it first saw the incident
+    #: closed. The problem stays on the row until the steward has told the publisher.
+    resolved_on: date | None = None
 
     detail: dict[str, Any] = Field(default_factory=dict)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from urllib.parse import unquote
 
@@ -22,12 +22,15 @@ from stewards.monitors.publisher_notifications import (
     alerts_badge,
     apply_edits,
     apply_filters,
+    attention_label,
     created_text,
     filter_options,
     has_alert,
+    problem_alert,
     problem_frame,
     problems_json,
     publisher_link,
+    resolution_alert,
     sort_rows,
     summary_stats,
     to_dataframe,
@@ -144,19 +147,45 @@ def test_filter_options_skip_blanks() -> None:
 
 def test_table_and_tones_line_up() -> None:
     rows = sort_rows(listing(), TODAY)
-    frame, tones = to_dataframe(rows), tone_frame(rows)
+    frame, tones = to_dataframe(rows, TODAY), tone_frame(rows, TODAY)
 
     assert list(frame.columns) == list(COLUMNS) == list(tones.columns)
-    assert "Alert" not in frame.columns
+    assert list(frame.columns)[:2] == ["Publisher", "Needs attention"]
     assert "Responsible" in frame.columns
     assert len(frame) == len(tones) == 4
     assert tones.iloc[1]["Oldest open"] == Tone.RED.value
     assert tones.iloc[3]["Status"] == Tone.GREEN.value
 
 
+def test_the_attention_cell_names_each_kind_of_alert_once_and_is_red() -> None:
+    busy = row(
+        date_contacted=None,
+        problems=[
+            problem("dataset_stall", 7),
+            problem("feed_ingestion_error", 12),
+            {**problem("dataset_stall", 3), "resolved_on": "2026-10-12"},
+        ],
+    )
+    quiet = row()
+    frame, tones = to_dataframe([busy, quiet], TODAY), tone_frame([busy, quiet], TODAY)
+    assert list(frame["Needs attention"]) == [
+        "Never contacted · Past threshold · Tell publisher",
+        EMPTY,
+    ]
+    assert list(tones["Needs attention"]) == [Tone.RED.value, ""]
+
+
+def test_the_attention_cell_reads_follow_up_and_ignores_closed_rows() -> None:
+    stale = row(date_contacted=(TODAY - timedelta(days=FOLLOW_UP_DAYS + 1)).isoformat())
+    assert attention_label(stale, TODAY) == "Follow up"
+    on_the_day = row(date_contacted=(TODAY - timedelta(days=FOLLOW_UP_DAYS)).isoformat())
+    assert attention_label(on_the_day, TODAY) == EMPTY
+    assert attention_label(row(status="closed", date_contacted=None), TODAY) == EMPTY
+
+
 def test_the_publisher_cell_links_the_dataset_and_shows_the_name() -> None:
     linked = row(publisher_name="Ice Leisure (harlow)", dataset_url="https://ice.example/oa")
-    cell = to_dataframe([linked]).iloc[0]["Publisher"]
+    cell = to_dataframe([linked], TODAY).iloc[0]["Publisher"]
     assert cell == "https://ice.example/oa#Ice%20Leisure%20%28harlow%29"
     [shown] = re.fullmatch(PUBLISHER_LINK_TEXT, cell).groups()  # type: ignore[union-attr]
     assert unquote(shown) == "Ice Leisure (harlow)"
@@ -186,7 +215,7 @@ def test_problems_json_is_the_stored_problems_verbatim() -> None:
 
 
 def test_the_json_column_is_last_and_created_comes_before_it() -> None:
-    frame = to_dataframe([row(problems=[], created_at="2026-10-01T09:00:00Z")])
+    frame = to_dataframe([row(problems=[], created_at="2026-10-01T09:00:00Z")], TODAY)
     assert list(frame.columns)[-2:] == ["Created", "Problems (JSON)"]
     assert frame.iloc[0]["Created"] == "2026-10-01 10:00"
     assert frame.iloc[0]["Problems (JSON)"] == "[]"
@@ -210,6 +239,65 @@ def test_problem_frame_marks_past_threshold() -> None:
 
 def test_problem_frame_of_an_empty_row_is_empty() -> None:
     assert problem_frame(row()).empty
+
+
+def test_problem_frame_shows_when_a_problem_was_resolved() -> None:
+    busy = row(
+        problems=[resolved("dataset_stall", 7, "2026-10-12"), problem("dataset_stall", 7)]
+    )
+    frame = problem_frame(busy)
+    assert list(frame["Resolved"]) == ["2026-10-12", EMPTY]
+    assert list(frame["Past threshold"]) == ["No", "Yes"]
+
+
+# --- resolved problems --------------------------------------------------------------------
+
+
+def resolved(monitor_id: str, days_open: int, on: str) -> dict[str, Any]:
+    return {**problem(monitor_id, days_open), "resolved_on": on}
+
+
+def test_a_resolved_problem_is_past_no_threshold() -> None:
+    parsed = row(problems=[resolved("dataset_stall", 30, "2026-10-12")]).problems[0]
+    assert parsed.resolved_on == date(2026, 10, 12)
+    assert "resolved_on" not in parsed.detail
+    assert problem_alert(parsed) is None
+
+
+@pytest.mark.parametrize(
+    ("contacted", "expected"),
+    [
+        (None, True),
+        ("2026-10-11", True),
+        ("2026-10-12", False),
+        ("2026-10-13", False),
+    ],
+)
+def test_a_resolved_problem_alerts_until_the_publisher_is_told(
+    contacted: str | None, expected: bool
+) -> None:
+    told = row(problems=[resolved("dataset_stall", 30, "2026-10-12")], date_contacted=contacted)
+    reason = resolution_alert(told.problems[0], told)
+    assert (reason is not None) is expected
+    reasons = alert_reasons(told, TODAY)
+    assert (
+        "Dataset-wide stalls resolved on 2026-10-12: let the publisher know" in reasons
+    ) is expected
+
+
+def test_an_unresolved_problem_has_no_resolution_alert() -> None:
+    busy = row(problems=[problem("dataset_stall", 30)])
+    assert resolution_alert(busy.problems[0], busy) is None
+
+
+def test_a_row_waiting_to_tell_the_publisher_sorts_first() -> None:
+    waiting = row(
+        id="pn_waiting",
+        problems=[resolved("dataset_stall", 3, "2026-10-12")],
+        date_contacted="2026-10-10",
+    )
+    quiet = row(id="pn_quiet", oldest_days_open=40)
+    assert [r.id for r in sort_rows([quiet, waiting], TODAY)] == ["pn_waiting", "pn_quiet"]
 
 
 # --- editing ------------------------------------------------------------------------------

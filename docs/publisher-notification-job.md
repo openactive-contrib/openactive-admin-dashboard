@@ -55,9 +55,13 @@ On every active row, the job also brings each problem it recognises up to date:
 - If the incident has closed, the problem is removed. When that leaves the row with no
   problems, the job adds the note "All problems resolved as of <date>; review and close." It
   does not change the status: closing a row is a steward's decision.
-- On an **In progress** row, a problem whose incident has closed is kept exactly as stored,
-  not removed. A steward is already talking to that publisher, so settling the problem is
-  theirs to do.
+- On an **In progress** row, a problem whose incident has closed is not removed straight
+  away. A steward is already talking to that publisher, so the job marks the problem with
+  `resolved_on`, the first day it saw it closed, and otherwise keeps it as stored. The row
+  then needs attention until a steward saves it with a date contacted on or after
+  `resolved_on`; the next run removes the problem. If the incident reopens first, the problem
+  is refreshed and the mark goes. A resolved problem does not count towards the row's
+  oldest open age.
 
 Problems the job does not recognise are kept exactly as stored. That covers problems for a
 monitor the rules do not read, and anything with no feed or dataset to identify it by. The

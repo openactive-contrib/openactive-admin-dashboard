@@ -40,7 +40,12 @@ def is_active(row: PublisherNotification) -> bool:
 
 
 def problem_alert(problem: NotificationProblem) -> str | None:
-    """Why this problem is past its Slack threshold, or None if it is not."""
+    """Why this problem is past its Slack threshold, or None if it is not.
+
+    A resolved problem is past nothing: its `days_open` stopped the day it closed.
+    """
+    if problem.resolved_on is not None:
+        return None
     check = _CHECKS_BY_MONITOR.get(problem.monitor_id)
     if check is None or problem.days_open is None:
         return None
@@ -51,22 +56,59 @@ def problem_alert(problem: NotificationProblem) -> str | None:
     return f"{check.label}: {check.describe(problem.days_open)}"
 
 
-def alert_reasons(row: PublisherNotification, today: date) -> tuple[str, ...]:
-    """Every reason this row needs attention today. Empty means no alert."""
+def resolution_alert(problem: NotificationProblem, row: PublisherNotification) -> str | None:
+    """Why the steward should tell the publisher this problem is fixed, or None.
+
+    The daily job stamps `resolved_on` on a problem it sees closed on an In progress row.
+    Saving the row with a contact date on or after that day says the publisher has been told.
+    """
+    resolved_on = problem.resolved_on
+    if resolved_on is None:
+        return None
+    if row.date_contacted is not None and row.date_contacted >= resolved_on:
+        return None
+    return (
+        f"{monitor_name(problem.monitor_id)} resolved on {resolved_on.isoformat()}: "
+        "let the publisher know"
+    )
+
+
+#: Short names for each kind of alert, for the table's "Needs attention" cell. The detail
+#: card shows the full reasons.
+NEVER_CONTACTED = "Never contacted"
+FOLLOW_UP = "Follow up"
+PAST_THRESHOLD = "Past threshold"
+TELL_PUBLISHER = "Tell publisher"
+
+
+def _alerts(row: PublisherNotification, today: date) -> list[tuple[str, str]]:
+    """Every alert on the row today, as (short name, full reason). Empty means no alert."""
     if not is_active(row):
-        return ()
-    reasons: list[str] = []
+        return []
+    alerts: list[tuple[str, str]] = []
     if row.date_contacted is None:
-        reasons.append("Never contacted")
+        alerts.append((NEVER_CONTACTED, "Never contacted"))
     else:
         days_since = (today - row.date_contacted).days
         if days_since > FOLLOW_UP_DAYS:
-            reasons.append(f"No follow-up for {days_since} days")
+            alerts.append((FOLLOW_UP, f"No follow-up for {days_since} days"))
     for problem in row.problems:
-        reason = problem_alert(problem)
-        if reason is not None:
-            reasons.append(reason)
-    return tuple(reasons)
+        if (reason := problem_alert(problem)) is not None:
+            alerts.append((PAST_THRESHOLD, reason))
+        elif (reason := resolution_alert(problem, row)) is not None:
+            alerts.append((TELL_PUBLISHER, reason))
+    return alerts
+
+
+def alert_reasons(row: PublisherNotification, today: date) -> tuple[str, ...]:
+    """Every reason this row needs attention today. Empty means no alert."""
+    return tuple(reason for _, reason in _alerts(row, today))
+
+
+def attention_label(row: PublisherNotification, today: date) -> str:
+    """The table cell: each kind of alert once, in the order raised; em dash for none."""
+    names = dict.fromkeys(name for name, _ in _alerts(row, today))
+    return " · ".join(names) or EMPTY
 
 
 def has_alert(row: PublisherNotification, today: date) -> bool:
@@ -91,6 +133,12 @@ COLUMN_SPECS: tuple[Col, ...] = (
         primary=True,
         help="Opens the publisher's dataset site in a new tab",
         link_text=PUBLISHER_LINK_TEXT,
+    ),
+    Col(
+        "attention",
+        "Needs attention",
+        ColKind.STATUS,
+        help="Why the row is flagged today. Select it to see the full reasons",
     ),
     Col("problem_count", "Problems", ColKind.NUMBER),
     Col("monitors", "Monitors", ColKind.TEXT),
@@ -193,11 +241,12 @@ def publisher_link(row: PublisherNotification) -> str:
     return f"{row.dataset_url or ''}#{quote(name, safe='')}"
 
 
-def to_dataframe(rows: Sequence[PublisherNotification]) -> pd.DataFrame:
+def to_dataframe(rows: Sequence[PublisherNotification], today: date) -> pd.DataFrame:
     """One line per row, in the order given. The page sorts and filters first."""
     lines = [
         {
             "Publisher": publisher_link(row),
+            "Needs attention": attention_label(row, today),
             "Problems": row.problem_count,
             "Monitors": ", ".join(monitor_name(m) for m in row.monitors) or EMPTY,
             "Oldest open": (
@@ -214,11 +263,12 @@ def to_dataframe(rows: Sequence[PublisherNotification]) -> pd.DataFrame:
     return pd.DataFrame(lines, columns=list(COLUMNS))
 
 
-def tone_frame(rows: Sequence[PublisherNotification]) -> pd.DataFrame:
+def tone_frame(rows: Sequence[PublisherNotification], today: date) -> pd.DataFrame:
     """Colour per cell for the coloured columns, aligned line for line with `to_dataframe`."""
     lines = [
         {
             **dict.fromkeys(COLUMNS, ""),
+            "Needs attention": Tone.RED.value if has_alert(row, today) else "",
             "Oldest open": (
                 ""
                 if row.oldest_days_open is None
@@ -254,6 +304,7 @@ PROBLEM_COLUMNS: tuple[str, ...] = (
     "Days open",
     "First detected",
     "Past threshold",
+    "Resolved",
 )
 
 
@@ -267,6 +318,7 @@ def problem_frame(row: PublisherNotification) -> pd.DataFrame:
             "Days open": EMPTY if problem.days_open is None else days_label(problem.days_open),
             "First detected": _date_text(problem.first_detected),
             "Past threshold": "Yes" if problem_alert(problem) else "No",
+            "Resolved": _date_text(problem.resolved_on),
         }
         for problem in row.problems
     ]
