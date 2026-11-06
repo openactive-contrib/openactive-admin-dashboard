@@ -115,6 +115,18 @@ def has_alert(row: PublisherNotification, today: date) -> bool:
     return bool(alert_reasons(row, today))
 
 
+#: Shown on a row with a future decline. We only have data since May, so we can't tell a
+#: seasonal dip from a real problem yet; a steward has to look before emailing.
+SEASONAL_CHECK_TEXT = (
+    "This row includes a decline in future sessions. Check it isn't seasonal "
+    "(e.g. winter activities) before you send the email."
+)
+
+
+def needs_seasonal_check(row: PublisherNotification) -> bool:
+    return any(p.monitor_id == "dataset_future_decline" for p in row.problems)
+
+
 #: The oldest problem goes amber from halfway to, and red at, the lowest Slack threshold.
 OLDEST_TONE_DAYS = min(check.threshold for check in CHECKS)
 

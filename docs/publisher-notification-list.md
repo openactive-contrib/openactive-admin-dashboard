@@ -41,7 +41,9 @@ on **Show closed**.
 
 1. Select the row. Its problems, the reasons it is flagged and a draft email appear below.
 2. Edit the draft if you need to and copy it into your mail client. The dashboard does not
-   send email, and edits to the draft are not saved.
+   send email, and edits to the draft are not saved. If the row has a decline in future
+   sessions, first check the decline isn't seasonal (for example winter activities); the
+   dashboard shows a reminder.
 3. Under **Update this row**, set the status, the person responsible, the contact and the
    date contacted, add a note, and **Save**.
 4. When a problem on an In progress row is marked resolved, the draft email tells the

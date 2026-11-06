@@ -110,6 +110,9 @@ class Rule:
 SCHEDULE_FEED_TYPES = frozenset({"Slot", "ScheduledSession"})
 
 RULES: tuple[Rule, ...] = (
+    # The API leaves 401/403 out of feed_ingestion_error, so a login failure never fires
+    # this rule and never hides anything. That's on purpose: crawls often still work for a
+    # while before the auth error starts, so it doesn't block data like other HTTP errors.
     Rule(
         id="http_endpoint_failure",
         label="HTTP endpoint failure",
@@ -133,7 +136,7 @@ RULES: tuple[Rule, ...] = (
         label="Orphaned child items",
         monitor_id="dataset_orphaned_children",
         when=(AtLeast("detail.orphan_share", 0.20),),
-        prechecks=("http_endpoint_failure", "single_feed_stall"),
+        prechecks=("http_endpoint_failure", "dataset_stall", "single_feed_stall"),
     ),
     Rule(
         id="future_decline",

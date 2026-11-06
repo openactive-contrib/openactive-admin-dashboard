@@ -139,6 +139,8 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
         reasons = pn.alert_reasons(row, today)
         if reasons:
             st.warning(" · ".join(reasons), icon=":material/notifications:")
+        if pn.needs_seasonal_check(row):
+            st.warning(pn.SEASONAL_CHECK_TEXT, icon=":material/calendar_month:")
         st.caption(
             " · ".join(
                 [

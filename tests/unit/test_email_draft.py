@@ -314,6 +314,9 @@ deleted or allowed to expire faster than new ones are published.
 Dataset: Better Sessions and Facilities
 Feeds: 1
 Endpoint: https://better-admin.org.uk/api/openactive/better
+Future opportunities at start: 190167
+Future opportunities now: 177186
+Drop (%): 6.83
 First detected: 2026-08-12 (9 days open)
 
 Could you confirm whether the export that populates this dataset is still running,

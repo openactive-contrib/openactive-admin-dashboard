@@ -21,7 +21,7 @@ A problem is raised when one of these rules triggers on an open incident:
 | `http_endpoint_failure` | Feed ingestion errors | open 10 days or more | |
 | `dataset_stall` | Dataset-wide stalls | open 5 days or more | |
 | `single_feed_stall` | Single-feed stalls | open 10 days or more, on a Slot or ScheduledSession feed | |
-| `orphaned_children` | Orphaned child items | 20% or more of child items orphaned | `http_endpoint_failure`, then `single_feed_stall` |
+| `orphaned_children` | Orphaned child items | 20% or more of child items orphaned | `http_endpoint_failure`, then `dataset_stall`, then `single_feed_stall` |
 | `future_decline` | Future session decline | open 15 days or more, with a ScheduledSession feed declining | `http_endpoint_failure`, then `dataset_stall`, then `single_feed_stall` |
 
 The last column is the rule's **pre-checks**. When one of those rules has also triggered on
@@ -30,6 +30,15 @@ one. Only a pre-check that *triggered* holds a problem back. An incident still b
 threshold does not.
 
 Thresholds are "or more", not "exactly", so a day the job did not run is caught up the next.
+
+Login failures (HTTP 401 or 403) never hold anything back. The API leaves them out of the
+feed ingestion errors monitor, because a feed usually keeps being crawled for a while before
+the login error starts, so they don't block data the way other HTTP errors do.
+
+Future declines are not checked for seasonality yet: there is only data since May 2026. The
+dashboard reminds the steward to check this by hand before emailing. The email includes the
+first detected date, the number of future opportunities at the start and now, and the drop
+as a percentage.
 
 ## What it writes
 
