@@ -12,14 +12,13 @@ from stewards.monitors.registry import Monitor
 
 
 def render_email_draft(monitor: Monitor, incident: Incident, snapshot_date: date) -> None:
-    """A popover holding the copyable message for the selected row."""
-    label = f"Draft email · {incident.publisher_name}"
-    with st.popover(label, width="content"):
-        st.caption(
-            "Copy this into your mail client. The dashboard does not send email and does not "
-            "record that you did."
-        )
-        st.code(draft_email(monitor, incident, snapshot_date), language="text")
+    """The copyable message for the selected row, shown in full (it sits in the pop-up)."""
+    st.markdown("**Draft email**")
+    st.caption(
+        "Copy this into your mail client with the copy icon. The dashboard does not send "
+        "email and does not record that you did."
+    )
+    st.code(draft_email(monitor, incident, snapshot_date), language="text", wrap_lines=True)
 
 
 def draft_key(row: PublisherNotification) -> str:
