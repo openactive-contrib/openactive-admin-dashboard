@@ -15,10 +15,12 @@ from stewards.components.errors import render_api_error
 from stewards.components.filters import render_filters
 from stewards.components.incident_table import column_config, render_monitor_table
 from stewards.components.loading import loading
+from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
 from stewards.components.trend_chart import render_figure
 from stewards.monitors import transforms
 from stewards.monitors.registry import Monitor
+from stewards.outreach.keys import incident_key
 
 
 def render_blurb(monitor: Monitor) -> None:
@@ -116,14 +118,32 @@ def render_monitor_page(monitor: Monitor) -> None:
     st.caption(
         f"{len(shown):,} of {len(rows):,} rows shown across "
         f"{len(transforms.unique_incidents(shown)):,} of {len(incidents):,} incidents. "
-        "Select a row to draft a publisher email."
+        "Select a row to open it."
     )
     selected = render_monitor_table(
         monitor, frame, tones, rag_columns=transforms.rag_columns(monitor)
     )
-    if selected is not None and selected < len(shown):
-        incident = shown[selected].incident
-        render_email_draft(monitor, incident, page.meta.snapshot_date)
-        render_row_detail(monitor, incident)
+    snapshot_date = page.meta.snapshot_date
+
+    def render(row: transforms.Row) -> None:
+        render_email_draft(monitor, row.incident, snapshot_date)
+        render_row_detail(monitor, row.incident)
+
+    render_row_dialog(
+        shown,
+        lambda row: _row_id(monitor, row),
+        selected,
+        key=f"dialog_{monitor.id}",
+        table_key=f"table_{monitor.id}",
+        title=lambda row: row.incident.publisher_name or row.incident.publisher_id,
+        render=render,
+    )
 
     layout.render_footer(monitor.query)
+
+
+def _row_id(monitor: Monitor, row: transforms.Row) -> str:
+    """The incident's own key. Several table rows can come from one incident (one per
+    feed), and they all open the same incident, so sharing an id is fine."""
+    incident = row.incident
+    return incident_key(incident) or f"{monitor.id}:{incident.publisher_id}"
