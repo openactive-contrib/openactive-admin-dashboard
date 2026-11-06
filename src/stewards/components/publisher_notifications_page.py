@@ -34,6 +34,9 @@ TABLE_KEY = "table_publisher_notifications"
 #: Survives the rerun after a save, so the confirmation is shown on the fresh page.
 FLASH_KEY = "pn_flash"
 
+#: The "Saved" message, shown inside the pop-up that stays open after a save.
+SAVED_KEY = "pn_saved"
+
 #: Save is the main action in the pop-up, so it is wider than Delete beside it (pixels).
 SAVE_WIDTH = 140
 
@@ -138,6 +141,9 @@ def _render_table(ordered: list[PublisherNotification]) -> int | None:
 
 def _render_detail(row: PublisherNotification, today: date) -> None:
     with card("notification_detail"):
+        saved = st.session_state.pop(SAVED_KEY, None)
+        if saved:
+            st.success(saved, icon=":material/check_circle:")
         reasons = pn.alert_reasons(row, today)
         if reasons:
             st.warning(" · ".join(reasons), icon=":material/notifications:")
@@ -234,8 +240,8 @@ def render_save_button(row: PublisherNotification, today: date) -> None:
         render_api_error(exc)
         return
 
-    st.session_state[FLASH_KEY] = f"Saved {row.publisher_name or row.id}."
-    st.session_state.pop(TABLE_KEY, None)
+    st.session_state[SAVED_KEY] = f"Saved {row.publisher_name or row.id}."
+    # The table selection is kept, so the pop-up reopens on this publisher after the reload.
     st.rerun()
 
 

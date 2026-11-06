@@ -1125,7 +1125,7 @@ def test_saving_sends_the_edit_and_keeps_the_evidence() -> None:
     assert sent["status"] == "in_progress"
     assert sent["stakeholder"] == "Council"
     assert sent["problems"]  # the evidence went back with the edit
-    assert app.session_state["pn_flash"] == "Saved Dummy Leisure."
+    assert app.session_state["pn_saved"] == "Saved Dummy Leisure."
 
 
 def test_an_invalid_edit_is_refused_and_not_sent() -> None:
@@ -1142,7 +1142,7 @@ def test_a_failed_save_says_so_and_does_not_confirm() -> None:
     app.button[0].click().run()
 
     assert app.error
-    assert "pn_flash" not in app.session_state
+    assert "pn_saved" not in app.session_state
 
 
 # --- deleting a notification ----------------------------------------------------------------
