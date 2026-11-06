@@ -9,13 +9,6 @@ repository: openactive-contrib/openactive-admin-dashboard
 branch: notebooks
 
 notebooks:
-  - id: hello_colab
-    title: Hello from Colab
-    file: 00_hello_colab.ipynb
-    description: >-
-      A minimal demo that prints a few lines of text. Use it to check that a notebook from
-      this repository opens and runs in Colab.
-    tags: [demo]
   - id: bigquery_starter
     title: BigQuery starter
     file: 01_bigquery_starter.ipynb
