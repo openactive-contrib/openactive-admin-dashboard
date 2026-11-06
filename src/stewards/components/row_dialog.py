@@ -10,6 +10,9 @@ from collections.abc import Callable, Sequence
 
 import streamlit as st
 
+#: Height in pixels of the pop-up's scrolling area: fits a laptop screen with the title.
+DIALOG_BODY_HEIGHT = 620
+
 
 def find_row[T](rows: Sequence[T], row_id: Callable[[T], str], wanted: str | None) -> T | None:
     """The row whose id is `wanted`, or None if there isn't one (or nothing is wanted)."""
@@ -47,11 +50,13 @@ def render_row_dialog[T](
     table_key: str,
     title: Callable[[T], str],
     render: Callable[[T], None],
+    actions: Callable[[T], None] | None = None,
 ) -> None:
     """Open the selected row in a large pop-up; closing it clears the table selection.
 
     `key` keeps each table's pop-up separate. `table_key` is the table's widget key, so
     closing the pop-up can clear its selection and it doesn't reopen on the next reload.
+    `actions`, if given, is drawn under the scrolling area so it is always in view.
     """
     id_key, position_key = f"{key}_open_id", f"{key}_open_position"
     wanted = chosen_id(
@@ -74,6 +79,10 @@ def render_row_dialog[T](
 
     @st.dialog(title(row), width="large", on_dismiss=close)
     def show() -> None:
-        render(row)
+        # A fixed-height box so long details scroll inside the pop-up, not the whole page.
+        with st.container(height=DIALOG_BODY_HEIGHT, border=False):
+            render(row)
+        if actions is not None:
+            actions(row)
 
     show()
