@@ -138,7 +138,7 @@ class RowSpec:
 
 @dataclass(frozen=True, slots=True)
 class RowDetail:
-    """A table shown under the incident table when a row is selected.
+    """A table shown in the row pop-up when a row is selected.
 
     `field` names a detail field holding a list of models — the parents a dataset's children
     are missing, the feeds a stalled dataset covers — and `columns` are read against each
@@ -198,7 +198,7 @@ class Monitor:
     #: Set to explode each incident into several table rows. None means one row per incident.
     rows: RowSpec | None = None
 
-    #: A table shown beneath the incident table for the selected row, where the monitor's
+    #: A table shown in the pop-up for the selected row, where the monitor's
     #: detail carries a list worth its own columns.
     row_detail: RowDetail | None = None
 
@@ -628,7 +628,7 @@ FEED_QUALITY = Monitor(
             "issue_count",
             "Issues",
             ColKind.NUMBER,
-            help="Errors plus warnings; select a row to read them",
+            help="Errors plus warnings; select a row to open them",
         ),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
     ),

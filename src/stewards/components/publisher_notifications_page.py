@@ -14,7 +14,8 @@ from stewards.components.email_draft import draft_key, render_editable_draft
 from stewards.components.errors import render_api_error
 from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
-from stewards.components.surface import card
+from stewards.components.row_dialog import render_row_dialog
+from stewards.components.surface import DANGER_PREFIX, card
 from stewards.monitors import publisher_notifications as pn
 from stewards.monitors.email_draft import draft_publisher_email
 from stewards.monitors.thresholds import status_label
@@ -32,6 +33,12 @@ TABLE_KEY = "table_publisher_notifications"
 
 #: Survives the rerun after a save, so the confirmation is shown on the fresh page.
 FLASH_KEY = "pn_flash"
+
+#: The "Saved" message, shown inside the pop-up that stays open after a save.
+SAVED_KEY = "pn_saved"
+
+#: Save is the main action in the pop-up, so it is wider than Delete beside it (pixels).
+SAVE_WIDTH = 140
 
 
 def render_publisher_notifications_page() -> None:
@@ -52,9 +59,18 @@ def render_publisher_notifications_page() -> None:
     _render_blurb()
     _render_kpis(summary.data)
     rows = _render_filters(list(listing.data))
-    selected = _render_table(rows, today)
-    if selected is not None:
-        _render_detail(selected, today)
+    ordered = pn.sort_rows(rows, today)
+    position = _render_table(ordered, today)
+    render_row_dialog(
+        ordered,
+        lambda row: row.id,
+        position,
+        key="pn_dialog",
+        table_key=TABLE_KEY,
+        title=lambda row: row.publisher_name or row.publisher_id or row.id,
+        render=lambda row: _render_detail(row, today),
+        actions=lambda row: _render_actions(row, today),
+    )
     layout.render_footer(
         QUERY,
         note="These rows are stored; the daily batch does not rewrite them.",
@@ -113,14 +129,9 @@ def _render_filters(rows: list[PublisherNotification]) -> list[PublisherNotifica
     )
 
 
-def _render_table(
-    rows: list[PublisherNotification], today: date
-) -> PublisherNotification | None:
-    ordered = pn.sort_rows(rows, today)
-    st.caption(
-        f"{len(ordered):,} publishers. Select a row to see its problems and draft an email."
-    )
-    position = render_table(
+def _render_table(ordered: list[PublisherNotification], today: date) -> int | None:
+    st.caption(f"{len(ordered):,} publishers. Select a row to open it.")
+    return render_table(
         pn.to_dataframe(ordered, today),
         pn.tone_frame(ordered, today),
         columns=pn.COLUMN_SPECS,
@@ -128,14 +139,13 @@ def _render_table(
         key=TABLE_KEY,
         empty_message="No publishers match these filters.",
     )
-    if position is None or position >= len(ordered):
-        return None
-    return ordered[position]
 
 
 def _render_detail(row: PublisherNotification, today: date) -> None:
     with card("notification_detail"):
-        st.markdown(f"**{row.publisher_name or row.publisher_id}**")
+        saved = st.session_state.pop(SAVED_KEY, None)
+        if saved:
+            st.success(saved, icon=":material/check_circle:")
         reasons = pn.alert_reasons(row, today)
         if reasons:
             st.warning(" · ".join(reasons), icon=":material/notifications:")
@@ -159,60 +169,66 @@ def _render_detail(row: PublisherNotification, today: date) -> None:
             st.info("No problems are recorded on this row.")
         else:
             st.dataframe(problems, hide_index=True, width="stretch")
-        render_edit_form(row, today)
+        render_edit_fields(row, today)
         render_editable_draft(draft_publisher_email(row, today), key=draft_key(row))
-        if st.button("Delete row", icon=":material/delete:", key=f"pn_delete_{row.id}"):
-            _confirm_delete(row)
+
+
+def _prefix(row: PublisherNotification) -> str:
+    # Keyed by row and last save: a new row, or a saved one, starts from its stored values.
+    return f"pn_edit_{draft_key(row)}"
 
 
 def render_edit_form(row: PublisherNotification, today: date) -> None:
-    """Edit the five steward fields and save the whole row back."""
-    # Keyed by row and last save: a new row, or a saved one, starts from its stored values.
-    prefix = f"pn_edit_{draft_key(row)}"
-    with st.form(prefix, border=False):
-        st.markdown("**Update this row**")
-        status_col, stakeholder_col, contact_col, date_col = st.columns(4)
-        status = status_col.selectbox(
-            "Status",
-            pn.STATUSES,
-            index=pn.STATUSES.index(row.status) if row.status in pn.STATUSES else None,
-            format_func=status_label,
-            placeholder="Choose a status",
-            key=f"{prefix}_status",
-        )
-        stakeholder = stakeholder_col.text_input(
-            pn.RESPONSIBLE, value=row.stakeholder or "", key=f"{prefix}_stakeholder"
-        )
-        contact = contact_col.text_input(
-            "Contact", value=row.contact or "", key=f"{prefix}_contact"
-        )
-        picked = date_col.date_input(
-            "Date contacted",
-            value=row.date_contacted,
-            max_value=today,
-            format="YYYY-MM-DD",
-            key=f"{prefix}_date",
-        )
-        notes = st.text_area(
-            "Notes",
-            value=row.notes or "",
-            max_chars=pn.NOTES_MAX,
-            key=f"{prefix}_notes",
-        )
-        submitted = st.form_submit_button("Save", type="primary")
+    """The edit fields with Save under them."""
+    render_edit_fields(row, today)
+    render_save_button(row, today)
 
-    if not submitted:
+
+def render_edit_fields(row: PublisherNotification, today: date) -> None:
+    """The five steward fields. Not an `st.form`, so Save can sit outside them, in the
+    pop-up's fixed footer; Save reads the values back from session state."""
+    prefix = _prefix(row)
+    st.markdown("**Update this row**")
+    status_col, stakeholder_col, contact_col, date_col = st.columns(4)
+    status_col.selectbox(
+        "Status",
+        pn.STATUSES,
+        index=pn.STATUSES.index(row.status) if row.status in pn.STATUSES else None,
+        format_func=status_label,
+        placeholder="Choose a status",
+        key=f"{prefix}_status",
+    )
+    stakeholder_col.text_input(
+        pn.RESPONSIBLE, value=row.stakeholder or "", key=f"{prefix}_stakeholder"
+    )
+    contact_col.text_input("Contact", value=row.contact or "", key=f"{prefix}_contact")
+    date_col.date_input(
+        "Date contacted",
+        value=row.date_contacted,
+        max_value=today,
+        format="YYYY-MM-DD",
+        key=f"{prefix}_date",
+    )
+    st.text_area("Notes", value=row.notes or "", max_chars=pn.NOTES_MAX, key=f"{prefix}_notes")
+
+
+def render_save_button(row: PublisherNotification, today: date) -> None:
+    """Save the edit fields and save the whole row back."""
+    if not st.button("Save", type="primary", key=f"pn_save_{row.id}", width=SAVE_WIDTH):
         return
 
+    prefix = _prefix(row)
+    state = st.session_state
     # `date_input` can in principle return a range; this one is a single date or empty.
+    picked = state.get(f"{prefix}_date", row.date_contacted)
     contacted = picked if isinstance(picked, date) else None
     body, errors = pn.apply_edits(
         row,
-        status=status or "",
-        stakeholder=stakeholder,
-        contact=contact,
+        status=state.get(f"{prefix}_status", row.status) or "",
+        stakeholder=state.get(f"{prefix}_stakeholder", row.stakeholder or ""),
+        contact=state.get(f"{prefix}_contact", row.contact or ""),
         date_contacted=contacted,
-        notes=notes,
+        notes=state.get(f"{prefix}_notes", row.notes or ""),
         today=today,
     )
     if body is None:
@@ -226,8 +242,8 @@ def render_edit_form(row: PublisherNotification, today: date) -> None:
         render_api_error(exc)
         return
 
-    st.session_state[FLASH_KEY] = f"Saved {row.publisher_name or row.id}."
-    st.session_state.pop(TABLE_KEY, None)
+    st.session_state[SAVED_KEY] = f"Saved {row.publisher_name or row.id}."
+    # The table selection is kept, so the pop-up reopens on this publisher after the reload.
     st.rerun()
 
 
@@ -245,16 +261,38 @@ def delete_row(row: PublisherNotification) -> bool:
     return True
 
 
-@st.dialog("Delete this row?")
-def _confirm_delete(row: PublisherNotification) -> None:
-    """Ask before deleting. Nothing is removed until the steward confirms."""
-    st.markdown(
+def _render_actions(row: PublisherNotification, today: date) -> None:
+    """The pop-up's fixed footer: Save on the left, Delete on the right."""
+    if st.session_state.get(f"pn_confirm_delete_{row.id}"):
+        _render_delete(row)
+        return
+    # Right-aligned row: Delete, then Save at the far right.
+    with st.container(horizontal=True, horizontal_alignment="right"):
+        _render_delete(row)
+        render_save_button(row, today)
+
+
+def _render_delete(row: PublisherNotification) -> None:
+    """Delete, with a confirm step in the same pop-up (Streamlit can't open one pop-up
+    inside another). Nothing is removed until the steward confirms."""
+    asking = f"pn_confirm_delete_{row.id}"
+    if not st.session_state.get(asking):
+        if st.button(
+            "Delete row", icon=":material/delete:", key=f"{DANGER_PREFIX}_pn_delete_{row.id}"
+        ):
+            st.session_state[asking] = True
+            st.rerun(scope="fragment")
+        return
+
+    st.error(
         f"This permanently removes **{row.publisher_name or row.id}** from the notification "
-        "list, including its problems and notes. It cannot be undone."
+        "list, including its problems and notes. It cannot be undone.",
+        icon=":material/warning:",
     )
-    st.caption(f"Row id: `{row.id}`")
     cancel_col, delete_col = st.columns(2)
     if cancel_col.button("Cancel", key="pn_delete_cancel", width="stretch"):
-        st.rerun()
-    if delete_col.button("Delete", type="primary", key="pn_delete_confirm", width="stretch"):
+        st.session_state.pop(asking, None)
+        st.rerun(scope="fragment")
+    if delete_col.button("Delete", key=f"{DANGER_PREFIX}_pn_delete_confirm", width="stretch"):
+        st.session_state.pop(asking, None)
         delete_row(row)

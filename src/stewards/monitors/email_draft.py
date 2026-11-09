@@ -1,7 +1,7 @@
 """The publisher email draft.
 
 Publisher-facing copy, so it is a golden-file test in `tests/unit/test_email_draft.py`.
-The app never sends: this string exists only to be copied out of the popover.
+The app never sends: this string exists only to be copied out of the row pop-up.
 """
 
 from __future__ import annotations

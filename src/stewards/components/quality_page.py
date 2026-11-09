@@ -26,6 +26,7 @@ from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
+from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
 from stewards.monitors import quality, transforms
 from stewards.monitors.quality import QualityRow
@@ -161,40 +162,39 @@ def render_filters(monitor: Monitor, rows: Sequence[QualityRow]) -> FilterState:
 
 def render_row_detail(monitor: Monitor, row: QualityRow) -> None:
     """What the assessment said about the selected feed: its issues, the required fields it
-    is missing, and its coverage per recommended field."""
-    with st.expander(f"Assessment · {row.feed_name}", expanded=True):
-        st.caption(
-            f"{row.publisher_name} · {row.dataset_name} · {row.feed_type} · "
-            f"{row.regularity.lower()} · assessed {row.last_assessed}"
-        )
+    is missing, and its coverage per recommended field. Shown in the row pop-up."""
+    st.caption(
+        f"{row.publisher_name} · {row.dataset_name} · {row.feed_type} · "
+        f"{row.regularity.lower()} · assessed {row.last_assessed}"
+    )
 
-        issues = quality.issue_lines(row)
-        missing = quality.missing_field_lines(row)
-        if issues:
-            for kind, text in issues:
-                st.markdown(f"**{kind}** — {text}")
-        else:
-            st.markdown("No errors or warnings recorded against this feed.")
-        if missing:
-            st.markdown("**Missing required fields**")
-            for line in missing:
-                st.markdown(f"- {line}")
+    issues = quality.issue_lines(row)
+    missing = quality.missing_field_lines(row)
+    if issues:
+        for kind, text in issues:
+            st.markdown(f"**{kind}** — {text}")
+    else:
+        st.markdown("No errors or warnings recorded against this feed.")
+    if missing:
+        st.markdown("**Missing required fields**")
+        for line in missing:
+            st.markdown(f"- {line}")
 
-        frame = quality.completeness_frame(row)
-        if frame.empty:
-            st.caption("This snapshot reports no field completeness for this feed.")
-            return
-        st.dataframe(
-            frame,
-            column_config={
-                "Coverage": st.column_config.ProgressColumn(
-                    "Coverage", min_value=0, max_value=100, format="%d"
-                )
-            },
-            hide_index=True,
-            width="stretch",
-            key=f"completeness_{monitor.id}",
-        )
+    frame = quality.completeness_frame(row)
+    if frame.empty:
+        st.caption("This snapshot reports no field completeness for this feed.")
+        return
+    st.dataframe(
+        frame,
+        column_config={
+            "Coverage": st.column_config.ProgressColumn(
+                "Coverage", min_value=0, max_value=100, format="%d"
+            )
+        },
+        hide_index=True,
+        width="stretch",
+        key=f"completeness_{monitor.id}",
+    )
 
 
 def render_quality_page(monitor: Monitor) -> None:
@@ -226,8 +226,7 @@ def render_quality_page(monitor: Monitor) -> None:
 
     st.caption(
         f"{len(shown):,} of {len(rows):,} feeds shown. Feeds are grouped by dataset and the "
-        "datasets ordered by their mean quality score, highest first. Select a row to read "
-        "its assessment."
+        "datasets ordered by their mean quality score, highest first. Select a row to open it."
     )
     selected = render_table(
         quality.to_dataframe(monitor, shown),
@@ -240,7 +239,14 @@ def render_quality_page(monitor: Monitor) -> None:
             "whole fleet."
         ),
     )
-    if selected is not None and selected < len(shown):
-        render_row_detail(monitor, shown[selected])
+    render_row_dialog(
+        shown,
+        lambda row: f"{row.dataset_key}:{row.feed_id}",
+        selected,
+        key=f"dialog_{monitor.id}",
+        table_key=f"table_{monitor.id}",
+        title=lambda row: f"Assessment · {row.feed_name}",
+        render=lambda row: render_row_detail(monitor, row),
+    )
 
     layout.render_footer(monitor.query)

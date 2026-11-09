@@ -29,6 +29,7 @@ from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
+from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
 from stewards.monitors import schema_drift, transforms
 from stewards.monitors.registry import Monitor
@@ -129,23 +130,23 @@ def render_filters(monitor: Monitor, rows: Sequence[PropertyRow]) -> FilterState
 
 
 def render_feed_detail(monitor: Monitor, row: PropertyRow) -> None:
-    """The selected feed's custom properties, one line per entity type."""
-    with st.expander(f"Custom properties · {row.feed_name}", expanded=True):
-        st.caption(
-            f"{row.publisher_name} · {row.dataset_name} · {row.feed_type} · "
-            f"{schema_drift.format_number(row.sampled_items)} items sampled"
-        )
-        frame = schema_drift.use_frame(row)
-        if frame.empty:
-            st.caption("This snapshot lists no custom properties for this feed.")
-            return
-        st.dataframe(
-            frame,
-            column_config={"Presence": PRESENCE},
-            hide_index=True,
-            width="stretch",
-            key=f"uses_{monitor.id}",
-        )
+    """The selected feed's custom properties, one line per entity type. Shown in the row
+    pop-up."""
+    st.caption(
+        f"{row.publisher_name} · {row.dataset_name} · {row.feed_type} · "
+        f"{schema_drift.format_number(row.sampled_items)} items sampled"
+    )
+    frame = schema_drift.use_frame(row)
+    if frame.empty:
+        st.caption("This snapshot lists no custom properties for this feed.")
+        return
+    st.dataframe(
+        frame,
+        column_config={"Presence": PRESENCE},
+        hide_index=True,
+        width="stretch",
+        key=f"uses_{monitor.id}",
+    )
 
 
 def render_feeds(monitor: Monitor, rows: Sequence[PropertyRow]) -> None:
@@ -162,7 +163,7 @@ def render_feeds(monitor: Monitor, rows: Sequence[PropertyRow]) -> None:
     )
     st.caption(
         f"{len(shown):,} of {len(rows):,} feeds shown, most custom properties first. Select "
-        "a row to read the feed's properties."
+        "a row to open it."
     )
     selected = render_table(
         schema_drift.to_dataframe(monitor, shown),
@@ -175,8 +176,15 @@ def render_feeds(monitor: Monitor, rows: Sequence[PropertyRow]) -> None:
             "feed using a custom property."
         ),
     )
-    if selected is not None and selected < len(shown):
-        render_feed_detail(monitor, shown[selected])
+    render_row_dialog(
+        shown,
+        lambda row: row.feed_id,
+        selected,
+        key=f"dialog_{monitor.id}",
+        table_key=f"table_{monitor.id}",
+        title=lambda row: f"Custom properties · {row.feed_name}",
+        render=lambda row: render_feed_detail(monitor, row),
+    )
 
 
 def render_properties(

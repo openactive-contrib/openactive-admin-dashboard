@@ -27,6 +27,7 @@ from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
+from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
 from stewards.monitors import coverage, transforms
 from stewards.monitors.coverage import MappingRow
@@ -117,16 +118,16 @@ def render_filters(monitor: Monitor, rows: Sequence[MappingRow]) -> FilterState:
 
 
 def render_row_detail(row: MappingRow) -> None:
-    """The OpenActive side of the selected pair, and how the batch matched it."""
-    with st.expander(f"Match · {row.site_name}", expanded=True):
-        st.caption(
-            f"{row.local_authority_name} · {row.postcode or coverage.UNKNOWN} · "
-            f"{row.ownership_type_group}"
-        )
-        for label, value in coverage.pair_facts(row):
-            st.markdown(f"**{label}** — {value}")
-        for url in row.dataset_urls:
-            st.markdown(f"- [{url}]({url})")
+    """The OpenActive side of the selected pair, and how the batch matched it. Shown in the
+    row pop-up."""
+    st.caption(
+        f"{row.local_authority_name} · {row.postcode or coverage.UNKNOWN} · "
+        f"{row.ownership_type_group}"
+    )
+    for label, value in coverage.pair_facts(row):
+        st.markdown(f"**{label}** — {value}")
+    for url in row.dataset_urls:
+        st.markdown(f"- [{url}]({url})")
 
 
 def render_table_section(monitor: Monitor, rows: Sequence[MappingRow]) -> None:
@@ -144,8 +145,7 @@ def render_table_section(monitor: Monitor, rows: Sequence[MappingRow]) -> None:
 
     st.caption(
         f"{len(shown):,} of {len(rows):,} site-venue pairs shown, most opportunities first. "
-        "A site matched to several venues carries one row per pair. Select a row to read the "
-        "match."
+        "A site matched to several venues carries one row per pair. Select a row to open it."
     )
     selected = render_table(
         coverage.to_dataframe(monitor, shown),
@@ -158,8 +158,15 @@ def render_table_section(monitor: Monitor, rows: Sequence[MappingRow]) -> None:
             "match the run made."
         ),
     )
-    if selected is not None and selected < len(shown):
-        render_row_detail(shown[selected])
+    render_row_dialog(
+        shown,
+        lambda row: f"{row.site_id}:{row.venue_name}:{row.dataset_url}",
+        selected,
+        key=f"dialog_{monitor.id}",
+        table_key=f"table_{monitor.id}",
+        title=lambda row: f"Match · {row.site_name}",
+        render=render_row_detail,
+    )
 
 
 def render_coverage_page(monitor: Monitor) -> None:

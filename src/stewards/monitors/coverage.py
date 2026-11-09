@@ -63,7 +63,7 @@ class MappingRow:
 
     The API reports the OpenActive side as parallel lists — a venue cluster can carry several
     names, publishers and dataset URLs — and a table cell holds one value, so the lists are
-    joined here and kept whole for the selected-row panel.
+    joined here and kept whole for the selected-row pop-up.
     """
 
     site_id: str

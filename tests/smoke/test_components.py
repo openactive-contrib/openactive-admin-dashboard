@@ -916,7 +916,6 @@ def _coverage_table_selection_script() -> None:
 
 def test_selecting_a_row_in_the_pairs_table_opens_that_pair() -> None:
     app = run(_coverage_table_selection_script)
-    assert [node.label for node in app.get("expander")]
     markdown = " ".join(m.value for m in app.markdown)
     assert "Matched by" in markdown
 
@@ -983,19 +982,17 @@ def _schema_drift_selection_script() -> None:
 def test_selecting_a_feed_and_a_property_opens_their_detail_tables() -> None:
     app = run(_schema_drift_selection_script)
     labels = [node.label for node in app.get("expander")]
-    assert labels == [
-        "Custom properties · rides",
-        "Feeds using · beta:formattedDescription",
-    ]
-    # The feeds, the selected feed's uses, the properties, the feeds using the selected one.
+    assert labels == ["Feeds using · beta:formattedDescription"]
+    # The feeds, the properties, the feeds using the selected one, then the selected feed's
+    # uses — the pop-up is drawn last, after the page.
     assert len(app.dataframe) == 4
-    assert list(app.dataframe[1].value.columns) == [
+    assert "Publisher" in app.dataframe[2].value.columns
+    assert list(app.dataframe[3].value.columns) == [
         "Property",
         "Namespace",
         "Entity type",
         "Presence",
     ]
-    assert "Publisher" in app.dataframe[3].value.columns
 
 
 def _schema_drift_empty_detail_script() -> None:
@@ -1125,7 +1122,7 @@ def test_saving_sends_the_edit_and_keeps_the_evidence() -> None:
     assert sent["status"] == "in_progress"
     assert sent["stakeholder"] == "Council"
     assert sent["problems"]  # the evidence went back with the edit
-    assert app.session_state["pn_flash"] == "Saved Dummy Leisure."
+    assert app.session_state["pn_saved"] == "Saved Dummy Leisure."
 
 
 def test_an_invalid_edit_is_refused_and_not_sent() -> None:
@@ -1142,7 +1139,7 @@ def test_a_failed_save_says_so_and_does_not_confirm() -> None:
     app.button[0].click().run()
 
     assert app.error
-    assert "pn_flash" not in app.session_state
+    assert "pn_saved" not in app.session_state
 
 
 # --- deleting a notification ----------------------------------------------------------------

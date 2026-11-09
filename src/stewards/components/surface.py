@@ -21,6 +21,9 @@ from stewards.components import theme
 
 CARD_PREFIX = "oacard"
 
+#: Key prefix that turns a button red. See the "danger buttons" rule below.
+DANGER_PREFIX = "oadanger"
+
 #: Container key on the sidebar identity block. Shared with `auth.google.render_identity`
 #: so the selector below and the widget that needs it cannot drift apart.
 SIDEBAR_FOOT_KEY = "oasidebarfoot"
@@ -75,6 +78,20 @@ _STYLES = f"""
   }}
   div[class*="st-key-oasnapshotsource"] p {{
       color: {theme.LABEL};
+  }}
+
+  /* --- danger buttons: red, for actions that can't be undone ------------------------- */
+  /* The theme has one primary colour (teal), so a delete would look like a save. A button
+     opts in by having a key that starts with `{DANGER_PREFIX}`. */
+  div[class*="st-key-{DANGER_PREFIX}"] button {{
+      background-color: {theme.RED};
+      border-color: {theme.RED};
+      color: {theme.SURFACE};
+  }}
+  div[class*="st-key-{DANGER_PREFIX}"] button:hover {{
+      background-color: {theme.RED};
+      border-color: {theme.INK};
+      color: {theme.SURFACE};
   }}
 
   /* --- login card -------------------------------------------------------------------- */
