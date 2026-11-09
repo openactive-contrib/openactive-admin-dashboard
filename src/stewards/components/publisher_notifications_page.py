@@ -60,7 +60,7 @@ def render_publisher_notifications_page() -> None:
     _render_kpis(summary.data)
     rows = _render_filters(list(listing.data))
     ordered = pn.sort_rows(rows, today)
-    position = _render_table(ordered)
+    position = _render_table(ordered, today)
     render_row_dialog(
         ordered,
         lambda row: row.id,
@@ -129,11 +129,11 @@ def _render_filters(rows: list[PublisherNotification]) -> list[PublisherNotifica
     )
 
 
-def _render_table(ordered: list[PublisherNotification]) -> int | None:
+def _render_table(ordered: list[PublisherNotification], today: date) -> int | None:
     st.caption(f"{len(ordered):,} publishers. Select a row to open it.")
     return render_table(
-        pn.to_dataframe(ordered),
-        pn.tone_frame(ordered),
+        pn.to_dataframe(ordered, today),
+        pn.tone_frame(ordered, today),
         columns=pn.COLUMN_SPECS,
         rag_columns=pn.RAG_COLUMNS,
         key=TABLE_KEY,
