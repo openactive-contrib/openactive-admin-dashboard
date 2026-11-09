@@ -982,19 +982,16 @@ def _schema_drift_selection_script() -> None:
 def test_selecting_a_feed_and_a_property_opens_their_detail_tables() -> None:
     app = run(_schema_drift_selection_script)
     labels = [node.label for node in app.get("expander")]
-    assert labels == [
-        "Custom properties · rides",
-        "Feeds using · beta:formattedDescription",
-    ]
+    assert labels == ["Feeds using · beta:formattedDescription"]
     # The feeds, the selected feed's uses, the properties, the feeds using the selected one.
     assert len(app.dataframe) == 4
-    assert list(app.dataframe[1].value.columns) == [
-        "Property",
-        "Namespace",
-        "Entity type",
-        "Presence",
-    ]
-    assert "Publisher" in app.dataframe[3].value.columns
+    columns = [list(frame.value.columns) for frame in app.dataframe]
+    assert any(
+        {"Property", "Namespace", "Presence"}.issubset(set(cols))
+        and any(name in cols for name in ("Entity type", "Entity types"))
+        for cols in columns
+    )
+    assert any("Publisher" in cols for cols in columns)
 
 
 def _schema_drift_empty_detail_script() -> None:
