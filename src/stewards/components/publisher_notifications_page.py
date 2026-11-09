@@ -83,7 +83,9 @@ def _render_blurb() -> None:
         st.markdown(
             "One row per publisher with open problems, kept by the stewards team. Rows that "
             "need attention today come first: never contacted, no follow-up for more than "
-            f"{pn.FOLLOW_UP_DAYS} days, or a problem past its Slack alert threshold."
+            f"{pn.FOLLOW_UP_DAYS} days, a problem past its Slack alert threshold, or a "
+            "problem resolved since the publisher was last contacted. Once you have told "
+            "the publisher, save the row with that day's date contacted."
         )
 
 
