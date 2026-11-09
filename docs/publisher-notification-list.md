@@ -32,13 +32,15 @@ on **Show closed**.
 
 ## Working a row
 
-1. Select the row. Its problems, the reasons it is flagged and a draft email appear below.
+1. Select the row. A pop-up opens with its problems, the reasons it is flagged and a draft
+   email. Close it with the **×** or by clicking outside it.
 2. Edit the draft if you need to and copy it into your mail client. The dashboard does not
    send email, and edits to the draft are not saved. If the row has a decline in future
    sessions, first check the decline isn't seasonal (for example winter activities); the
    dashboard shows a reminder.
 3. Under **Update this row**, set the status, the person responsible, the contact and the
-   date contacted, add a note, and **Save**.
+   date contacted, add a note, and press **Save** at the bottom right of the pop-up. The
+   pop-up stays open and says the row was saved.
 4. When the publisher has fixed everything, set the status to **Closed**. A row whose
    problems have all cleared is not closed for you: the job adds a note saying so.
 
@@ -46,5 +48,6 @@ Saving changes only those five fields; the problems on the row are kept exactly 
 
 ## Deleting
 
-**Delete row** removes the row and its problems and notes permanently, after you confirm.
-Prefer **Closed** for a row that is finished: it keeps the history.
+**Delete row** (red, beside **Save**) removes the row and its problems and notes permanently,
+after you confirm inside the pop-up. Prefer **Closed** for a row that is finished: it keeps
+the history.

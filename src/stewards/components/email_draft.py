@@ -1,4 +1,4 @@
-"""The draft-email popover. Copy only — the app never sends."""
+"""The draft email, shown in the row pop-up. Copy only — the app never sends."""
 
 from __future__ import annotations
 

@@ -983,15 +983,16 @@ def test_selecting_a_feed_and_a_property_opens_their_detail_tables() -> None:
     app = run(_schema_drift_selection_script)
     labels = [node.label for node in app.get("expander")]
     assert labels == ["Feeds using · beta:formattedDescription"]
-    # The feeds, the selected feed's uses, the properties, the feeds using the selected one.
+    # The feeds, the properties, the feeds using the selected one, then the selected feed's
+    # uses — the pop-up is drawn last, after the page.
     assert len(app.dataframe) == 4
-    columns = [list(frame.value.columns) for frame in app.dataframe]
-    assert any(
-        {"Property", "Namespace", "Presence"}.issubset(set(cols))
-        and any(name in cols for name in ("Entity type", "Entity types"))
-        for cols in columns
-    )
-    assert any("Publisher" in cols for cols in columns)
+    assert "Publisher" in app.dataframe[2].value.columns
+    assert list(app.dataframe[3].value.columns) == [
+        "Property",
+        "Namespace",
+        "Entity type",
+        "Presence",
+    ]
 
 
 def _schema_drift_empty_detail_script() -> None:
