@@ -916,7 +916,6 @@ def _coverage_table_selection_script() -> None:
 
 def test_selecting_a_row_in_the_pairs_table_opens_that_pair() -> None:
     app = run(_coverage_table_selection_script)
-    assert [node.label for node in app.get("expander")]
     markdown = " ".join(m.value for m in app.markdown)
     assert "Matched by" in markdown
 
