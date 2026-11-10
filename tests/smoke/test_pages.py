@@ -300,7 +300,7 @@ def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
 
     app = run("00_overview.py")
-    assert len(app.button) == 1  # only the banner's call to action; tiles use page links
+    assert not app.button  # tiles use page links
     text = text_of(app)
     for monitor in MONITOR_REGISTRY:
         assert monitor.name in text
@@ -338,9 +338,26 @@ def test_each_tile_says_which_way_its_series_is_moving() -> None:
     assert "benchmark" in text  # the gauge card names its reference instead of a movement
 
 
-def test_overview_banner_names_the_threshold() -> None:
+def test_overview_has_no_threshold_banner() -> None:
     app = run("00_overview.py")
-    assert any("7-day" in warning.value for warning in app.warning)
+    assert not app.warning
+    assert not app.info
+
+
+def test_overview_kpis_match_the_notification_list() -> None:
+    """Open incidents and past contact threshold are the list's "open" and "need attention"."""
+    markdown = [m.value for m in run("00_overview.py").markdown]
+    # The summary fixture says open 2, alerts 2; /summary's own figures differ.
+    open_at = markdown.index("OPEN INCIDENTS")
+    past_at = markdown.index("PAST CONTACT THRESHOLD")
+    assert markdown[open_at + 1 : open_at + 3] == [
+        ":red[2]",
+        "open rows on the notification list",
+    ]
+    assert markdown[past_at + 1 : past_at + 3] == [
+        ":red[2]",
+        "notification list rows needing attention",
+    ]
 
 
 def test_notification_list_hides_closed_rows_by_default() -> None:
@@ -480,8 +497,10 @@ def test_every_registered_monitor_page_lives_under_views() -> None:
         assert (APP_FILE.parent / monitor.page).is_file()
 
 
-def test_the_header_shows_a_delta_when_the_api_supplies_one() -> None:
-    text = text_of(run("00_overview.py"))
-    assert "+3" in text  # publishers with issues
-    assert "+5" in text  # open incidents
-    assert "+2" in text  # past threshold
+def test_the_overview_has_no_publishers_with_issues_kpi_and_no_deltas() -> None:
+    """Removed on request; /summary's deltas belonged to figures the KPIs no longer show."""
+    markdown = [m.value for m in run("00_overview.py").markdown]
+    assert "PUBLISHERS WITH ISSUES" not in markdown
+    assert "OPEN INCIDENTS" in markdown
+    for delta in ("+3", "+5", "+2"):
+        assert delta not in markdown

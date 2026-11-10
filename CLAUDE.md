@@ -280,13 +280,19 @@ Every count in `BUILD_BRIEF.md` §3 is `int | None`. A deployment sends `null` f
 its batch does not compute for that snapshot — the live admin API does exactly this for
 `open_incidents` and `past_threshold` — and null is not zero: the KPI reads em dash with no
 tone, the tile says "not reported", and the sidebar badge is omitted.
-`monitors.overview.format_count` owns that rendering. The same applies per monitor inside
+`monitors.overview.format_count` owns that rendering. The overview's "Open incidents" and
+"Past contact threshold" KPIs do **not** read `/summary`: they show the publisher notification
+list's `open` and `alerts` counts (`/admin/publisher-notifications/summary`), the same figures
+as that page's "open" and "need attention" cards, read tolerantly so a failing list costs
+only those two figures. The same applies per monitor inside
 `data.monitors` (`count`, `past_threshold_count`, and null points in `sparkline`).
 
 Beyond those counts, `/summary` may send optional `publishers_with_issues_delta`,
 `open_incidents_delta` and `past_threshold_delta` (change against the previous snapshot).
 They are `int | None` too: absent means the KPI renders with no delta, never a fabricated
-zero. `monitors.overview.format_delta` owns the sign convention.
+zero. `monitors.overview.format_delta` owns the sign convention. The overview draws none of
+them today: its KPIs are "Publishers monitored" plus the two notification-list figures, and
+the "Publishers with issues" card was removed on request — do not reintroduce it unasked.
 
 ## Testing bar
 
