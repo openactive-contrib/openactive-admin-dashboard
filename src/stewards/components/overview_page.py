@@ -1,4 +1,4 @@
-"""The landing page: fleet KPIs, the threshold banner, and one tile per monitor."""
+"""The landing page: fleet KPIs and one tile per monitor."""
 
 from __future__ import annotations
 
@@ -7,12 +7,11 @@ import streamlit as st
 
 from stewards.api import repository
 from stewards.api.errors import ApiError
-from stewards.api.models import Summary
+from stewards.api.models import PublisherNotificationSummary, Summary
 from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.loading import loading
 from stewards.components.surface import card
-from stewards.config import get_settings
 from stewards.monitors import coverage, quality, schema_drift
 from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import (
@@ -20,7 +19,6 @@ from stewards.monitors.overview import (
     Tile,
     build_tiles,
     format_count,
-    format_delta,
 )
 from stewards.monitors.registry import Source, monitor_ids
 from stewards.monitors.thresholds import Tone
@@ -38,45 +36,42 @@ def value_tone(value: str, tone: Tone) -> Tone | None:
     return Tone.GREEN if value == "0" else tone
 
 
-def render_fleet_kpis(summary: Summary) -> None:
-    issue_share = (
-        f"{summary.publishers_with_issues / summary.publishers_monitored:.1%} of the fleet"
-        if summary.publishers_monitored and summary.publishers_with_issues is not None
-        else "fleet size unknown"
-    )
+def notification_counts() -> PublisherNotificationSummary:
+    """The notification list's own counts, which the last two KPIs show.
+
+    Read on its own, like the sidebar pill, so a failing list endpoint costs those two
+    figures (em dash) rather than the whole overview.
+    """
+    try:
+        return repository.fetch_publisher_notification_summary().data
+    except ApiError:
+        return PublisherNotificationSummary()
+
+
+def render_fleet_kpis(summary: Summary, notifications: PublisherNotificationSummary) -> None:
     cells = (
         (
             "Publishers monitored",
             format_count(summary.publishers_monitored),
-            None,
             f"{format_count(summary.feeds)} feeds across "
             f"{format_count(summary.datasets)} datasets",
             None,
         ),
         (
-            "Publishers with issues",
-            format_count(summary.publishers_with_issues),
-            format_delta(summary.publishers_with_issues_delta),
-            issue_share,
-            Tone.AMBER,
-        ),
-        (
             "Open incidents",
-            format_count(summary.open_incidents),
-            format_delta(summary.open_incidents_delta),
-            f"across {len(summary.monitors)} monitors",
+            format_count(notifications.open),
+            "open rows on the notification list",
             Tone.RED,
         ),
         (
             "Past contact threshold",
-            format_count(summary.past_threshold),
-            format_delta(summary.past_threshold_delta),
-            f"open longer than {get_settings().contact_threshold_days} days",
+            format_count(notifications.alerts),
+            "notification list rows needing attention",
             Tone.RED,
         ),
     )
-    for index, (column, (label, value, delta, sub, tone)) in enumerate(
-        zip(st.columns(4), cells, strict=True)
+    for index, (column, (label, value, sub, tone)) in enumerate(
+        zip(st.columns(len(cells)), cells, strict=True)
     ):
         with column, card(f"kpi_{index}"):
             layout.tone_metric(
@@ -84,37 +79,8 @@ def render_fleet_kpis(summary: Summary) -> None:
                 value,
                 value_tone(value, tone) if tone is not None else None,
                 slug=f"fleet{index}",
-                delta=delta,
                 sub=sub,
             )
-
-
-def render_threshold_banner(summary: Summary, threshold_days: int) -> None:
-    if summary.past_threshold is None:
-        st.info(
-            f"This snapshot does not report how many incidents have passed the "
-            f"{threshold_days}-day contact threshold. Open the notification list to see "
-            "which publishers need contacting.",
-            icon=":material/info:",
-        )
-        return
-    if summary.past_threshold <= 0:
-        st.success(
-            f"No incident has been open longer than {threshold_days} days in this snapshot.",
-            icon=":material/check_circle:",
-        )
-        return
-    banner, action = st.columns([4, 1], vertical_alignment="center")
-    with banner:
-        st.warning(
-            f"**{summary.past_threshold} incidents have passed the {threshold_days}-day "
-            "contact threshold.** The publisher notification list tracks who has been "
-            "contacted about them, and who still needs to be.",
-            icon=":material/schedule:",
-        )
-    with action:
-        if st.button("Open notification list", width="stretch", type="primary"):
-            nav.switch_to("publisher_notifications")
 
 
 def tile_cards() -> Cards:
@@ -236,6 +202,7 @@ def render_overview_page() -> None:
             # own card, verdict included.
             trends = repository.fetch_monitor_trends(monitor_ids(Source.INCIDENTS))
             cards = tile_cards()
+            notifications = notification_counts()
     except ApiError as exc:
         layout.render_error_header("Overview", "Health of the publisher fleet")
         render_api_error(exc)
@@ -254,9 +221,7 @@ def render_overview_page() -> None:
         response.meta,
     )
 
-    render_fleet_kpis(summary)
-    threshold_days = get_settings().contact_threshold_days
-    render_threshold_banner(summary, threshold_days)
+    render_fleet_kpis(summary, notifications)
 
     with st.container(horizontal=True, vertical_alignment="bottom"):
         st.markdown("**Monitors**")

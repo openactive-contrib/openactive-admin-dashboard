@@ -174,44 +174,29 @@ def test_the_overview_reports_a_contract_mismatch() -> None:
     assert any("unexpected shape" in error.value for error in app.error)
 
 
-# --- the all-clear overview -------------------------------------------------------------
-
-
-def _all_clear_script(response: object) -> None:
-    from stewards.api.models import SummaryResponse
-    from stewards.components.overview_page import render_fleet_kpis, render_threshold_banner
-
-    assert isinstance(response, SummaryResponse)
-    render_fleet_kpis(response.data)
-    render_threshold_banner(response.data, 7)
-
-
-def test_an_all_clear_snapshot_says_so_instead_of_warning(payload) -> None:
-    app = run(_all_clear_script, SummaryResponse.model_validate(payload("summary_zero")))
-    assert any("No incident has been open longer than 7 days" in s.value for s in app.success)
-    assert not app.warning
+# --- the overview's fleet KPIs ----------------------------------------------------------
 
 
 def _unknown_fleet_size_script() -> None:
-    from stewards.api.models import Meta, Summary
+    from stewards.api.models import PublisherNotificationSummary, Summary
     from stewards.components.overview_page import render_fleet_kpis
 
-    render_fleet_kpis(Summary())
-    Meta(snapshot_date="2026-08-21", generated_at="2026-08-21T06:12:04Z")
+    render_fleet_kpis(Summary(), PublisherNotificationSummary())
 
 
-def test_a_summary_with_no_fleet_size_does_not_divide_by_zero() -> None:
+def test_a_summary_with_no_figures_renders_three_em_dash_kpis() -> None:
     app = run(_unknown_fleet_size_script)
-    assert any("fleet size unknown" in m.value for m in app.markdown)
+    markdown = [m.value for m in app.markdown]
+    assert markdown.count("—") == 3
+    assert "PUBLISHERS WITH ISSUES" not in markdown
 
 
 def _partial_summary_script(response: object) -> None:
-    from stewards.api.models import SummaryResponse
-    from stewards.components.overview_page import render_fleet_kpis, render_threshold_banner
+    from stewards.api.models import PublisherNotificationSummary, SummaryResponse
+    from stewards.components.overview_page import render_fleet_kpis
 
     assert isinstance(response, SummaryResponse)
-    render_fleet_kpis(response.data)
-    render_threshold_banner(response.data, 7)
+    render_fleet_kpis(response.data, PublisherNotificationSummary())
 
 
 def test_counts_the_api_does_not_report_render_as_unknown(payload) -> None:
@@ -222,9 +207,48 @@ def test_counts_the_api_does_not_report_render_as_unknown(payload) -> None:
 
     assert "179" in markdown
     assert "—" in markdown
-    assert not app.success  # nothing is known to be clear
+    assert not app.success
     assert not app.warning
-    assert any("does not report" in info.value for info in app.info)
+    assert not app.info  # the "does not report" banner is gone
+
+
+def _notification_kpis_script(response: object) -> None:
+    from stewards.api.models import PublisherNotificationSummary, SummaryResponse
+    from stewards.components.overview_page import render_fleet_kpis
+
+    assert isinstance(response, SummaryResponse)
+    render_fleet_kpis(response.data, PublisherNotificationSummary(open=12, alerts=5))
+
+
+def test_open_and_past_threshold_kpis_read_the_notification_list(payload) -> None:
+    """The /summary nulls for these two figures are ignored; the list's counts are shown."""
+    response = SummaryResponse.model_validate(payload("admin_summary_partial"))
+    app = run(_notification_kpis_script, response)
+    markdown = " ".join(m.value for m in app.markdown)
+
+    assert "12" in markdown
+    assert "5" in markdown
+    assert "open rows on the notification list" in markdown
+    assert "notification list rows needing attention" in markdown
+
+
+def _notification_failure_script() -> None:
+    from unittest.mock import patch
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiUnavailable
+    from stewards.components.overview_page import notification_counts
+
+    with patch.object(
+        repository, "fetch_publisher_notification_summary", side_effect=ApiUnavailable("down")
+    ):
+        counts = notification_counts()
+    assert counts.open is None
+    assert counts.alerts is None
+
+
+def test_a_failing_notification_list_costs_only_its_two_figures() -> None:
+    run(_notification_failure_script)
 
 
 # --- the layout header ------------------------------------------------------------------
