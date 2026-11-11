@@ -30,6 +30,7 @@ from enum import StrEnum
 from statistics import fmean
 from typing import Any
 
+import altair as alt
 import pandas as pd
 
 from stewards.api.models import SchemaComplianceSnapshot
@@ -383,3 +384,52 @@ def page_stats(rows: Sequence[ComplianceRow]) -> tuple[Stat, ...]:
             _share(custom, total) if custom is not None else "custom properties not reported",
         ),
     )
+
+
+# --- the chart -----------------------------------------------------------------------------
+
+
+def key_field_chart(
+    rows: Sequence[ComplianceRow],
+    palette: Mapping[Tone, str],
+    *,
+    label_colour: str,
+    grid_colour: str,
+) -> alt.Chart | None:
+    """Mean completeness of each key field across the feeds, in `KEY_FIELDS` order, shaded
+    on the score scale. A field no feed reported is left off rather than drawn as zero."""
+    reported = [(f, v) for f, v in key_field_averages(rows).items() if v is not None]
+    return quality._bar_chart(
+        [quality.field_label(field) for field, _ in reported],
+        [float(value) for _, value in reported],
+        [palette[score_tone(value)] for _, value in reported],
+        label_title="Field",
+        value_title="Mean completeness %",
+        label_colour=label_colour,
+        grid_colour=grid_colour,
+        horizontal=True,
+        height=260,
+    )
+
+
+# --- the selected row ----------------------------------------------------------------------
+
+
+def key_field_frame(row: ComplianceRow) -> pd.DataFrame:
+    """The selected feed's completeness per key field, in `KEY_FIELDS` order. A field the
+    assessment did not reach stays as an empty cell, not a zero."""
+    return pd.DataFrame(
+        [
+            {
+                "Field": quality.field_label(field),
+                "Completeness": None if value is None else float(value),
+            }
+            for field, value in row.key_completeness.items()
+        ],
+        columns=["Field", "Completeness"],
+    )
+
+
+def missing_field_lines(row: ComplianceRow) -> tuple[str, ...]:
+    """`SessionSeries: name, location` per opportunity type with a field missing."""
+    return quality.missing_field_lines(row.quality)
