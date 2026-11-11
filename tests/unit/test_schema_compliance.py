@@ -10,10 +10,27 @@ from stewards.api.models import (
     FeedQualityResponse,
     SchemaComplianceSnapshot,
 )
-from stewards.monitors.schema_compliance import KEY_FIELDS, ComplianceRow, build_rows
+from stewards.monitors.registry import Col, ColKind
+from stewards.monitors.schema_compliance import (
+    KEY_FIELDS,
+    ComplianceRow,
+    Verdict,
+    apply_filters,
+    build_rows,
+    key_field_averages,
+    page_stats,
+    resolve,
+    sort_rows,
+    to_dataframe,
+    tone_frame,
+)
+from stewards.monitors.thresholds import Tone, status_label, status_tone
 
 SHARED_FEED = "api-letsride-co-uk-public-v1-rides"
 META = load_sample("feed_quality_quality")["meta"]
+
+#: Every key field fully covered: a feed with this and a version passes.
+FULL = dict.fromkeys(KEY_FIELDS, 100)
 
 
 def _snapshot(*, with_properties: bool = True) -> SchemaComplianceSnapshot:
@@ -107,3 +124,161 @@ def test_missing_required_fields_are_counted_once_across_opportunity_types() -> 
 def test_a_feed_with_no_version_reads_unknown() -> None:
     row = _one({"feed_id": "f", "feed_version": ""}, [])
     assert row.feed_version == "Unknown"
+
+
+# --- the verdict ---------------------------------------------------------------------------
+
+
+def _feed(feed_id: str = "f", **fields: Any) -> dict[str, Any]:
+    """A feed that passes unless the test overrides something."""
+    return {"feed_id": feed_id, "feed_version": "V2.0", "completeness": FULL, **fields}
+
+
+def _rows(*feeds: dict[str, Any], with_properties: bool = True) -> tuple[ComplianceRow, ...]:
+    return build_rows(
+        SchemaComplianceSnapshot(
+            quality=FeedQualityResponse.model_validate({"data": list(feeds), "meta": META}),
+            custom_properties=(
+                CustomPropertyResponse.model_validate({"data": [], "meta": META})
+                if with_properties
+                else None
+            ),
+        )
+    )
+
+
+def test_a_complete_feed_with_a_version_passes() -> None:
+    (row,) = _rows(_feed())
+    assert row.verdict is Verdict.PASS
+    assert row.reasons == ()
+
+
+def test_a_missing_required_field_fails_whatever_else_is_true() -> None:
+    (row,) = _rows(_feed(missing_required_fields={"SessionSeries": ["name"]}))
+    assert row.verdict is Verdict.FAIL
+    assert row.reasons[0] == "1 required field missing"
+
+
+def test_a_poorly_covered_key_field_warns_and_names_the_field() -> None:
+    (row,) = _rows(_feed(completeness={**FULL, "start_date": 59.9, "level": 60}))
+    assert row.verdict is Verdict.WARNING
+    assert row.weak_fields == ("start_date",)
+    assert row.reasons == ("Below 60% complete: start date",)
+
+
+def test_an_unreported_field_is_not_a_poorly_covered_one() -> None:
+    (row,) = _rows(_feed(completeness={**FULL, "level": None}))
+    assert row.verdict is Verdict.PASS
+
+
+def test_no_completeness_at_all_warns() -> None:
+    (row,) = _rows(_feed(completeness={}))
+    assert row.verdict is Verdict.WARNING
+    assert "Completeness of the key fields was not reported" in row.reasons
+
+
+def test_an_unknown_version_warns() -> None:
+    (row,) = _rows(_feed(feed_version=""))
+    assert row.verdict is Verdict.WARNING
+    assert row.reasons == ("Feed version not reported",)
+
+
+def test_the_verdicts_read_as_toned_status_labels() -> None:
+    assert (status_label("pass"), status_tone("pass")) == ("Pass", Tone.GREEN)
+    assert (status_label("warning"), status_tone("warning")) == ("Warning", Tone.AMBER)
+    assert (status_label("fail"), status_tone("fail")) == ("Fail", Tone.RED)
+
+
+# --- sorting and filtering -----------------------------------------------------------------
+
+
+def test_rows_sort_worst_first() -> None:
+    rows = _rows(
+        _feed("pass"),
+        _feed("warn", completeness={**FULL, "location": 10}),
+        _feed("fail-one", missing_required_fields={"A": ["name"]}),
+        _feed("fail-two", missing_required_fields={"A": ["name", "url"]}),
+    )
+    assert [row.feed_id for row in sort_rows(rows)] == ["fail-two", "fail-one", "warn", "pass"]
+
+
+def test_completeness_columns_read_one_key_field() -> None:
+    (row,) = _rows(_feed(completeness={**FULL, "location": 42}))
+    assert resolve(row, "completeness.location") == 42
+    assert resolve(row, "feed_version") == "V2.0"
+
+
+def test_not_passing_only_hides_the_passes() -> None:
+    rows = _rows(_feed("pass"), _feed("fail", missing_required_fields={"A": ["name"]}))
+    assert [row.feed_id for row in apply_filters(rows, not_passing_only=True)] == ["fail"]
+
+
+def test_a_status_selection_matches_the_verdict_token() -> None:
+    rows = _rows(_feed("pass"), _feed("fail", missing_required_fields={"A": ["name"]}))
+    picked = apply_filters(rows, selections={"status": "fail"})
+    assert [row.feed_id for row in picked] == ["fail"]
+
+
+def test_search_matches_the_feed_id() -> None:
+    rows = _rows(_feed("alpha"), _feed("beta"))
+    assert [row.feed_id for row in apply_filters(rows, search="ALP")] == ["alpha"]
+
+
+# --- the table -----------------------------------------------------------------------------
+
+COLUMNS = (
+    Col("feed_id", "Feed", ColKind.MONO),
+    Col("status", "Status", ColKind.STATUS),
+    Col("completeness.location", "Location", ColKind.PERCENT),
+)
+
+
+def test_the_table_labels_the_verdict_and_shades_the_cells() -> None:
+    rows = _rows(_feed(missing_required_fields={"A": ["name"]}, completeness={"location": 70}))
+    frame = to_dataframe(COLUMNS, rows)
+    tones = tone_frame(COLUMNS, rows)
+    assert frame.iloc[0].tolist() == ["f", "Fail", 70.0]
+    assert tones.iloc[0].tolist() == ["", "red", "amber"]
+
+
+def test_an_empty_table_keeps_its_columns() -> None:
+    assert list(to_dataframe(COLUMNS, ()).columns) == ["Feed", "Status", "Location"]
+
+
+# --- the figures ---------------------------------------------------------------------------
+
+
+def test_page_stats_count_each_verdict() -> None:
+    rows = _rows(
+        _feed("pass"),
+        _feed("warn", completeness={**FULL, "location": 10}),
+        _feed("fail", missing_required_fields={"A": ["name"]}),
+    )
+    stats = {stat.label: stat for stat in page_stats(rows)}
+    assert stats["Feeds checked"].value == "3"
+    assert (stats["Failing"].value, stats["Failing"].tone) == ("1", Tone.RED)
+    assert (stats["Warnings"].value, stats["Warnings"].tone) == ("1", Tone.AMBER)
+    assert stats["Non-standard properties"].value == "0"
+
+
+def test_page_stats_say_when_custom_properties_were_not_reported() -> None:
+    stats = {stat.label: stat for stat in page_stats(_rows(_feed(), with_properties=False))}
+    assert stats["Non-standard properties"].value == "—"
+    assert stats["Non-standard properties"].sub == "custom properties not reported"
+
+
+def test_page_stats_of_no_rows_do_not_divide_by_zero() -> None:
+    stats = {stat.label: stat for stat in page_stats(())}
+    assert stats["Feeds checked"].value == "0"
+    assert stats["Key field completeness"].value == "—"
+
+
+def test_key_field_averages_skip_unreported_values() -> None:
+    rows = _rows(
+        _feed("a", completeness={"location": 100, "level": None}),
+        _feed("b", completeness={"location": 50}),
+    )
+    averages = key_field_averages(rows)
+    assert tuple(averages) == KEY_FIELDS
+    assert averages["location"] == 75
+    assert averages["level"] is None

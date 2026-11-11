@@ -58,6 +58,9 @@ _STATUS_TONES = {
     "ok": Tone.GREEN,
     "warning": Tone.AMBER,
     "error": Tone.RED,
+    # Schema compliance: a feed meets the standard, falls short of it, or breaks it.
+    "pass": Tone.GREEN,
+    "fail": Tone.RED,
 }
 
 _STATUS_LABELS = {
@@ -76,6 +79,8 @@ _STATUS_LABELS = {
     "ok": "OK",
     "warning": "Warning",
     "error": "Error",
+    "pass": "Pass",
+    "fail": "Fail",
 }
 
 
