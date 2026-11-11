@@ -282,3 +282,40 @@ def test_key_field_averages_skip_unreported_values() -> None:
     assert tuple(averages) == KEY_FIELDS
     assert averages["location"] == 75
     assert averages["level"] is None
+
+
+# --- the registry entry --------------------------------------------------------------------
+
+
+def test_every_declared_column_resolves_on_the_sample_rows() -> None:
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    rows = build_rows(_snapshot())
+    for col in SCHEMA_COMPLIANCE.columns:
+        assert any(resolve(row, col.field) is not None for row in rows), col.field
+
+
+def test_every_completeness_column_is_a_key_field() -> None:
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    fields = [c.field for c in SCHEMA_COMPLIANCE.columns if c.field.startswith("completeness.")]
+    assert [f.removeprefix("completeness.") for f in fields] == list(KEY_FIELDS)
+
+
+def test_every_declared_filter_has_options_on_the_sample_rows() -> None:
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+    from stewards.monitors.schema_compliance import filter_options
+
+    rows = build_rows(_snapshot())
+    for spec in SCHEMA_COMPLIANCE.filters:
+        assert filter_options(rows, spec.field), spec.field
+
+
+def test_the_table_builds_from_the_registry_columns() -> None:
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    rows = build_rows(_snapshot())
+    frame = to_dataframe(SCHEMA_COMPLIANCE.columns, rows)
+    assert len(frame) == 15
+    assert list(frame.columns) == [c.label for c in SCHEMA_COMPLIANCE.columns]
+    assert tone_frame(SCHEMA_COMPLIANCE.columns, rows).shape == frame.shape
