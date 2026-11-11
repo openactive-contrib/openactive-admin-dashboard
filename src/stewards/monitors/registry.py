@@ -858,7 +858,7 @@ SCHEMA_COMPLIANCE = Monitor(
     summary_field="feed_name",
     schedule="nightly assessment",
     query="monitor_feed_quality_v1 + monitor_feed_custom_properties_v1",
-    page="views/32_schema_compliance.py",
+    page="views/33_schema_compliance.py",
 )
 
 
@@ -872,6 +872,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     FEED_QUALITY,
     ACTIVE_PLACES_COVERAGE,
     FEED_CUSTOM_PROPERTIES,
+    SCHEMA_COMPLIANCE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}
