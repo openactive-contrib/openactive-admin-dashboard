@@ -112,6 +112,10 @@ class ComplianceRow:
         return self.quality.feed_type
 
     @property
+    def feed_url(self) -> str:
+        return self.quality.feed_url
+
+    @property
     def feed_version(self) -> str:
         return self.quality.feed_version
 
