@@ -13,17 +13,32 @@ zero. If the custom-property read failed, the whole list is unknown, which is no
 
 The rows reuse `quality.build_rows` and `schema_drift.build_row` rather than copying them,
 so the labels and counts read the same on every page.
+
+Each row then gets one verdict:
+
+- **Fail**: a required field is missing. The feed breaks the standard.
+- **Warning**: nothing required is missing, but a key field is poorly covered, the
+  completeness was not reported, or the version is not known.
+- **Pass**: everything required is there and the key fields are well covered.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
+from statistics import fmean
+from typing import Any
+
+import pandas as pd
 
 from stewards.api.models import SchemaComplianceSnapshot
 from stewards.monitors import quality, schema_drift
-from stewards.monitors.quality import QualityRow
+from stewards.monitors.quality import UNKNOWN, QualityRow, Stat, format_number
+from stewards.monitors.registry import Col
 from stewards.monitors.schema_drift import PropertyRow
+from stewards.monitors.thresholds import Tone, score_tone
+from stewards.monitors.transforms import EMPTY, format_cell
 
 #: The key fields the compliance view checks, in the order the page shows them. These are
 #: the recommended fields the quality assessment measures. Optional fields are left out on
@@ -39,6 +54,25 @@ KEY_FIELDS: tuple[str, ...] = (
     "accessibility_support",
     "gender_restriction",
 )
+
+#: A key field below this share of items is poorly covered. The same line as the amber band
+#: in `thresholds.score_tone`, so a field shaded red in the table is the one that warns.
+FIELD_WARNING_BELOW = 60.0
+
+#: A column field that reads one key field's completeness, e.g. `completeness.location`.
+COMPLETENESS_PREFIX = "completeness."
+
+
+class Verdict(StrEnum):
+    """The row's verdict. The values are status tokens `thresholds` already tones."""
+
+    FAIL = "fail"
+    WARNING = "warning"
+    PASS = "pass"
+
+
+#: Worst first, for sorting.
+VERDICT_ORDER = {Verdict.FAIL: 0, Verdict.WARNING: 1, Verdict.PASS: 2}
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +154,44 @@ class ComplianceRow:
             return None
         return self.properties.outside_beta_count if self.properties else 0
 
+    @property
+    def weak_fields(self) -> tuple[str, ...]:
+        """Key fields the assessment reached and found below `FIELD_WARNING_BELOW`."""
+        return tuple(
+            field
+            for field, value in self.key_completeness.items()
+            if value is not None and value < FIELD_WARNING_BELOW
+        )
+
+    @property
+    def reasons(self) -> tuple[str, ...]:
+        """Why the row is not a pass, worst first, in plain words. Empty for a pass."""
+        lines: list[str] = []
+        if count := self.missing_required_count:
+            noun = "field" if count == 1 else "fields"
+            lines.append(f"{count} required {noun} missing")
+        if self.mean_key_completeness is None:
+            lines.append("Completeness of the key fields was not reported")
+        if weak := self.weak_fields:
+            labels = ", ".join(quality.field_label(field).lower() for field in weak)
+            lines.append(f"Below {FIELD_WARNING_BELOW:.0f}% complete: {labels}")
+        if self.feed_version == UNKNOWN:
+            lines.append("Feed version not reported")
+        return tuple(lines)
+
+    @property
+    def verdict(self) -> Verdict:
+        if self.missing_required_count:
+            return Verdict.FAIL
+        if self.reasons:
+            return Verdict.WARNING
+        return Verdict.PASS
+
+    @property
+    def status(self) -> str:
+        """The verdict as a status token, for a `ColKind.STATUS` column and the filters."""
+        return self.verdict.value
+
 
 def build_rows(snapshot: SchemaComplianceSnapshot) -> tuple[ComplianceRow, ...]:
     """One row per feed in the quality snapshot, joined to its custom properties by id.
@@ -140,4 +212,170 @@ def build_rows(snapshot: SchemaComplianceSnapshot) -> tuple[ComplianceRow, ...]:
             properties_reported=reported,
         )
         for row in quality.build_rows(snapshot.quality.data)
+    )
+
+
+# --- reading, sorting and filtering -------------------------------------------------------
+
+
+def resolve(row: ComplianceRow, field: str) -> Any:
+    """Read a column or filter field off a row. `completeness.<field>` reads one key
+    field's completeness; anything else is an attribute of the row."""
+    if field.startswith(COMPLETENESS_PREFIX):
+        return row.key_completeness.get(field.removeprefix(COMPLETENESS_PREFIX))
+    return getattr(row, field, None)
+
+
+def sort_rows(rows: Sequence[ComplianceRow]) -> list[ComplianceRow]:
+    """Worst first: fails, then warnings, then passes. Within each, the most required
+    fields missing first, then the least complete, then by publisher and feed."""
+
+    def key(row: ComplianceRow) -> tuple[int, int, float, str, str]:
+        mean = row.mean_key_completeness
+        return (
+            VERDICT_ORDER[row.verdict],
+            -row.missing_required_count,
+            mean if mean is not None else -1.0,
+            row.publisher_name.lower(),
+            row.feed_name.lower(),
+        )
+
+    return sorted(rows, key=key)
+
+
+def filter_options(rows: Sequence[ComplianceRow], field: str) -> list[str]:
+    """Distinct non-empty values for a filter field, sorted, for a selectbox."""
+    return sorted(
+        {str(value) for row in rows if (value := resolve(row, field)) not in (None, "")}
+    )
+
+
+def search_rows(rows: Iterable[ComplianceRow], term: str) -> list[ComplianceRow]:
+    """Case-insensitive match on publisher, dataset, feed name and feed id."""
+    needle = term.strip().lower()
+    if not needle:
+        return list(rows)
+    return [
+        row
+        for row in rows
+        if needle
+        in " ".join(
+            part.lower()
+            for part in (row.publisher_name, row.dataset_name, row.feed_name, row.feed_id)
+        )
+    ]
+
+
+def apply_filters(
+    rows: Sequence[ComplianceRow],
+    *,
+    search: str = "",
+    selections: Mapping[str, str] | None = None,
+    not_passing_only: bool = False,
+) -> list[ComplianceRow]:
+    """Search, per-field selections and the "not passing" toggle, in that order."""
+    result = search_rows(rows, search)
+    for field, wanted in (selections or {}).items():
+        if not wanted:
+            continue
+        result = [row for row in result if str(resolve(row, field) or "") == wanted]
+    if not_passing_only:
+        result = [row for row in result if row.verdict is not Verdict.PASS]
+    return result
+
+
+# --- the table ----------------------------------------------------------------------------
+
+
+def to_dataframe(columns: Sequence[Col], rows: Sequence[ComplianceRow]) -> pd.DataFrame:
+    """One line per row, in the column order given. Zero rows gives an empty frame with
+    the columns, so the table renders empty instead of raising."""
+    labels = [col.label for col in columns]
+    records = [
+        {col.label: format_cell(col, resolve(row, col.field)) for col in columns}
+        for row in rows
+    ]
+    return pd.DataFrame(records, columns=labels)
+
+
+def tone_frame(columns: Sequence[Col], rows: Sequence[ComplianceRow]) -> pd.DataFrame:
+    """Tone name per cell, aligned with `to_dataframe`. Uses the quality page's cell
+    tones, so completeness is shaded on the same bands everywhere."""
+    labels = [col.label for col in columns]
+    records = [
+        {
+            col.label: (
+                tone.value if (tone := quality.cell_tone(col, resolve(row, col.field))) else ""
+            )
+            for col in columns
+        }
+        for row in rows
+    ]
+    return pd.DataFrame(records, columns=labels).fillna("")
+
+
+# --- the figures --------------------------------------------------------------------------
+
+
+def _share(part: int, whole: int) -> str:
+    return f"{part / whole:.0%} of feeds checked" if whole else EMPTY
+
+
+def _count_tone(count: int | None, tone: Tone) -> Tone | None:
+    """A figure not reported carries no state, and a zero is nothing to flag."""
+    if count is None:
+        return None
+    return tone if count else Tone.GREY
+
+
+def key_field_averages(rows: Sequence[ComplianceRow]) -> dict[str, float | None]:
+    """Each key field's mean completeness across the feeds that reported it."""
+    averages: dict[str, float | None] = {}
+    for field in KEY_FIELDS:
+        values = [v for row in rows if (v := row.key_completeness.get(field)) is not None]
+        averages[field] = fmean(values) if values else None
+    return averages
+
+
+def page_stats(rows: Sequence[ComplianceRow]) -> tuple[Stat, ...]:
+    """The five figures above the table.
+
+    Worked out from the rows rather than read from a summary block, because the page joins
+    two snapshots and neither block describes the join. Pass in every row, not the
+    filtered ones, so a filter does not appear to move the figures.
+    """
+    total = len(rows)
+    failing = sum(row.verdict is Verdict.FAIL for row in rows)
+    warning = sum(row.verdict is Verdict.WARNING for row in rows)
+    means = [m for row in rows if (m := row.mean_key_completeness) is not None]
+    average = fmean(means) if means else None
+    reported = bool(rows) and rows[0].properties_reported
+    custom = sum(bool(row.custom_property_count) for row in rows) if reported else None
+
+    return (
+        Stat("Feeds checked", format_number(total), None, "from the quality assessment"),
+        Stat(
+            "Failing",
+            format_number(failing),
+            _count_tone(failing, Tone.RED),
+            "missing a required field",
+        ),
+        Stat(
+            "Warnings",
+            format_number(warning),
+            _count_tone(warning, Tone.AMBER),
+            "key fields poorly covered",
+        ),
+        Stat(
+            "Key field completeness",
+            EMPTY if average is None else f"{average:.0f}%",
+            None if average is None else score_tone(average),
+            "average across the key fields",
+        ),
+        Stat(
+            "Non-standard properties",
+            format_number(custom),
+            None,
+            _share(custom, total) if custom is not None else "custom properties not reported",
+        ),
     )
