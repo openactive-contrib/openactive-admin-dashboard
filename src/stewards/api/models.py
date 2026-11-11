@@ -667,6 +667,22 @@ class CustomPropertyResponse(ApiModel):
     meta: Meta
 
 
+class SchemaComplianceSnapshot(BaseModel):
+    """The two reads the schema compliance page joins, fetched together.
+
+    Not an API response: the page has no endpoint of its own, it combines the quality
+    snapshot (version, missing required fields, completeness) with the custom-property
+    snapshot (non-standard properties). The quality read is required. The custom-property
+    read is `None` when it failed, so the page can still show compliance and say the
+    properties are not available, rather than losing the whole view.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    quality: FeedQualityResponse
+    custom_properties: CustomPropertyResponse | None = None
+
+
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward work rows, read and written through `/admin/publisher-notifications`. One
