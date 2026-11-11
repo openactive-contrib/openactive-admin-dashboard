@@ -49,6 +49,7 @@ from stewards.api.repository import (
     _fetch_publisher_notifications,
     _fetch_quality,
     _fetch_quality_summaries,
+    _fetch_schema_compliance,
     _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
@@ -694,6 +695,52 @@ def test_custom_property_summaries_of_nothing_is_an_empty_mapping(
     client: StewardsClient,
 ) -> None:
     assert _fetch_custom_property_summaries((), client) == {}
+
+
+# --- schema compliance --------------------------------------------------------------------
+
+
+@respx.mock
+def test_schema_compliance_reads_quality_and_custom_properties_together(
+    client: StewardsClient,
+) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    snapshot = _fetch_schema_compliance(client)
+    assert isinstance(snapshot.quality, FeedQualityResponse)
+    assert len(snapshot.quality.data) == 15
+    assert snapshot.custom_properties is not None
+    assert len(snapshot.custom_properties.data) == 12
+
+
+@respx.mock
+def test_schema_compliance_survives_a_missing_custom_properties_endpoint(
+    client: StewardsClient,
+) -> None:
+    """The properties only add detail: losing them must not cost the compliance checks."""
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
+    snapshot = _fetch_schema_compliance(client)
+    assert len(snapshot.quality.data) == 15
+    assert snapshot.custom_properties is None
+
+
+@respx.mock
+def test_schema_compliance_fails_when_quality_fails(client: StewardsClient) -> None:
+    """Quality carries the checks themselves, so without it there is no page to show."""
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    properties = respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    with pytest.raises(ApiNotFound):
+        _fetch_schema_compliance(client)
+    assert properties.call_count == 0
 
 
 # --- publisher notifications --------------------------------------------------------------

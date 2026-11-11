@@ -35,6 +35,7 @@ from stewards.api.models import (
     PublisherNotificationDocument,
     PublisherNotificationPage,
     PublisherNotificationSummaryResponse,
+    SchemaComplianceSnapshot,
     SiteMapping,
     SiteMappingPage,
     SummaryResponse,
@@ -352,6 +353,35 @@ def _fetch_custom_property_summaries(
     return summaries
 
 
+# --- schema compliance --------------------------------------------------------------------
+#
+# No endpoint of its own: the page joins two snapshots the API already serves.
+
+QUALITY_MONITOR_ID = "feed_quality"
+CUSTOM_PROPERTIES_MONITOR_ID = "feed_custom_properties"
+
+
+def _fetch_schema_compliance(
+    client: StewardsClient | None = None, as_of: date | None = None
+) -> SchemaComplianceSnapshot:
+    """The quality and custom-property snapshots, read together for the compliance page.
+
+    The quality read carries the checks themselves, so its failure is the page's failure
+    and raises. The custom-property read only adds the non-standard properties, so its
+    failure is logged and left as `None` for the page to explain.
+    """
+    client = client or get_client()
+    quality = _fetch_quality(QUALITY_MONITOR_ID, client=client, as_of=as_of)
+    try:
+        custom = _fetch_custom_properties(
+            CUSTOM_PROPERTIES_MONITOR_ID, client=client, as_of=as_of
+        )
+    except ApiError as exc:
+        log.info("No custom-property snapshot for schema compliance: %s", exc)
+        custom = None
+    return SchemaComplianceSnapshot(quality=quality, custom_properties=custom)
+
+
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward rows, not the daily batch, and the only resource this app writes. Reads are
@@ -491,6 +521,11 @@ def fetch_custom_property_summaries(
     monitor_ids: tuple[str, ...],
 ) -> dict[str, CustomPropertySummary]:
     return _fetch_custom_property_summaries(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_schema_compliance() -> SchemaComplianceSnapshot:
+    return _fetch_schema_compliance()
 
 
 @st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)
