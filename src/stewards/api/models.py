@@ -418,6 +418,40 @@ class FeedQualitySummary(NullTolerantModel):
     newest_assessment: datetime | None = None
 
 
+class VocabularyAdherence(NullTolerantModel):
+    """How far one feed's activities or facilities use a controlled vocabulary.
+
+    Sparse by design, and that is the point: the nightly job assesses a rolling five-day
+    window, so a feed it did not reach carries no figure at all rather than a zero. Every
+    count is optional for the same reason the `/summary` counts are — a batch that does not
+    compute one sends null, and null is not zero.
+
+    `top_unmatched` is deliberately undeclared: the payload sends it, but its element shape
+    is not settled, and guessing wrong would raise `ApiContractError` on a page that could
+    otherwise render. `extra="ignore"` carries it until there is something to draw it with.
+    """
+
+    #: Share of the feed's sampled items whose terms matched the vocabulary, 0-100.
+    adherence_pct: float | None = None
+
+    items: int | None = None
+
+    #: Matched by identifier — the standard's own way of referring to a term.
+    valid_id: int | None = None
+
+    #: An identifier was given but is not in the vocabulary.
+    invalid_id: int | None = None
+
+    #: Matched on label alone, so the term is right but the reference is not.
+    label_match_only: int | None = None
+
+    #: Referred to a vocabulary other than the expected one.
+    other_scheme: int | None = None
+
+    #: No match of any kind. These are the items a search will not surface.
+    unrecognised: int | None = None
+
+
 class FeedQualityFeed(NullTolerantModel):
     """One feed's quality assessment in this snapshot."""
 
@@ -452,6 +486,11 @@ class FeedQualityFeed(NullTolerantModel):
     missing_required_fields: dict[str, tuple[str, ...]] = Field(default_factory=dict)
 
     last_assessed: datetime | None = None
+
+    #: Vocabulary adherence for the feed's activities and facilities. None for a feed the
+    #: five-day assessment window did not reach, which is not zero adherence.
+    activity_vocabulary_adherence: VocabularyAdherence | None = None
+    facility_vocabulary_adherence: VocabularyAdherence | None = None
 
 
 class FeedQualityResponse(ApiModel):

@@ -326,6 +326,84 @@ def test_the_table_builds_from_the_registry_columns() -> None:
     assert tone_frame(SCHEMA_COMPLIANCE.columns, rows).shape == frame.shape
 
 
+# --- vocabulary adherence -------------------------------------------------------------------
+#
+# Two figures the nightly assessment added to the quality read. Sparse on purpose: it works a
+# rolling five-day window, so most feeds carry nothing and the absence must not read as zero.
+
+#: The payload shape the assessment sends, as one feed's activity block.
+ADHERENCE = {
+    "adherence_pct": 66.67,
+    "invalid_id": 0,
+    "items": 12,
+    "label_match_only": 0,
+    "other_scheme": 0,
+    "top_unmatched": [],
+    "unrecognised": 4,
+    "valid_id": 8,
+}
+
+ACTIVITY_FEED = "activeluton-openactive-legendonlineservices-co-uk-api-sessions"
+FACILITY_FEED = "better-admin-org-uk-api-openactive-better-facility-uses"
+
+
+def test_a_feed_carries_the_vocabulary_figures_the_assessment_reported() -> None:
+    row = _row(build_rows(_snapshot()), ACTIVITY_FEED)
+    assert row.activity_adherence == 66.67
+    assert row.vocabularies_reported
+    assert row.activity_vocabulary is not None
+    assert row.activity_vocabulary.items == 12
+    assert row.activity_vocabulary.valid_id == 8
+    assert row.activity_vocabulary.unrecognised == 4
+
+
+def test_the_two_vocabularies_are_read_independently() -> None:
+    """A session feed reports activities and a facility feed reports facilities; neither
+    absence is a zero for the other."""
+    activity = _row(build_rows(_snapshot()), ACTIVITY_FEED)
+    facility = _row(build_rows(_snapshot()), FACILITY_FEED)
+    assert activity.activity_adherence == 66.67
+    assert activity.facility_adherence is None
+    assert facility.facility_adherence == 91.3
+    assert facility.activity_adherence is None
+
+
+def test_a_feed_the_window_did_not_reach_reports_nothing_rather_than_zero() -> None:
+    """The assessment covers five days, so most feeds carry no figure at all. Reading that
+    as zero adherence would fail the whole fleet while the window fills in."""
+    (row,) = _rows(_feed())
+    assert row.activity_adherence is None
+    assert row.facility_adherence is None
+    assert row.activity_vocabulary is None
+    assert not row.vocabularies_reported
+
+
+def test_nothing_matching_is_an_adherence_of_zero_not_a_missing_figure() -> None:
+    """The boundary that matters: 0.0 is falsy, and a feed where nothing matched has still
+    been assessed."""
+    nothing = {**ADHERENCE, "adherence_pct": 0.0, "valid_id": 0, "unrecognised": 12}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=nothing))
+    assert row.activity_adherence == 0.0
+    assert row.vocabularies_reported
+
+
+def test_an_assessment_that_reported_no_counts_still_reads_as_assessed() -> None:
+    (row,) = _rows(_feed(activity_vocabulary_adherence={"adherence_pct": 100.0}))
+    assert row.activity_adherence == 100.0
+    assert row.activity_vocabulary is not None
+    assert row.activity_vocabulary.items is None
+    assert row.activity_vocabulary.unrecognised is None
+
+
+def test_an_unsettled_top_unmatched_does_not_cost_the_read() -> None:
+    """`top_unmatched` is not declared on the model, because its element shape is not
+    settled. Whatever it carries must be ignored rather than raise."""
+    objects = {**ADHERENCE, "top_unmatched": [{"term": "Zumba Gold", "count": 3}]}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=objects))
+    assert row.activity_adherence == 66.67
+    assert not hasattr(row.activity_vocabulary, "top_unmatched")
+
+
 # --- the overview card ---------------------------------------------------------------------
 
 

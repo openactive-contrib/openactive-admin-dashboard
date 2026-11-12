@@ -26,7 +26,12 @@ from urllib.parse import urlparse
 import altair as alt
 import pandas as pd
 
-from stewards.api.models import FeedQualityFeed, FeedQualitySummary, QualityBreakdown
+from stewards.api.models import (
+    FeedQualityFeed,
+    FeedQualitySummary,
+    QualityBreakdown,
+    VocabularyAdherence,
+)
 from stewards.monitors.health import Health, HealthState, Movement
 from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.registry import Col, ColKind, Monitor
@@ -77,6 +82,12 @@ class QualityRow:
     completeness: Mapping[str, float | None]
     missing_required_fields: Mapping[str, tuple[str, ...]]
     last_assessed: str
+
+    #: Vocabulary adherence for the feed's activities and facilities, as the assessment
+    #: reported it. None for a feed its five-day window did not reach. Carried here so the
+    #: compliance monitor can read it; the quality table does not draw it.
+    activity_vocabulary: VocabularyAdherence | None = None
+    facility_vocabulary: VocabularyAdherence | None = None
 
     @property
     def error_count(self) -> int:
@@ -164,6 +175,8 @@ def build_rows(feeds: Sequence[FeedQualityFeed]) -> tuple[QualityRow, ...]:
             last_assessed=(
                 feed.last_assessed.date().isoformat() if feed.last_assessed else EMPTY
             ),
+            activity_vocabulary=feed.activity_vocabulary_adherence,
+            facility_vocabulary=feed.facility_vocabulary_adherence,
         )
         for feed in feeds
     )

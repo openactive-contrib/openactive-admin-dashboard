@@ -33,7 +33,7 @@ from typing import Any
 import altair as alt
 import pandas as pd
 
-from stewards.api.models import SchemaComplianceSnapshot
+from stewards.api.models import SchemaComplianceSnapshot, VocabularyAdherence
 from stewards.monitors import quality, schema_drift
 from stewards.monitors.health import Health, HealthState, Movement
 from stewards.monitors.overview import Fact, TileCard
@@ -143,6 +143,34 @@ class ComplianceRow:
     @property
     def mean_key_completeness(self) -> float | None:
         return quality.mean_completeness(self.key_completeness)
+
+    @property
+    def activity_vocabulary(self) -> VocabularyAdherence | None:
+        return self.quality.activity_vocabulary
+
+    @property
+    def facility_vocabulary(self) -> VocabularyAdherence | None:
+        return self.quality.facility_vocabulary
+
+    @property
+    def activity_adherence(self) -> float | None:
+        """Share of the feed's activity terms matching the standard vocabulary, 0-100.
+
+        None where the assessment's five-day window did not reach this feed, which is not
+        the same as nothing matching. The window fills in over time, so most feeds read
+        None today.
+        """
+        return self.activity_vocabulary.adherence_pct if self.activity_vocabulary else None
+
+    @property
+    def facility_adherence(self) -> float | None:
+        """As `activity_adherence`, for the feed's facility terms."""
+        return self.facility_vocabulary.adherence_pct if self.facility_vocabulary else None
+
+    @property
+    def vocabularies_reported(self) -> bool:
+        """Whether the assessment reported either figure for this feed."""
+        return self.activity_adherence is not None or self.facility_adherence is not None
 
     @property
     def custom_property_count(self) -> int | None:
