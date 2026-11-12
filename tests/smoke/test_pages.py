@@ -28,6 +28,7 @@ PAGES = [
     "30_feed_quality.py",
     "31_active_places_coverage.py",
     "32_feed_custom_properties.py",
+    "33_schema_compliance.py",
     "90_notebooks.py",
 ]
 
@@ -47,6 +48,8 @@ COVERAGE_PAGES = ["31_active_places_coverage.py"]
 
 SCHEMA_DRIFT_PAGES = ["32_feed_custom_properties.py"]
 
+SCHEMA_COMPLIANCE_PAGES = ["33_schema_compliance.py"]
+
 #: Page filename -> registry id, so the counts a page must render are read from the monitor
 #: rather than hard-coded per page.
 MONITOR_IDS = {
@@ -58,6 +61,7 @@ MONITOR_IDS = {
     "32_feed_custom_properties.py": "feed_custom_properties",
     "30_feed_quality.py": "feed_quality",
     "31_active_places_coverage.py": "active_places_coverage",
+    "33_schema_compliance.py": "schema_compliance",
 }
 
 
@@ -296,6 +300,68 @@ def test_the_schema_drift_page_states_the_fleet_figures_not_the_filtered_ones() 
     assert "Actions available: none" in text
 
 
+@pytest.mark.parametrize("name", SCHEMA_COMPLIANCE_PAGES)
+def test_schema_compliance_page_has_five_figures_one_chart_and_one_table(name: str) -> None:
+    from stewards.monitors.registry import get_monitor
+
+    monitor = get_monitor(MONITOR_IDS[name])
+    app = run(name)
+    # One table: the selected feed's key fields render only once a row is selected.
+    assert len(app.dataframe) == 1
+    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.selectbox) == len(monitor.filters)
+    # "not passing only" stands where the threshold toggle would
+    assert len(app.toggle) == 1
+    assert len(app.text_input) == 1
+
+
+def test_schema_compliance_table_carries_every_declared_column() -> None:
+    """The join is driven by the quality read, so the table holds its feeds and no others."""
+    from fixture_loader import load_sample
+    from stewards.monitors.registry import get_monitor
+
+    app = run("33_schema_compliance.py")
+    frame = app.dataframe[0].value
+    monitor = get_monitor("schema_compliance")
+    assert list(frame.columns) == [c.label for c in monitor.columns]
+    assert len(frame) == len(load_sample("feed_quality_quality")["data"])
+
+
+def test_schema_compliance_verdict_filter_narrows_the_table_to_the_failing_feed() -> None:
+    app = run("33_schema_compliance.py")
+    assert len(app.dataframe[0].value) == 15
+    app.selectbox[0].set_value("fail").run()
+    assert not app.exception
+    frame = app.dataframe[0].value
+    assert list(frame["Compliance"]) == ["Fail"]
+    assert list(frame["Missing required"]) == [1]
+
+
+def test_the_compliance_page_states_the_fleet_figures_not_the_filtered_ones() -> None:
+    """The five figures describe every assessed feed; the caption describes the rows shown."""
+    app = run("33_schema_compliance.py")
+    app.text_input[0].set_value("better").run()
+    markdown = [m.value for m in app.markdown]
+    text = text_of(app)
+    assert "3 of 15 feeds shown" in text
+    assert markdown[markdown.index("FEEDS CHECKED") + 1] == "15"
+    assert markdown[markdown.index("FAILING") + 1] == ":red[1]"
+    assert markdown[markdown.index("WARNINGS") + 1] == ":orange[14]"
+    assert "Actions available: none" in text
+
+
+def test_the_join_carries_custom_property_counts_onto_the_quality_feeds() -> None:
+    """A feed in both snapshots gets its count; a feed in only the quality one gets a real
+    zero. A blank is reserved for the custom-property read having failed."""
+    app = run("33_schema_compliance.py")
+    counts = list(app.dataframe[0].value["Custom properties"])
+    assert sorted(count for count in counts if count) == [1, 6, 18]
+    assert counts.count(0) == 12
+    text = text_of(app)
+    assert "20% of feeds checked" in text
+    assert "blank rather than zero" not in text
+
+
 def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
     from stewards.monitors.registry import MONITOR_REGISTRY
 
@@ -336,6 +402,16 @@ def test_each_tile_says_which_way_its_series_is_moving() -> None:
     series_tiles = [m for m in MONITOR_REGISTRY if isinstance(m.viz, Sparkline)]
     assert sum("snapshots" in caption for caption in captions) == len(series_tiles)
     assert "benchmark" in text  # the gauge card names its reference instead of a movement
+
+
+def test_the_compliance_tile_states_the_join_rather_than_not_reported() -> None:
+    """/summary describes neither read behind this monitor, so the card is handed over
+    whole — without it the tile would read "not reported"."""
+    text = text_of(run("00_overview.py"))
+    assert "of 15 feeds assessed · this snapshot only" in text
+    assert "feeds failing" in text
+    for label in ("Feeds checked", "Warnings", "Key fields"):
+        assert label in text
 
 
 def test_overview_has_no_threshold_banner() -> None:

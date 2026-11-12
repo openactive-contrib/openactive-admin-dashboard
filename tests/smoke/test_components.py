@@ -19,7 +19,12 @@ from stewards.api.errors import (
     ApiUnauthorized,
     ApiUnavailable,
 )
-from stewards.api.models import Meta, Summary, SummaryResponse
+from stewards.api.models import (
+    Meta,
+    SchemaComplianceSnapshot,
+    Summary,
+    SummaryResponse,
+)
 
 SNAPSHOT = date(2026, 8, 21)
 
@@ -1054,6 +1059,171 @@ def test_empty_detail_and_unreported_charts_render_captions_not_tables() -> None
     assert sum("does not report the figures" in c for c in captions) == 1
     assert not app.get("vega_lite_chart")
     assert not app.dataframe
+
+
+# --- the schema compliance page --------------------------------------------------------------
+
+
+def _schema_compliance_snapshot(with_properties: bool = True) -> SchemaComplianceSnapshot:
+    """The joined snapshot the compliance page reads, built from the two sample payloads."""
+    from fixture_loader import load_sample
+    from stewards.api.models import CustomPropertyResponse, FeedQualityResponse
+
+    custom = None
+    if with_properties:
+        custom = CustomPropertyResponse.model_validate(
+            load_sample("feed_custom_properties_properties")
+        )
+    return SchemaComplianceSnapshot(
+        quality=FeedQualityResponse.model_validate(load_sample("feed_quality_quality")),
+        custom_properties=custom,
+    )
+
+
+def _schema_compliance_page_error_script() -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.schema_compliance_page import render_schema_compliance_page
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = repository.fetch_schema_compliance
+    repository.fetch_schema_compliance = boom  # type: ignore[assignment]
+    try:
+        render_schema_compliance_page(SCHEMA_COMPLIANCE)
+    finally:
+        repository.fetch_schema_compliance = original
+        st.cache_data.clear()
+
+
+def test_a_compliance_page_whose_quality_read_fails_says_so_and_shows_no_snapshot() -> None:
+    app = run(_schema_compliance_page_error_script)
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def _schema_compliance_page_script() -> None:
+    """`AppTest` cannot click a dataframe row, so the selection is the one thing stubbed:
+    everything below it — the join, the figures, the chart, the pop-up — is the real path."""
+    import streamlit as st
+    from test_components import _schema_compliance_snapshot
+
+    from stewards.api import repository
+    from stewards.components import schema_compliance_page
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    snapshot = _schema_compliance_snapshot()
+    original_fetch = repository.fetch_schema_compliance
+    original_table = schema_compliance_page.render_table
+
+    def first_row(*args: object, **kwargs: object) -> int:
+        original_table(*args, **kwargs)  # type: ignore[arg-type]
+        return 0
+
+    st.cache_data.clear()
+    repository.fetch_schema_compliance = lambda: snapshot  # type: ignore[assignment]
+    schema_compliance_page.render_table = first_row  # type: ignore[assignment]
+    try:
+        schema_compliance_page.render_schema_compliance_page(SCHEMA_COMPLIANCE)
+    finally:
+        repository.fetch_schema_compliance = original_fetch
+        schema_compliance_page.render_table = original_table
+        st.cache_data.clear()
+
+
+def test_the_compliance_page_renders_the_join_and_opens_the_worst_feed() -> None:
+    app = run(_schema_compliance_page_script)
+    markdown = " ".join(m.value for m in app.markdown)
+    captions = [c.value for c in app.caption]
+
+    # The header dates the quality read, which is the snapshot that decides the rows.
+    assert "2026-08-21" in markdown
+    # Five figures above the table, the key field chart where a trend would be.
+    assert len(app.get("vega_lite_chart")) == 1
+    assert any("of 15 feeds shown" in c for c in captions)
+    # Worst first, so the pop-up opens the feed that is missing a required field.
+    assert "required field missing" in markdown
+    assert "Missing required fields" in markdown
+    # The table, then the selected feed's key fields.
+    assert len(app.dataframe) == 2
+    assert list(app.dataframe[1].value.columns) == ["Field", "Completeness"]
+
+
+def _schema_compliance_no_properties_script() -> None:
+    import streamlit as st
+    from test_components import _schema_compliance_snapshot
+
+    from stewards.api import repository
+    from stewards.components import schema_compliance_page
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    snapshot = _schema_compliance_snapshot(False)
+    original = repository.fetch_schema_compliance
+
+    st.cache_data.clear()
+    repository.fetch_schema_compliance = lambda: snapshot  # type: ignore[assignment]
+    try:
+        schema_compliance_page.render_schema_compliance_page(SCHEMA_COMPLIANCE)
+    finally:
+        repository.fetch_schema_compliance = original
+        st.cache_data.clear()
+
+
+def _schema_compliance_clean_feed_script() -> None:
+    from stewards.api.models import FeedQualityFeed
+    from stewards.components.schema_compliance_page import (
+        render_row_detail,
+        render_summary_chart,
+    )
+    from stewards.monitors import quality, schema_compliance
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    # No rows at all: every key field is unreported, so there is nothing to chart.
+    render_summary_chart(SCHEMA_COMPLIANCE, ())
+
+    feed = FeedQualityFeed.model_validate(
+        {
+            "feed_id": "clean",
+            "feed_name": "Clean feed",
+            "publisher_name": "Example Publisher",
+            "dataset_name": "Example dataset",
+            "feed_type": "SessionSeries",
+            "feed_version": "V2.0",
+            "completeness": dict.fromkeys(schema_compliance.KEY_FIELDS, 100),
+        }
+    )
+    passing = schema_compliance.ComplianceRow(
+        quality=quality.build_rows((feed,))[0],
+        properties=None,
+        properties_reported=True,
+    )
+    render_row_detail(SCHEMA_COMPLIANCE, passing)
+
+
+def test_a_passing_feed_says_so_and_an_unreported_chart_is_a_caption() -> None:
+    app = run(_schema_compliance_clean_feed_script)
+    captions = [c.value for c in app.caption]
+    markdown = " ".join(m.value for m in app.markdown)
+    assert sum("does not report the figures" in c for c in captions) == 1
+    assert not app.get("vega_lite_chart")
+    assert "Every required field is present" in markdown
+    # The verdict still renders, and the key fields still tabulate.
+    assert len(app.dataframe) == 1
+
+
+def test_a_failed_custom_property_read_is_said_rather_than_shown_as_zero() -> None:
+    app = run(_schema_compliance_no_properties_script)
+    captions = [c.value for c in app.caption]
+    markdown = " ".join(m.value for m in app.markdown)
+    assert any("blank rather than zero" in c for c in captions)
+    # The figure above the table says the same thing, so it is not read as a real zero.
+    assert "custom properties not reported" in markdown
 
 
 # --- the loading card ----------------------------------------------------------------------

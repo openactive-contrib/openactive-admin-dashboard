@@ -46,12 +46,16 @@ class Source(StrEnum):
     summary block in one paginated read, and no history. It arrives shaped like a quality
     snapshot but measures nothing a score describes — each row is a feed and the properties
     it uses that the OpenActive vocabulary does not define. See `monitors.schema_drift`.
+    `SCHEMA_COMPLIANCE` has no read of its own: it joins the quality and custom-property
+    snapshots into one row per feed, judged against the standard's required and
+    recommended fields. See `monitors.schema_compliance`.
     """
 
     INCIDENTS = "incidents"
     QUALITY = "quality"
     COVERAGE = "coverage"
     SCHEMA_DRIFT = "schema_drift"
+    SCHEMA_COMPLIANCE = "schema_compliance"
 
 
 class Severity(StrEnum):
@@ -782,6 +786,82 @@ FEED_CUSTOM_PROPERTIES = Monitor(
 )
 
 
+SCHEMA_COMPLIANCE = Monitor(
+    id="schema_compliance",
+    name="Schema compliance",
+    group=Group.COVERAGE,
+    # A failing feed breaks the standard, which is worth a steward's attention, but it is a
+    # snapshot rather than a fault that ages, so it is not a contact queue.
+    severity=Severity.MEDIUM,
+    source=Source.SCHEMA_COMPLIANCE,
+    blurb=(
+        "How closely each feed follows the OpenActive standard: which version it publishes, "
+        "which required fields it is missing, how complete its key recommended fields are, "
+        "and which non-standard properties it uses. A feed fails when a required field is "
+        "missing and warns when a key field is poorly covered. Checking that activities "
+        "and facilities use the standard vocabularies will follow once the nightly job "
+        "reports it."
+    ),
+    unit="feeds failing",
+    # The card is a set of figures and a verdict, as the quality and drift cards are.
+    viz=Facts(),
+    columns=(
+        Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
+        Col("dataset_name", "Dataset", ColKind.TEXT),
+        Col("feed_name", "Feed", ColKind.MONO),
+        Col("feed_type", "Type", ColKind.TEXT),
+        Col("feed_version", "Version", ColKind.TEXT),
+        Col(
+            "status",
+            "Compliance",
+            ColKind.STATUS,
+            help="Fail: a required field is missing. Warning: a key field is poorly covered",
+        ),
+        Col(
+            "missing_required_count",
+            "Missing required",
+            ColKind.NUMBER,
+            help="Distinct required fields missing; select a row to see which",
+        ),
+        Col(
+            "mean_key_completeness",
+            "Key fields",
+            ColKind.PERCENT,
+            help="Mean completeness of the key recommended fields",
+        ),
+        Col("completeness.location", "Location", ColKind.PERCENT),
+        Col("completeness.start_date", "Start date", ColKind.PERCENT),
+        Col("completeness.end_date", "End date", ColKind.PERCENT),
+        Col("completeness.activities", "Activities", ColKind.PERCENT),
+        Col("completeness.facilities", "Facilities", ColKind.PERCENT),
+        Col("completeness.age_range", "Age range", ColKind.PERCENT),
+        Col("completeness.level", "Level", ColKind.PERCENT),
+        Col("completeness.accessibility_support", "Accessibility", ColKind.PERCENT),
+        Col("completeness.gender_restriction", "Gender", ColKind.PERCENT),
+        Col(
+            "custom_property_count",
+            "Custom properties",
+            ColKind.NUMBER,
+            help="Distinct properties outside the OpenActive vocabulary",
+        ),
+        Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
+    ),
+    filters=(
+        FilterSpec("status", "Compliance"),
+        FilterSpec("feed_version", "Version"),
+        FilterSpec("feed_type", "Feed type"),
+    ),
+    # Worst first is the module's own order. See `monitors.schema_compliance.sort_rows`.
+    sort_field="missing_required_count",
+    # Nothing here ages; the page offers a "not passing only" toggle instead.
+    has_threshold_filter=False,
+    summary_field="feed_name",
+    schedule="nightly assessment",
+    query="monitor_feed_quality_v1 + monitor_feed_custom_properties_v1",
+    page="views/33_schema_compliance.py",
+)
+
+
 #: Ordered registry. The overview and the sidebar iterate this — never a hard-coded list.
 MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_STALL,
@@ -792,6 +872,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     FEED_QUALITY,
     ACTIVE_PLACES_COVERAGE,
     FEED_CUSTOM_PROPERTIES,
+    SCHEMA_COMPLIANCE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}
