@@ -382,6 +382,27 @@ def _fetch_schema_compliance(
     return SchemaComplianceSnapshot(quality=quality, custom_properties=custom)
 
 
+def _fetch_schema_compliance_snapshots(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, SchemaComplianceSnapshot]:
+    """Each compliance monitor's joined snapshot, for its overview card.
+
+    The monitor id is only the key here, never a path: this read has no endpoint of its own
+    and always joins the same two. Tolerant in the same way as `_fetch_quality_summaries` —
+    a monitor whose quality endpoint this deployment has not built yet is left out of the
+    mapping rather than costing the whole overview.
+    """
+    snapshots: dict[str, SchemaComplianceSnapshot] = {}
+    for monitor_id in monitor_ids:
+        try:
+            snapshots[monitor_id] = _fetch_schema_compliance(client=client, as_of=as_of)
+        except ApiError as exc:
+            log.info("No compliance snapshot for %s: %s", monitor_id, exc)
+    return snapshots
+
+
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward rows, not the daily batch, and the only resource this app writes. Reads are
@@ -526,6 +547,13 @@ def fetch_custom_property_summaries(
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_schema_compliance() -> SchemaComplianceSnapshot:
     return _fetch_schema_compliance()
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_schema_compliance_snapshots(
+    monitor_ids: tuple[str, ...],
+) -> dict[str, SchemaComplianceSnapshot]:
+    return _fetch_schema_compliance_snapshots(monitor_ids)
 
 
 @st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)

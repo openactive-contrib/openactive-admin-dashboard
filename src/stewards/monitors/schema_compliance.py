@@ -35,6 +35,8 @@ import pandas as pd
 
 from stewards.api.models import SchemaComplianceSnapshot
 from stewards.monitors import quality, schema_drift
+from stewards.monitors.health import Health, HealthState, Movement
+from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.quality import UNKNOWN, QualityRow, Stat, format_number
 from stewards.monitors.registry import Col
 from stewards.monitors.schema_drift import PropertyRow
@@ -326,10 +328,12 @@ def _share(part: int, whole: int) -> str:
     return f"{part / whole:.0%} of feeds checked" if whole else EMPTY
 
 
-def _count_tone(count: int | None, tone: Tone) -> Tone | None:
-    """A figure not reported carries no state, and a zero is nothing to flag."""
-    if count is None:
-        return None
+def _count_tone(count: int, tone: Tone) -> Tone:
+    """A zero is nothing to flag.
+
+    Narrower than `quality._count_tone`, which shades a figure the batch may not report:
+    every count here is derived from the rows, so there is no "not reported" case.
+    """
     return tone if count else Tone.GREY
 
 
@@ -433,3 +437,83 @@ def key_field_frame(row: ComplianceRow) -> pd.DataFrame:
 def missing_field_lines(row: ComplianceRow) -> tuple[str, ...]:
     """`SessionSeries: name, location` per opportunity type with a field missing."""
     return quality.missing_field_lines(row.quality)
+
+
+# --- the overview card ---------------------------------------------------------------------
+
+#: What the card says when the quality snapshot carried no feeds at all.
+NOT_ASSESSED = "no feeds assessed in this snapshot"
+
+
+def assess_compliance(rows: Sequence[ComplianceRow]) -> Health:
+    """The card's verdict, from the share of feeds that do not break the standard.
+
+    Two rules, in order. The level comes from the compliant share on `thresholds.score_tone`
+    — the bands that shade every other percentage in the app, so the card and the table
+    cannot tell different stories. A clean share is then held back from `HEALTHY` while any
+    feed falls short of the key fields: a thin recommended field is not a breach of the
+    standard, but it is not an all-clear either.
+
+    `movement` stays unknown for the reason `quality.assess_quality` gives: one snapshot
+    carries a level and says nothing about direction.
+    """
+    if not rows:
+        return Health(HealthState.UNKNOWN, Movement.UNKNOWN, NOT_ASSESSED)
+
+    failing = sum(row.verdict is Verdict.FAIL for row in rows)
+    warning = sum(row.verdict is Verdict.WARNING for row in rows)
+    total = len(rows)
+    states = {Tone.GREEN: HealthState.HEALTHY, Tone.AMBER: HealthState.WARNING}
+    state = states.get(score_tone((total - failing) / total * 100), HealthState.CRITICAL)
+    if state is HealthState.HEALTHY and warning:
+        state = HealthState.WARNING
+
+    if failing:
+        noun = "feed" if total == 1 else "feeds"
+        reason = (
+            f"{format_number(failing)} of {format_number(total)} {noun} missing a "
+            "required field"
+        )
+    elif warning:
+        reason = (
+            f"{format_number(warning)} of {format_number(total)} feeds fall short of "
+            "the key fields"
+        )
+    else:
+        reason = f"all {format_number(total)} feeds meet the standard"
+    return Health(state, Movement.UNKNOWN, reason, current=float(failing))
+
+
+def tile_note(rows: Sequence[ComplianceRow]) -> str:
+    if not rows:
+        return NOT_ASSESSED
+    return f"of {format_number(len(rows))} feeds assessed · this snapshot only"
+
+
+def tile_card(snapshot: SchemaComplianceSnapshot) -> TileCard:
+    """The overview card: feeds failing, three supporting figures and the verdict.
+
+    It takes the snapshot rather than the rows because the join is what the card is about:
+    `/summary` describes neither read, let alone the two together. See `tile_viz.Facts`.
+    """
+    rows = build_rows(snapshot)
+    failing = sum(row.verdict is Verdict.FAIL for row in rows)
+    warning = sum(row.verdict is Verdict.WARNING for row in rows)
+    means = [mean for row in rows if (mean := row.mean_key_completeness) is not None]
+    average = fmean(means) if means else None
+    return TileCard(
+        value=format_number(failing),
+        unit="feeds failing",
+        health=assess_compliance(rows),
+        facts=(
+            Fact("Feeds checked", format_number(len(rows))),
+            Fact("Warnings", format_number(warning), _count_tone(warning, Tone.AMBER)),
+            Fact(
+                "Key fields",
+                EMPTY if average is None else f"{average:.0f}%",
+                None if average is None else score_tone(average),
+            ),
+        ),
+        note=tile_note(rows),
+        badge=failing,
+    )

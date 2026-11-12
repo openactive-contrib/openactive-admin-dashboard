@@ -404,6 +404,16 @@ def test_each_tile_says_which_way_its_series_is_moving() -> None:
     assert "benchmark" in text  # the gauge card names its reference instead of a movement
 
 
+def test_the_compliance_tile_states_the_join_rather_than_not_reported() -> None:
+    """/summary describes neither read behind this monitor, so the card is handed over
+    whole — without it the tile would read "not reported"."""
+    text = text_of(run("00_overview.py"))
+    assert "of 15 feeds assessed · this snapshot only" in text
+    assert "feeds failing" in text
+    for label in ("Feeds checked", "Warnings", "Key fields"):
+        assert label in text
+
+
 def test_overview_has_no_threshold_banner() -> None:
     app = run("00_overview.py")
     assert not app.warning

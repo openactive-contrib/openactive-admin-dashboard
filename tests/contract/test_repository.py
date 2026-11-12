@@ -50,6 +50,7 @@ from stewards.api.repository import (
     _fetch_quality,
     _fetch_quality_summaries,
     _fetch_schema_compliance,
+    _fetch_schema_compliance_snapshots,
     _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
@@ -741,6 +742,32 @@ def test_schema_compliance_fails_when_quality_fails(client: StewardsClient) -> N
     with pytest.raises(ApiNotFound):
         _fetch_schema_compliance(client)
     assert properties.call_count == 0
+
+
+@respx.mock
+def test_compliance_snapshots_return_one_entry_per_monitor(client: StewardsClient) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    snapshots = _fetch_schema_compliance_snapshots(("schema_compliance",), client)
+    assert set(snapshots) == {"schema_compliance"}
+    assert len(snapshots["schema_compliance"].quality.data) == 15
+
+
+@respx.mock
+def test_compliance_snapshots_skip_a_monitor_whose_quality_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    """The overview must survive it, as it does a missing trend."""
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    assert _fetch_schema_compliance_snapshots(("schema_compliance",), client) == {}
+
+
+def test_compliance_snapshots_of_nothing_is_an_empty_mapping(client: StewardsClient) -> None:
+    assert _fetch_schema_compliance_snapshots((), client) == {}
 
 
 # --- publisher notifications --------------------------------------------------------------

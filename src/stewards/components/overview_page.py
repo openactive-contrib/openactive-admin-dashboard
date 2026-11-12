@@ -12,7 +12,7 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.loading import loading
 from stewards.components.surface import card
-from stewards.monitors import coverage, quality, schema_drift
+from stewards.monitors import coverage, quality, schema_compliance, schema_drift
 from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import (
     Cards,
@@ -111,6 +111,14 @@ def tile_cards() -> Cards:
             monitor_id: schema_drift.tile_card(summary)
             for monitor_id, summary in repository.fetch_custom_property_summaries(
                 monitor_ids(Source.SCHEMA_DRIFT)
+            ).items()
+        }
+    )
+    cards.update(
+        {
+            monitor_id: schema_compliance.tile_card(snapshot)
+            for monitor_id, snapshot in repository.fetch_schema_compliance_snapshots(
+                monitor_ids(Source.SCHEMA_COMPLIANCE)
             ).items()
         }
     )

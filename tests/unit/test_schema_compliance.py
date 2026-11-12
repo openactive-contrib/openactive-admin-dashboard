@@ -10,17 +10,22 @@ from stewards.api.models import (
     FeedQualityResponse,
     SchemaComplianceSnapshot,
 )
+from stewards.monitors.health import HealthState, Movement
 from stewards.monitors.registry import Col, ColKind
 from stewards.monitors.schema_compliance import (
     KEY_FIELDS,
+    NOT_ASSESSED,
     ComplianceRow,
     Verdict,
     apply_filters,
+    assess_compliance,
     build_rows,
     key_field_averages,
     page_stats,
     resolve,
     sort_rows,
+    tile_card,
+    tile_note,
     to_dataframe,
     tone_frame,
 )
@@ -319,3 +324,71 @@ def test_the_table_builds_from_the_registry_columns() -> None:
     assert len(frame) == 15
     assert list(frame.columns) == [c.label for c in SCHEMA_COMPLIANCE.columns]
     assert tone_frame(SCHEMA_COMPLIANCE.columns, rows).shape == frame.shape
+
+
+# --- the overview card ---------------------------------------------------------------------
+
+
+def test_the_card_states_the_failing_feeds_and_the_fleet_figures() -> None:
+    card = tile_card(_snapshot())
+    assert card.value == "1"
+    assert card.unit == "feeds failing"
+    assert card.badge == 1
+    assert [fact.label for fact in card.facts] == ["Feeds checked", "Warnings", "Key fields"]
+    assert [fact.value for fact in card.facts] == ["15", "14", "37%"]
+    assert card.note == "of 15 feeds assessed · this snapshot only"
+
+
+def test_the_card_unit_is_the_one_the_registry_declares() -> None:
+    """The overview reads the registry's unit, so a card that disagrees reads as a bug."""
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    assert tile_card(_snapshot()).unit == SCHEMA_COMPLIANCE.unit
+
+
+def test_a_breach_of_the_standard_is_reported_as_the_reason() -> None:
+    health = assess_compliance(build_rows(_snapshot()))
+    assert health.state is HealthState.WARNING
+    assert health.reason == "1 of 15 feeds missing a required field"
+    assert health.movement is Movement.UNKNOWN
+    assert health.points == 0
+    assert health.current == 1.0
+
+
+def test_no_feeds_at_all_is_unknown_not_an_all_clear() -> None:
+    health = assess_compliance(())
+    assert health.state is HealthState.UNKNOWN
+    assert health.reason == "no feeds assessed in this snapshot"
+
+
+def test_a_fleet_that_fully_meets_the_standard_is_healthy() -> None:
+    health = assess_compliance(_rows(_feed("a"), _feed("b")))
+    assert health.state is HealthState.HEALTHY
+    assert health.reason == "all 2 feeds meet the standard"
+
+
+def test_a_clean_share_is_held_back_from_healthy_while_a_key_field_is_thin() -> None:
+    """A recommended field is not a breach, so it does not fail the fleet — but a card that
+    called this HEALTHY would claim an all-clear the table contradicts."""
+    rows = _rows(_feed("a"), _feed("b", completeness={**FULL, "level": 10}))
+    health = assess_compliance(rows)
+    assert health.state is HealthState.WARNING
+    assert health.reason == "1 of 2 feeds fall short of the key fields"
+
+
+def test_the_compliant_share_bands_the_card_at_the_amber_edge() -> None:
+    """60% compliant is the floor of the amber band in `thresholds.score_tone`; one more
+    breach drops the card through it."""
+    gone = {"missing_required_fields": {"SessionSeries": ["name"]}}
+    at_edge = _rows(_feed("a"), _feed("b"), _feed("c"), _feed("d", **gone), _feed("e", **gone))
+    assert assess_compliance(at_edge).state is HealthState.WARNING
+
+    below = _rows(
+        _feed("a"), _feed("b"), _feed("c", **gone), _feed("d", **gone), _feed("e", **gone)
+    )
+    assert assess_compliance(below).state is HealthState.CRITICAL
+
+
+def test_the_note_of_an_empty_fleet_says_so_rather_than_counting_nothing() -> None:
+    assert tile_note(()) == NOT_ASSESSED
+    assert tile_note(_rows(_feed("a"))) == "of 1 feeds assessed · this snapshot only"
