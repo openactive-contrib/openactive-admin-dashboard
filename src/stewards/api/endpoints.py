@@ -167,6 +167,17 @@ def custom_properties(
     )
 
 
+def ecosystem_growth(style: Style, *, as_of: date) -> Endpoint:
+    """The ecosystem's monthly growth series: one row per calendar month, no paging.
+
+    Not a monitor read, so it does not hang off a monitor id. The admin API names it
+    `ecosystem-growth-trend`; the contract shape files it under `/ecosystem`.
+    """
+    if style is Style.ADMIN:
+        return Endpoint(f"{ADMIN_ROOT}/ecosystem-growth-trend", {"as_of": as_of.isoformat()})
+    return Endpoint("/ecosystem/growth")
+
+
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward work rows rather than a daily snapshot: the same in both shapes, and no

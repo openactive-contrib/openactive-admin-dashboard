@@ -1,0 +1,3 @@
+from stewards.components.ecosystem_page import render_ecosystem_growth_page
+
+render_ecosystem_growth_page()

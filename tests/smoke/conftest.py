@@ -84,6 +84,9 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
             )
+        mock.get(f"{BASE}/ecosystem/growth").mock(
+            return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
+        )
         notifications = f"{BASE}/publisher-notifications"
         mock.get(notifications, params={"page": "1"}).mock(
             return_value=httpx.Response(200, json=load_sample("publisher_notifications_page1"))

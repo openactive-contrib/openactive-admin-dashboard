@@ -360,6 +360,7 @@ def _navigation_script() -> None:
     nav.build_navigation()
     assert nav.page_for("overview") is not None
     assert nav.page_for("publisher_notifications") is not None
+    assert nav.page_for("ecosystem_growth") is not None
     assert nav.page_for("no_such_monitor") is None
     for monitor in MONITOR_REGISTRY:
         page = nav.page_for(monitor.id)
@@ -376,6 +377,7 @@ def _url_path_script() -> None:
     expected = {
         "overview": "",
         "publisher_notifications": "publisher_notifications",
+        "ecosystem_growth": "ecosystem_growth",
         "single_feed_stall": "single_feed_stalls",
         "feed_ingestion_error": "feed_ingestion_errors",
     }
@@ -411,8 +413,14 @@ def _sidebar_script() -> None:
 def test_the_sidebar_renders_a_link_per_page_and_a_pill_per_count() -> None:
     app = run(_sidebar_script)
     captions = [c.value for c in app.caption]
-    for section in ("OVERVIEW", "AVAILABILITY", "REFERENCE"):
+    for section in ("OVERVIEW", "ECOSYSTEM", "AVAILABILITY", "REFERENCE"):
         assert section in captions
+    # Ecosystem sits between the overview and the first monitor group.
+    assert (
+        captions.index("OVERVIEW")
+        < captions.index("ECOSYSTEM")
+        < captions.index("AVAILABILITY")
+    )
     markdown = " ".join(m.value for m in app.markdown)
     # Badges render as markdown colour directives carrying the count.
     for count, colour in (("10", "red"), ("23", "red"), ("9", "orange")):
@@ -1238,3 +1246,120 @@ def test_an_empty_notebook_manifest_says_so(tmp_path) -> None:
     app = run(_notebooks_script, str(manifest))
     assert "No notebooks are listed" in app.info[0].value
     assert not app.get("link_button")
+
+
+# --- the ecosystem growth page ----------------------------------------------------------
+
+
+def _growth_error_script(exc: object) -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.components.ecosystem_page import render_ecosystem_growth_page
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise exc  # type: ignore[misc]
+
+    st.cache_data.clear()
+    original = repository.fetch_ecosystem_growth
+    repository.fetch_ecosystem_growth = boom  # type: ignore[assignment]
+    try:
+        render_ecosystem_growth_page()
+    finally:
+        repository.fetch_ecosystem_growth = original
+        st.cache_data.clear()
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [ApiNotFound("not deployed"), ApiUnavailable("the API is down")],
+    ids=["not_found", "unavailable"],
+)
+def test_the_growth_page_reports_a_failure_with_no_snapshot(exc: ApiError) -> None:
+    app = run(_growth_error_script, exc)
+    assert app.error
+    assert not app.dataframe
+    assert not app.get("vega_lite_chart")
+    markdown = " ".join(m.value for m in app.markdown)
+    assert "Growth" in markdown
+    assert "Snapshot" not in markdown
+
+
+def _empty_growth_script() -> None:
+    import streamlit as st
+
+    from fixture_loader import load_sample
+    from stewards.api import repository
+    from stewards.api.models import EcosystemGrowthResponse
+    from stewards.components.ecosystem_page import render_ecosystem_growth_page
+
+    payload = load_sample("ecosystem_growth")
+    response = EcosystemGrowthResponse.model_validate({"data": [], "meta": payload["meta"]})
+    st.cache_data.clear()
+    original = repository.fetch_ecosystem_growth
+    repository.fetch_ecosystem_growth = lambda: response  # type: ignore[assignment]
+    try:
+        render_ecosystem_growth_page()
+    finally:
+        repository.fetch_ecosystem_growth = original
+        st.cache_data.clear()
+
+
+def test_a_growth_series_with_no_months_says_so() -> None:
+    app = run(_empty_growth_script)
+    assert not app.dataframe
+    assert not app.get("vega_lite_chart")
+    captions = " ".join(c.value for c in app.caption)
+    assert "no figures for the chosen series" in captions
+    assert any("no months" in info.value for info in app.info)
+
+
+def _growth_selection_script(position: int) -> None:
+    """`AppTest` cannot click a dataframe row, so the selection is the one thing stubbed:
+    everything below it — the month lookup, the pop-up, its tabs and tables — is real."""
+    from fixture_loader import load_sample
+    from stewards.api.models import EcosystemGrowthResponse
+    from stewards.components import ecosystem_page
+
+    response = EcosystemGrowthResponse.model_validate(load_sample("ecosystem_growth"))
+    original = ecosystem_page.render_table
+
+    def select(*args: object, **kwargs: object) -> int:
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        return position
+
+    ecosystem_page.render_table = select  # type: ignore[assignment]
+    try:
+        ecosystem_page.render_months(response.data)
+    finally:
+        ecosystem_page.render_table = original
+
+
+def test_selecting_a_month_opens_its_dataset_lists() -> None:
+    app = run(_growth_selection_script, 0)  # the newest month, 2026-11
+    assert not app.exception
+    assert [tab.label for tab in app.tabs] == [
+        "Added · 0",
+        "Removed · 1",
+        "Without future · 18",
+        "Not ingested · 6",
+        "Stopped · 14",
+        "Stopped (all runs failed) · 8",
+    ]
+    captions = " ".join(c.value for c in app.caption)
+    assert "In progress · 13 days with data" in captions
+    assert "None this month." in captions  # nothing was added
+    # The months table, then one table per non-empty list.
+    assert len(app.dataframe) == 1 + 5
+    removed = app.dataframe[1].value
+    assert list(removed.columns) == ["Publisher", "Dataset", "URL"]
+    assert list(removed["Publisher"]) == ["Leisure SK"]
+
+
+def test_a_month_whose_lists_were_not_computed_says_so() -> None:
+    app = run(_growth_selection_script, 6)  # the oldest month, 2026-05
+    assert not app.exception
+    assert app.tabs[0].label == "Added · —"
+    captions = [c.value for c in app.caption]
+    assert captions.count("Not computed for this month.") == 6
+    assert len(app.dataframe) == 1

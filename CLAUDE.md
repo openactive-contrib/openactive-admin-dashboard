@@ -67,6 +67,19 @@ path, with pre-checks naming the rules that take precedence on the same dataset)
 because the API echoes a requested date back) is today's and every read is complete.
 `docs/publisher-notification-job.md` is the full account.
 
+The sidebar's **Ecosystem** section (between Overview and Availability) holds pages about the
+ecosystem as a whole rather than faults in it. They are **not monitors**: no registry entry, no
+overview card and no count pill, so `nav.build_navigation` lists them itself. Its one page today
+is Growth (`views/05_ecosystem_growth.py`, `components/ecosystem_page.py` over the
+Streamlit-free `monitors/ecosystem.py`), which reads `/admin/ecosystem-growth-trend?as_of=`
+(`repository.fetch_ecosystem_growth`): one row per calendar month, the current one flagged
+`in_progress`, with no `/summary` entry. It draws one line chart whose series a multiselect
+picks, and the monthly table below it, newest first; a null figure is blank in the table and
+omitted from the chart, never a zero. "With future" is charted but not tabled
+(`Series.in_table`). Most figures also carry a `*_list` of the datasets behind them; the table keeps to counts, and selecting a month opens those lists in the usual
+row pop-up (`row_dialog`), one tab per list. A null list reads "Not computed for this month",
+an empty one "None this month".
+
 Also built out: the overview and the publisher notification list. Runbooks are **not** in
 the app: they live in `docs/` and are published to GitHub Pages by
 `.github/workflows/pages.yml`. The sidebar's Documentation row is an external
@@ -126,10 +139,12 @@ src/stewards/
                              edit validation, sidebar pill
   monitors/trend.py          30-snapshot series
   monitors/email_draft.py    the publisher email drafts (one incident, or one publisher)
+  monitors/ecosystem.py      the ecosystem growth series -> monthly table and chart
+                             (not a monitor: no registry entry, no card)
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
                              quality_page, coverage_page, schema_drift_page, overview_page,
-                             publisher_notifications_page, notebooks_page
+                             publisher_notifications_page, notebooks_page, ecosystem_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/

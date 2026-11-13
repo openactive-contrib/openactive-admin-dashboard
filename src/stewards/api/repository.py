@@ -27,6 +27,7 @@ from stewards.api.models import (
     CustomPropertyFeed,
     CustomPropertyResponse,
     CustomPropertySummary,
+    EcosystemGrowthResponse,
     FeedQualityResponse,
     FeedQualitySummary,
     IncidentPage,
@@ -352,6 +353,26 @@ def _fetch_custom_property_summaries(
     return summaries
 
 
+def _fetch_ecosystem_growth(
+    client: StewardsClient | None = None, as_of: date | None = None
+) -> EcosystemGrowthResponse:
+    """The ecosystem's monthly growth series, oldest or newest first as the API sends it.
+
+    No paging loop: one row per calendar month will not reach a page in the life of this
+    app. A response that says otherwise is logged rather than silently trimmed.
+    """
+    client = client or get_client()
+    endpoint = endpoints.ecosystem_growth(client.style, as_of=as_of or date.today())
+    response = _parse(
+        EcosystemGrowthResponse, client.get(endpoint.path, endpoint.params), endpoint.path
+    )
+    if len(response.data) < response.meta.total:
+        log.warning(
+            "Fetched %d of %d ecosystem growth periods", len(response.data), response.meta.total
+        )
+    return response
+
+
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward rows, not the daily batch, and the only resource this app writes. Reads are
@@ -491,6 +512,11 @@ def fetch_custom_property_summaries(
     monitor_ids: tuple[str, ...],
 ) -> dict[str, CustomPropertySummary]:
     return _fetch_custom_property_summaries(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_ecosystem_growth() -> EcosystemGrowthResponse:
+    return _fetch_ecosystem_growth()
 
 
 @st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)
