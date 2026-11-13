@@ -20,6 +20,7 @@ VIEWS_DIR = Path(__file__).resolve().parents[2] / "src" / "stewards" / "views"
 PAGES = [
     "00_overview.py",
     "01_publisher_notifications.py",
+    "05_ecosystem_growth.py",
     "10_dataset_stalls.py",
     "11_single_feed_stalls.py",
     "12_feed_ingestion_errors.py",
@@ -89,9 +90,13 @@ def test_page_renders_without_exception(name: str) -> None:
 
 #: Every page over the daily batch. The notification list is stored rows, not a batch
 #: snapshot, and states its own source; the notebooks page reads no data at all. Both have
-#: their own tests further down.
+#: their own tests further down. The growth page's fixture is the live API's own payload,
+#: dated 2026-11-13, so its snapshot is asserted with the rest of that page below.
 BATCH_PAGES = [
-    name for name in PAGES if name not in {"01_publisher_notifications.py", "90_notebooks.py"}
+    name
+    for name in PAGES
+    if name
+    not in {"01_publisher_notifications.py", "05_ecosystem_growth.py", "90_notebooks.py"}
 ]
 
 
@@ -504,3 +509,58 @@ def test_the_overview_has_no_publishers_with_issues_kpi_and_no_deltas() -> None:
     assert "OPEN INCIDENTS" in markdown
     for delta in ("+3", "+5", "+2"):
         assert delta not in markdown
+
+
+# --- ecosystem growth -----------------------------------------------------------------------
+
+GROWTH_PAGE = "05_ecosystem_growth.py"
+
+
+def test_the_growth_page_states_its_snapshot() -> None:
+    text = text_of(run(GROWTH_PAGE))
+    assert "ECOSYSTEM" in text
+    assert "Growth" in text
+    assert "Snapshot 2026-11-13" in text
+    assert "daily batch" in text
+    assert "Actions available: none" in text
+
+
+def test_the_growth_page_charts_the_default_series_and_tables_every_month() -> None:
+    from stewards.monitors.ecosystem import DEFAULT_SERIES, TABLE_COLUMNS
+
+    app = run(GROWTH_PAGE)
+    assert len(app.get("vega_lite_chart")) == 1
+    assert app.multiselect[0].value == list(DEFAULT_SERIES)
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == [col.label for col in TABLE_COLUMNS]
+    assert list(frame["Month"]) == [
+        "2026-11",
+        "2026-10",
+        "2026-09",
+        "2026-08",
+        "2026-07",
+        "2026-06",
+        "2026-05",
+    ]
+    text = text_of(app)
+    assert "7 months, most recent first." in text
+    assert "Select a month to see the datasets behind its figures." in text
+    assert not app.tabs  # no month is open until one is selected
+
+
+def test_the_growth_chart_follows_the_series_picker() -> None:
+    app = run(GROWTH_PAGE)
+    app.multiselect[0].set_value(["datasets_added", "datasets_removed"]).run()
+    assert not app.exception
+    assert len(app.get("vega_lite_chart")) == 1
+
+    app.multiselect[0].set_value([]).run()
+    assert not app.exception
+    assert not app.get("vega_lite_chart")
+    assert "Choose at least one series" in text_of(app)
+    assert len(app.dataframe) == 1  # the table does not depend on the picker
+
+
+def test_the_overview_has_no_growth_card() -> None:
+    text = text_of(run("00_overview.py"))
+    assert "Growth" not in text

@@ -227,3 +227,18 @@ def test_a_notification_id_is_one_encoded_path_segment(
 ) -> None:
     path = endpoints.publisher_notification(Style.ADMIN, notification_id).path
     assert path == f"/admin/publisher-notifications/{segment}"
+
+
+# --- ecosystem growth ---------------------------------------------------------------------
+
+
+def test_admin_ecosystem_growth_is_the_trend_resource_for_the_snapshot() -> None:
+    endpoint = endpoints.ecosystem_growth(Style.ADMIN, as_of=AS_OF)
+    assert endpoint.path == "/admin/ecosystem-growth-trend"
+    assert endpoint.params == {"as_of": "2026-09-02"}
+
+
+def test_contract_ecosystem_growth_hangs_off_the_ecosystem() -> None:
+    endpoint = endpoints.ecosystem_growth(Style.CONTRACT, as_of=AS_OF)
+    assert endpoint.path == "/ecosystem/growth"
+    assert endpoint.params == {}

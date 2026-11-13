@@ -45,6 +45,14 @@ or any other shared module, that is a signal the shared code is not general enou
 Generalise the component instead of special-casing the monitor. That rule is what keeps
 eight dashboards from becoming eight one-off pages.
 
+**Not every page is a monitor.** The sidebar's Ecosystem section holds pages about the
+ecosystem as a whole — Growth is the first — which judge nothing: no incidents, no verdict, no
+home-page card and no count pill. Such a page is not a registry entry. It is a model, an
+endpoint in both URL shapes, a repository read, a Streamlit-free shaping module under
+`monitors/`, a page renderer under `components/`, a view stub, and one line in
+`nav.build_navigation` that lists it under `ECOSYSTEM_SECTION`. `monitors/ecosystem.py` and
+`components/ecosystem_page.py` are the pattern to copy.
+
 ## The backing reads
 
 Most monitors report **incidents**, and everything below assumes that shape. Two other shapes

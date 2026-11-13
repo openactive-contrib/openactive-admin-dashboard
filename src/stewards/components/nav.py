@@ -34,9 +34,14 @@ LOGO = ASSET_DIR / "openactive-logo.png"
 
 OVERVIEW_PAGE = "views/00_overview.py"
 PUBLISHER_NOTIFICATIONS_PAGE = "views/01_publisher_notifications.py"
+ECOSYSTEM_GROWTH_PAGE = "views/05_ecosystem_growth.py"
 NOTEBOOKS_PAGE = "views/90_notebooks.py"
 
 OVERVIEW_SECTION = "Overview"
+
+#: Pages about the ecosystem as a whole rather than faults in it. They are not monitors: no
+#: registry entry, no card on the overview and no count pill, so they are listed here.
+ECOSYSTEM_SECTION = "Ecosystem"
 
 #: The last section. Besides its in-app pages it carries the runbooks, which live on GitHub
 #: Pages, outside the app: `st.page_link` renders a URL as an external link, which opens in a
@@ -67,6 +72,9 @@ def build_navigation() -> StreamlitPage:
         ("overview", _pages["overview"]),
         ("publisher_notifications", _pages["publisher_notifications"]),
     ]
+
+    _pages["ecosystem_growth"] = st.Page(APP_DIR / ECOSYSTEM_GROWTH_PAGE, title="Growth")
+    _sections[ECOSYSTEM_SECTION] = [("ecosystem_growth", _pages["ecosystem_growth"])]
 
     for group in groups():
         section: list[tuple[str, StreamlitPage]] = []
@@ -125,7 +133,7 @@ def render_sidebar(badges: Mapping[str, NavBadge]) -> None:
 
 def page_for(key: str) -> StreamlitPage | None:
     """Look up a built page by monitor id, or by `overview`/`publisher_notifications`/
-    `notebooks`."""
+    `ecosystem_growth`/`notebooks`."""
     return _pages.get(key)
 
 

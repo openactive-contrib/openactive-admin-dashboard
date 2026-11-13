@@ -845,3 +845,48 @@ class PublisherNotificationBody(ApiModel):
     def to_payload(self) -> dict[str, Any]:
         """JSON-ready: dates as ISO strings, tuples as lists, `problems` untouched."""
         return self.model_dump(mode="json")
+
+
+# --- ecosystem growth ---------------------------------------------------------------------
+#
+# Not a monitor: one row per calendar month describing the size of the ecosystem, with no
+# incidents, no verdict and no `/summary` entry. The current month arrives with
+# `in_progress` set. A figure the batch did not compute for a month is null, and stays None
+# here rather than becoming a zero. Most counts carry a `*_list` of the datasets behind
+# them; a list is null exactly where its count is, and empty where its count is zero.
+
+
+class GrowthDataset(ApiModel):
+    """One dataset named in a month's list. A publisher the catalogue could not identify
+    arrives as `pub_unknown` with an empty name."""
+
+    dataset_url: str
+    dataset_name: str = ""
+    publisher_id: str = ""
+    publisher_name: str = ""
+
+
+class EcosystemGrowthPeriod(ApiModel):
+    period_start: date
+    period_end: date
+    in_progress: bool = False
+    days_with_data: int | None = None
+    datasets_crawled: int | None = None
+    datasets_added: int | None = None
+    datasets_added_list: tuple[GrowthDataset, ...] | None = None
+    datasets_removed: int | None = None
+    datasets_removed_list: tuple[GrowthDataset, ...] | None = None
+    datasets_with_future: int | None = None
+    datasets_without_future: int | None = None
+    datasets_without_future_list: tuple[GrowthDataset, ...] | None = None
+    datasets_stopped: int | None = None
+    datasets_stopped_list: tuple[GrowthDataset, ...] | None = None
+    datasets_stopped_all_runs_failed: int | None = None
+    datasets_stopped_all_runs_failed_list: tuple[GrowthDataset, ...] | None = None
+    datasets_not_ingested: int | None = None
+    datasets_not_ingested_list: tuple[GrowthDataset, ...] | None = None
+
+
+class EcosystemGrowthResponse(ApiModel):
+    data: tuple[EcosystemGrowthPeriod, ...]
+    meta: Meta

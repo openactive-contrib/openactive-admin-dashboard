@@ -21,6 +21,7 @@ from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
     _fetch_coverage,
     _fetch_custom_properties,
+    _fetch_ecosystem_growth,
     _fetch_incidents,
     _fetch_quality,
     _fetch_site_mappings,
@@ -365,3 +366,22 @@ def test_the_real_custom_property_payload_fills_every_declared_column(
     frame = schema_drift.to_dataframe(FEED_CUSTOM_PROPERTIES, rows)
     assert list(frame.columns) == [c.label for c in FEED_CUSTOM_PROPERTIES.columns]
     assert len(frame) == len(response.data)
+
+
+# --- the ecosystem growth series -----------------------------------------------------------
+
+
+@respx.mock
+def test_ecosystem_growth_comes_from_the_trend_path_with_the_snapshot_and_token(
+    client: StewardsClient, payload
+) -> None:
+    route = respx.get(f"{BASE}/admin/ecosystem-growth-trend").mock(
+        return_value=httpx.Response(200, json=payload("ecosystem_growth"))
+    )
+    response = _fetch_ecosystem_growth(client, as_of=AS_OF)
+
+    assert len(response.data) == 7
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers

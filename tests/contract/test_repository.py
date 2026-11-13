@@ -26,7 +26,9 @@ from stewards.api.errors import (
 from stewards.api.models import (
     CoverageResponse,
     CustomPropertyResponse,
+    EcosystemGrowthResponse,
     FeedQualityResponse,
+    GrowthDataset,
     IncidentPage,
     PublisherNotificationBody,
     PublisherNotificationPage,
@@ -43,6 +45,7 @@ from stewards.api.repository import (
     _fetch_coverage_snapshots,
     _fetch_custom_properties,
     _fetch_custom_property_summaries,
+    _fetch_ecosystem_growth,
     _fetch_incidents,
     _fetch_monitor_trends,
     _fetch_publisher_notification_summary,
@@ -871,3 +874,119 @@ def test_failed_save_keeps_the_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ApiUnavailable):
         repository.update_publisher_notification(PublisherNotificationBody(id="pn_x"))
     assert cleared == []
+
+
+# --- ecosystem growth ---------------------------------------------------------------------
+
+GROWTH = f"{BASE}/ecosystem/growth"
+
+
+@respx.mock
+def test_ecosystem_growth_returns_every_month(client: StewardsClient) -> None:
+    respx.get(GROWTH).mock(
+        return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
+    )
+    response = _fetch_ecosystem_growth(client)
+    assert isinstance(response, EcosystemGrowthResponse)
+    assert response.meta.snapshot_date == date(2026, 11, 13)
+    assert len(response.data) == 7
+    assert [p.in_progress for p in response.data] == [False] * 6 + [True]
+
+
+@respx.mock
+def test_ecosystem_growth_keeps_a_null_figure_as_none(client: StewardsClient) -> None:
+    respx.get(GROWTH).mock(
+        return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
+    )
+    first = _fetch_ecosystem_growth(client).data[0]
+    assert first.datasets_added is None
+    assert first.datasets_added_list is None
+    assert first.datasets_not_ingested_list is None
+    assert first.datasets_crawled == 179
+
+
+@respx.mock
+def test_ecosystem_growth_parses_the_dataset_lists(client: StewardsClient) -> None:
+    respx.get(GROWTH).mock(
+        return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
+    )
+    november = _fetch_ecosystem_growth(client).data[-1]
+    assert november.datasets_added_list == ()  # reported empty, not null
+    assert november.datasets_removed_list == (
+        GrowthDataset(
+            dataset_url="https://leisuresk.leisurecloud.net/OpenActive/",
+            dataset_name="Leisure SK Sessions and Facilities",
+            publisher_id="pub_leisure-sk",
+            publisher_name="Leisure SK",
+        ),
+    )
+    assert november.datasets_not_ingested_list is not None
+    assert len(november.datasets_not_ingested_list) == november.datasets_not_ingested == 6
+
+
+@respx.mock
+def test_ecosystem_growth_without_lists_still_parses(client: StewardsClient) -> None:
+    """A deployment that predates the lists sends only the counts."""
+    month = {"period_start": "2026-11-01", "period_end": "2026-11-30", "datasets_added": 2}
+    meta = load_sample("ecosystem_growth")["meta"] | {"total": 1}
+    respx.get(GROWTH).mock(
+        return_value=httpx.Response(200, json={"data": [month], "meta": meta})
+    )
+    only = _fetch_ecosystem_growth(client).data[0]
+    assert only.datasets_added == 2
+    assert only.datasets_added_list is None
+    assert only.datasets_not_ingested is None
+
+
+@respx.mock
+def test_ecosystem_growth_rejects_a_list_entry_without_a_url(client: StewardsClient) -> None:
+    payload = load_sample("ecosystem_growth")
+    payload["data"][-1]["datasets_removed_list"] = [{"dataset_name": "No URL"}]
+    respx.get(GROWTH).mock(return_value=httpx.Response(200, json=payload))
+    with pytest.raises(ApiContractError):
+        _fetch_ecosystem_growth(client)
+
+
+@respx.mock
+def test_ecosystem_growth_of_no_months_is_empty(client: StewardsClient) -> None:
+    meta = load_sample("ecosystem_growth")["meta"] | {"total": 0}
+    respx.get(GROWTH).mock(return_value=httpx.Response(200, json={"data": [], "meta": meta}))
+    assert _fetch_ecosystem_growth(client).data == ()
+
+
+@respx.mock
+def test_ecosystem_growth_warns_when_the_api_reports_more_months_than_it_sent(
+    client: StewardsClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    payload = load_sample("ecosystem_growth")
+    payload["meta"]["total"] = 600
+    respx.get(GROWTH).mock(return_value=httpx.Response(200, json=payload))
+    assert len(_fetch_ecosystem_growth(client).data) == 7
+    assert "Fetched 7 of 600 ecosystem growth periods" in caplog.text
+
+
+@respx.mock
+def test_ecosystem_growth_rejects_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
+    respx.get(GROWTH).mock(return_value=httpx.Response(200, json={"data": [{"month": 1}]}))
+    with pytest.raises(ApiContractError):
+        _fetch_ecosystem_growth(client)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(401, ApiUnauthorized), (404, ApiNotFound), (500, ApiUnavailable)],
+)
+@respx.mock
+def test_ecosystem_growth_transport_failures_are_typed(
+    client: StewardsClient, status: int, expected: type[Exception]
+) -> None:
+    respx.get(GROWTH).mock(return_value=httpx.Response(status))
+    with pytest.raises(expected):
+        _fetch_ecosystem_growth(client)
+
+
+@respx.mock
+def test_ecosystem_growth_timeout_is_unavailable(client: StewardsClient) -> None:
+    respx.get(GROWTH).mock(side_effect=httpx.ReadTimeout("slow"))
+    with pytest.raises(ApiUnavailable):
+        _fetch_ecosystem_growth(client)
