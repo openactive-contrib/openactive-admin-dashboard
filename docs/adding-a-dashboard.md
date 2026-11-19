@@ -396,7 +396,12 @@ exactly as incidents are.
                  "venues_unmatched_pct": 52.2, "pairs": 10034},
     "coverage_by_region": [{"region_name": "London", "sites_total": 2826,
                             "sites_matched": 1110, "sites_missing": 1716,
-                            "coverage_pct": 39.3}]
+                            "coverage_pct": 39.3}],
+    "coverage_by_local_authority": [{"local_authority_code": "E07000063",
+                                     "local_authority_name": "Lewes", "sites_total": 62,
+                                     "sites_matched": 2, "sites_missing": 60,
+                                     "coverage_pct": 3.2, "oa_venues": 6,
+                                     "oa_venues_unmatched": 4}]
   },
   "meta": {"snapshot_date": "2026-08-21", "generated_at": "…", "total": 1}
 }
@@ -430,12 +435,46 @@ Which figures reach the page:
   must not appear to change what was measured. Its `pairs` count is the exception and is not
   modelled: the caption above the table already states how many rows there are, and two
   figures for the same thing read as a bug the moment a filter moves one of them.
-- `coverage_by_region` fills the one chart. The other breakdowns the payload carries —
-  ownership, management, facility type, local authority — are deliberately not modelled yet:
-  a field earns a line in `api/models.py` when something draws it.
-- the rows fill the table. `monitors/coverage.py` derives what the API does not send: the
+- `coverage_by_region` fills the bar chart, and `coverage_by_local_authority` the map below
+  it, joined to the bundled ONS boundaries on `local_authority_code` (a code the boundaries
+  do not carry is named in the map's caption, not dropped silently). The other breakdowns the
+  payload carries — ownership, management, facility type — are deliberately not modelled
+  yet: a field earns a line in `api/models.py` when something draws it.
+- the rows fill the table, fetched only once the steward presses "Load site-venue pairs":
+  most visits are for the figures and the map, and ten thousand rows over ten pages is the
+  slow part of the page. `monitors/coverage.py` derives what the API does not send: the
   venue's display name, the joined publisher and kind cells, the match channel's prose label
   and the similarity as a percentage.
+
+#### Adding a map to a view
+
+Any view with a figure per area can draw one; nothing in the map code knows about coverage.
+Build plain rows keyed by area code, then:
+
+```python
+# monitors/<view>.py — pure
+def my_map(snapshot, boundaries, style, focus=None) -> Choropleth | None:
+    return choropleth.choropleth(
+        boundaries.only(prefixes=("E",)),
+        rows, code_key="local_authority_code", value_field="coverage_pct",
+        tooltip=(TooltipField("coverage_pct", "Coverage", ".1f", "%"),
+                 TooltipField("sites_total", "Active Places sites", ",")),
+        style=style, focus=focus,
+    )
+
+# components/<view>_page.py — thin
+style = map_chart.map_style("Coverage %")
+map_chart.render_map(key, title, lambda focus: my_map(snapshot, boundaries, style, focus),
+                     areas=<the boundaries drawn>, height=style.height,
+                     attribution=boundaries.attribution, empty_message=…)
+```
+
+The tooltip is the area's name then one `Title: value` line per `TooltipField`, formatted
+with a Python format spec; a missing figure reads "Not reported". Test the row-shaping and
+the `choropleth` call against a synthetic boundary set; only `render_map` is in the
+component. Another boundary set is a `geography.BoundarySet` beside `UK_LAD_2024`: a WGS84
+GeoJSON (no `crs`) is used as it is, a British National Grid one is converted on load, and
+any other CRS is refused.
 
 The rows endpoint has its own name, so the registry entry declares `rows_id`. Deriving a
 suffix from the monitor id would point the read at a path that does not exist.

@@ -42,8 +42,12 @@ TREND_IDS = (
 
 
 @pytest.fixture(autouse=True)
-def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Mock the API responses page smoke tests expect under a live-only config."""
+def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[respx.MockRouter]:
+    """Mock the API responses page smoke tests expect under a live-only config.
+
+    Yields the router, so a test that requests `smoke_env` can ask whether a route was hit.
+    Routes worth asking about are named.
+    """
     monkeypatch.setenv("STEWARDS_API_BASE_URL", "https://api.test")
     monkeypatch.setenv("STEWARDS_API_TOKEN", "test-token")
     monkeypatch.setenv("STEWARDS_ENV", "dev")
@@ -77,9 +81,9 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             mock.get(f"{BASE}/monitors/{monitor_id}/coverage").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_coverage"))
             )
-            mock.get(f"{BASE}/monitors/{monitor_id}/mappings").mock(
-                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings"))
-            )
+            mock.get(
+                f"{BASE}/monitors/{monitor_id}/mappings", name=f"{monitor_id}_mappings"
+            ).mock(return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings")))
         for monitor_id in SCHEMA_DRIFT_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
@@ -99,7 +103,7 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
                 200, json=load_sample("publisher_notifications_summary")
             )
         )
-        yield
+        yield mock
 
     client_module.reset_client()
     config.get_settings.cache_clear()

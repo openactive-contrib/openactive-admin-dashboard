@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
+import respx
 from streamlit.testing.v1 import AppTest
 
 from stewards.monitors.publisher_notifications import PUBLISHER_LINK_TEXT
@@ -193,25 +194,54 @@ def test_quality_issues_toggle_narrows_the_table() -> None:
     assert len(app.dataframe[0].value) == 5
 
 
+def run_with_pairs(name: str) -> AppTest:
+    """A coverage page with its site-venue pairs asked for: the table loads on request."""
+    app = run(name)
+    app.button(key=f"load_pairs_{MONITOR_IDS[name]}").click().run()
+    return app
+
+
 @pytest.mark.parametrize("name", COVERAGE_PAGES)
-def test_coverage_page_has_four_figures_one_chart_and_one_table(name: str) -> None:
+def test_coverage_page_opens_with_figures_two_charts_and_no_table(
+    name: str, smoke_env: respx.MockRouter
+) -> None:
+    """The pairs are ten thousand rows; the first render must not wait for them."""
+    app = run(name)
+    assert not app.exception
+    # The region chart and the map's legend; the map itself is deck.gl.
+    assert len(app.get("vega_lite_chart")) == 2
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert len(app.dataframe) == 0
+    # The map's own "centre on" list is the only selectbox until the pairs load.
+    assert [s.key for s in app.selectbox] == [f"chart_{MONITOR_IDS[name]}_la_focus"]
+    assert [b.label for b in app.button if b.label] == ["Load site-venue pairs"]
+    assert not smoke_env[f"{MONITOR_IDS[name]}_mappings"].called
+    assert "Coverage by local authority" in [h.value for h in app.subheader]
+
+
+@pytest.mark.parametrize("name", COVERAGE_PAGES)
+def test_coverage_page_loads_the_table_on_request(name: str) -> None:
     from stewards.monitors.registry import get_monitor
 
     monitor = get_monitor(MONITOR_IDS[name])
-    app = run(name)
+    app = run_with_pairs(name)
+    assert not app.exception
     assert len(app.dataframe) == 1
-    assert len(app.get("vega_lite_chart")) == 1
-    assert len(app.selectbox) == len(monitor.filters)
+    assert len(app.get("vega_lite_chart")) == 2
+    filters = [s for s in app.selectbox if s.key != f"chart_{monitor.id}_la_focus"]
+    assert len(filters) == len(monitor.filters)
     # "primary pairs only" stands where the threshold toggle would
     assert len(app.toggle) == 1
     assert len(app.text_input) == 1
+    # The button has done its job and is gone.
+    assert not any(b.label == "Load site-venue pairs" for b in app.button)
 
 
 def test_coverage_table_carries_every_declared_column() -> None:
     from fixture_loader import load_sample
     from stewards.monitors.registry import get_monitor
 
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     frame = app.dataframe[0].value
     monitor = get_monitor("active_places_coverage")
     assert list(frame.columns) == [c.label for c in monitor.columns]
@@ -223,8 +253,9 @@ def test_coverage_primary_pairs_toggle_narrows_the_table() -> None:
 
     rows = load_sample("active_places_coverage_mappings")["data"]
     primary = sum(1 for row in rows if row["is_primary_for_venue"])
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     assert len(app.dataframe[0].value) == len(rows)
+    # A filter rerun keeps the table: the request outlives the click that made it.
     app.toggle[0].set_value(True).run()
     assert not app.exception
     assert len(app.dataframe[0].value) == primary
@@ -233,7 +264,7 @@ def test_coverage_primary_pairs_toggle_narrows_the_table() -> None:
 
 def test_the_coverage_page_states_the_run_figures_not_the_filtered_ones() -> None:
     """The four figures describe the whole estate; the table describes the pairs shown."""
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     text = text_of(app)
     assert "26.4%" in text
     assert "7,351" in text

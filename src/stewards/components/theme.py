@@ -81,6 +81,23 @@ AMBER_BG = "#FDF3E3"
 GREEN_BG = "#EAF4EE"
 GREY_BG = SURFACE_SUNKEN
 
+# --- maps --------------------------------------------------------------------------------
+
+COVERAGE_RAMP: tuple[str, ...] = ("#D3EBE9", "#97D0CB", "#55B0AA", TEAL, "#0A5F5C")
+"""A sequential ramp, one hue light to dark, for a choropleth of a measurement. Teal rather
+than RAG for the reason `coverage.region_chart` gives: a coverage rate is not a verdict. The
+lightest step stays clear of the white card so a district at 0% still reads as data."""
+
+MAP_NO_DATA = BORDER
+"""A district the snapshot reports no figure for. Grey, never the ramp's low end: no figure
+is not a zero one."""
+
+MAP_STROKE = SURFACE
+"""The hairline between districts: the card's own white, so neighbours read as separate."""
+
+MAP_HIGHLIGHT = INK
+"""Laid translucently over the hovered district, so the tooltip is never ambiguous."""
+
 FOREGROUND: dict[Tone, str] = {
     Tone.RED: RED,
     Tone.AMBER: AMBER,

@@ -861,6 +861,8 @@ def _coverage_rows_missing_script() -> None:
     mappings_read = repository.fetch_site_mappings
     repository.fetch_coverage = snapshot  # type: ignore[assignment]
     repository.fetch_site_mappings = boom  # type: ignore[assignment]
+    # As though the steward had already asked for the pairs.
+    st.session_state["pairs_loaded_active_places_coverage"] = True
     try:
         render_coverage_page(get_monitor("active_places_coverage"))
     finally:
@@ -877,7 +879,7 @@ def test_a_rows_endpoint_that_is_not_live_costs_the_table_and_not_the_figures() 
     assert any("no data for this view yet" in error.value for error in app.error)
     assert "26.4%" in text
     assert any("Snapshot" in m.value for m in app.markdown)
-    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("vega_lite_chart")) == 2
     assert not app.dataframe
 
 
@@ -1363,3 +1365,95 @@ def test_a_month_whose_lists_were_not_computed_says_so() -> None:
     captions = [c.value for c in app.caption]
     assert captions.count("Not computed for this month.") == 6
     assert len(app.dataframe) == 1
+
+
+# --- the map card -------------------------------------------------------------------------
+
+
+def _map_script(with_chart: bool) -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import CoverageResponse
+    from stewards.components import map_chart
+    from stewards.geography import uk_local_authority_districts
+    from stewards.monitors import coverage
+
+    snapshot = CoverageResponse.model_validate(
+        load_sample("active_places_coverage_coverage")
+    ).data
+    boundaries = uk_local_authority_districts()
+    style = map_chart.map_style("Coverage %")
+    map_chart.render_map(
+        "map_test",
+        "A map",
+        lambda focus: (
+            coverage.local_authority_map(snapshot, boundaries, style, focus)
+            if with_chart
+            else None
+        ),
+        areas=coverage.map_areas(boundaries),
+        height=style.height,
+        caption="A note.",
+        attribution="Boundaries: somebody.",
+        empty_message="Nothing to draw.",
+    )
+
+
+def _view_of(app: AppTest) -> dict:
+    import json
+
+    return json.loads(app.get("deck_gl_json_chart")[0].proto.json)["initialViewState"]
+
+
+def test_a_map_card_draws_legend_map_controls_and_attribution() -> None:
+    from stewards.components.map_chart import MAP_HELP
+
+    app = run(_map_script, True)
+    assert [h.value for h in app.subheader] == ["A map"]
+    assert app.subheader[0].help == MAP_HELP
+    assert len(app.get("vega_lite_chart")) == 1  # the legend
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert [c.value for c in app.caption] == ["A note.", "Boundaries: somebody."]
+    assert len(app.selectbox) == 1
+    assert len(app.selectbox[0].options) == 296
+    # Zooming is the mouse's job; the one button is "show the whole map".
+    assert [b.key for b in app.button] == ["map_test_whole"]
+
+
+def test_centring_on_a_district_opens_the_map_on_it_and_clearing_it_opens_on_england() -> None:
+    app = run(_map_script, True)
+    england = _view_of(app)
+    app.selectbox[0].select("E09000033").run()  # Westminster
+    assert not app.exception
+    close = _view_of(app)
+    assert close["zoom"] > england["zoom"] + 3
+    assert app.session_state["map_test_view"] == 1
+
+    app.selectbox[0].select(None).run()
+    assert _view_of(app) == england
+    assert app.session_state["map_test_view"] == 2
+
+
+def test_showing_the_whole_map_clears_the_focus_and_remounts_the_map() -> None:
+    """The map is in a container keyed on the view revision, so a press mounts a fresh map at
+    its opening view even when that view has not changed."""
+    app = run(_map_script, True)
+    england = _view_of(app)
+    app.selectbox[0].select("E09000033").run()
+    app.button(key="map_test_whole").click().run()
+    assert not app.exception
+    assert app.session_state["map_test_focus"] is None
+    assert app.session_state["map_test_view"] == 2
+    assert _view_of(app) == england
+
+    app.button(key="map_test_whole").click().run()
+    assert app.session_state["map_test_view"] == 3
+    assert _view_of(app) == england
+
+
+def test_a_map_card_with_no_chart_says_so_and_draws_nothing_else() -> None:
+    app = run(_map_script, False)
+    assert len(app.get("vega_lite_chart")) == 0
+    assert len(app.get("deck_gl_json_chart")) == 0
+    assert len(app.selectbox) == 0
+    assert len(app.button) == 0
+    assert [c.value for c in app.caption] == ["Nothing to draw."]

@@ -497,6 +497,23 @@ class CoverageGroup(NullTolerantModel):
     coverage_pct: float | None = None
 
 
+class CoverageLocalAuthority(NullTolerantModel):
+    """One local authority district's coverage, keyed by its ONS code (`E07000063`).
+
+    The code, not the name, is what joins a row to its boundary on the map: names are
+    respelled between boundary releases, codes are not.
+    """
+
+    local_authority_code: str = ""
+    local_authority_name: str = ""
+    sites_total: int | None = None
+    sites_matched: int | None = None
+    sites_missing: int | None = None
+    coverage_pct: float | None = None
+    oa_venues: int | None = None
+    oa_venues_unmatched: int | None = None
+
+
 class CoverageParameters(NullTolerantModel):
     """The thresholds the run was computed at, for the page's own copy."""
 
@@ -517,6 +534,7 @@ class CoverageSnapshot(NullTolerantModel):
     parameters: CoverageParameters = Field(default_factory=CoverageParameters)
     source: CoverageSource = Field(default_factory=CoverageSource)
     coverage_by_region: tuple[CoverageGroup, ...] = ()
+    coverage_by_local_authority: tuple[CoverageLocalAuthority, ...] = ()
 
 
 class CoverageResponse(ApiModel):
@@ -527,8 +545,9 @@ class CoverageResponse(ApiModel):
 class SiteMapping(NullTolerantModel):
     """One site-venue pair: an Active Places site and an OpenActive venue matched to it.
 
-    The coordinates and the raw `oa_location_json` are deliberately not declared: the app
-    draws no map, and the distance the batch already computed is the figure a reader needs.
+    The coordinates and the raw `oa_location_json` are deliberately not declared: the page's
+    map is drawn per local authority from the snapshot's breakdown, not per pair, and the
+    distance the batch already computed is the figure a reader of a pair needs.
     """
 
     site_id: str = ""

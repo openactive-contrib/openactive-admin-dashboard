@@ -33,7 +33,10 @@ a snapshot of every feed's nightly quality assessment with a fleet-wide `summary
 beside the rows and no history at all. `active_places_coverage` reads two live endpoints —
 `/admin/active-places-coverage` for the run's figures and `/admin/active-places-site-mappings`
 for the ~10k site-venue pairs behind them, paginated — with no history either and no
-`/summary` entry, so it supplies its whole card itself and carries no sidebar pill.
+`/summary` entry, so it supplies its whole card itself and carries no sidebar pill. Its page
+draws a choropleth of `coverage_by_local_authority` below the region chart, and fetches the
+pairs only when the steward presses "Load site-venue pairs" (a session flag keeps them through
+filter reruns).
 `feed_custom_properties` (the "Schema drift" page) reads the live `/admin/feed-custom-properties`:
 one paginated read of every feed publishing a property outside the OpenActive vocabulary, with
 a fleet-wide `summary` block beside the rows, no history and no `/summary` entry; it is
@@ -99,6 +102,7 @@ committed without outputs. `notebooks/README.md` is the procedure for adding one
 
 - Python 3.12, Streamlit ≥ 1.40 (`st.navigation`, `st.login`, `st.dataframe` selections)
 - `httpx` for the API client, `pydantic` v2 for response models, `pandas` for table shaping
+- `pydeck` for maps (`st.pydeck_chart`); every other chart is Altair
 - `uv` for dependency management, `ruff` for lint+format, `mypy --strict` on `src/`
 - `pytest` + `pytest-cov` + `respx` (httpx mocking) for tests
 
@@ -119,6 +123,11 @@ src/stewards/
   outreach/                  the daily notification job: rules.py (the decision tree),
                              keys.py, decide.py, reconcile.py (all pure), __main__.py
   notebooks.py               the notebook manifest: models, YAML parsing, Colab/GitHub URLs
+  geography.py               map boundaries: GeoJSON -> WGS84 Boundaries (code, name,
+                             geometry), converting British National Grid on load (OS
+                             formulas, no geospatial dependency); bundles the ONS LAD Dec
+                             2024 UK set (`assets/uk_lad_2024.geojson`, EPSG:27700, same
+                             file as openactive-monitor)
   monitors/registry.py       Monitor / Col / ColKind / RowSpec / RowDetail / Group / Severity
                              / Source + MONITOR_REGISTRY (registry order is card and
                              sidebar order)
@@ -141,10 +150,13 @@ src/stewards/
   monitors/email_draft.py    the publisher email drafts (one incident, or one publisher)
   monitors/ecosystem.py      the ecosystem growth series -> monthly table and chart
                              (not a monitor: no registry entry, no card)
+  monitors/choropleth.py     the app's map builder: boundaries + rows keyed by area code ->
+                             a pydeck slippy map + Altair legend (any view, not just coverage)
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
                              quality_page, coverage_page, schema_drift_page, overview_page,
-                             publisher_notifications_page, notebooks_page, ecosystem_page
+                             publisher_notifications_page, notebooks_page, ecosystem_page,
+                             map_chart (the map card + theme-built `map_style`)
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/
@@ -383,6 +395,22 @@ uv run mypy src
 - Charts are Altair, built by `monitors/trend.py` and passed their colours by the caller:
   `st.line_chart` cannot draw a dashed series or a transparent plot area. Tile sparklines
   are axis-less; the trend chart is solid teal over dashed red.
+- Maps are the one exception to Altair: `monitors/choropleth.choropleth` builds a pydeck
+  `Deck` (deck.gl, Streamlit's own element — not a custom component) and
+  `components/map_chart.render_map` draws it. The interaction is a web map's: wheel or pinch
+  zooms at the cursor, drag pans, double-click zooms in, Streamlit's +/− buttons sit on the
+  map; rotation and tilt are off. Vega-Lite cannot do this — it binds wheel/drag only to x/y
+  scales, and a map has none. Hover darkens the area and shows its tooltip, which is plain
+  text built and formatted in Python (`tooltip_text`), never markup. Colours are computed
+  per feature in Python too, and the legend is a small pixel-placed Altair chart (an axis
+  would be squeezed to nothing by Streamlit's fit-autosize). The features go to deck.gl as a
+  compact `data:` URL: pydeck indents its JSON, which would quadruple the payload. A
+  sequential ramp (`theme.COVERAGE_RAMP`) for a measurement; grey (`MAP_NO_DATA`) for a null,
+  never the ramp's low end. The basemap is Carto Positron (loaded by the user's browser from
+  basemaps.cartocdn.com, no token); its attribution and the boundaries' must be shown
+  wherever a map is. "Centre on" and "show the whole map" live in an `st.fragment` and set
+  the map's opening view; the map sits in a container keyed on a view revision, so each
+  press mounts a fresh map rather than nudging the one the user has moved.
 - Use `width="stretch"` / `width="content"`. `use_container_width` is past its removal date.
 - Route URLs drop the filename's numeric prefix: `views/12_feed_ingestion_errors.py` serves
   `/feed_ingestion_errors`.
