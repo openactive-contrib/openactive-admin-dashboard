@@ -62,6 +62,13 @@ KEY_FIELDS: tuple[str, ...] = (
 #: in `thresholds.score_tone`, so a field shaded red in the table is the one that warns.
 FIELD_WARNING_BELOW = 60.0
 
+#: A vocabulary matching fewer than this share of a feed's items is poorly covered.
+#: Deliberately a higher bar than `FIELD_WARNING_BELOW`, and a separate constant so the two
+#: can move apart: a thinly populated field is one of many things a steward might chase,
+#: whereas an unrecognised activity term means the session does not surface in a search at
+#: all. The number is the standard's to set, not this module's to infer.
+VOCABULARY_WARNING_BELOW = 90.0
+
 #: A column field that reads one key field's completeness, e.g. `completeness.location`.
 COMPLETENESS_PREFIX = "completeness."
 
@@ -199,6 +206,24 @@ class ComplianceRow:
         )
 
     @property
+    def weak_vocabularies(self) -> tuple[str, ...]:
+        """Vocabularies the assessment reported and found below `VOCABULARY_WARNING_BELOW`.
+
+        A vocabulary it did not report is absent from this tuple rather than weak. That
+        asymmetry with `weak_fields` is the point: the quality assessment scores every key
+        field, so a missing completeness figure is itself worth reporting, but the
+        vocabulary job works a rolling five-day window and has not reached most feeds yet.
+        Warning on that silence would fail the fleet and then quietly un-fail it.
+        """
+        reported = (
+            ("activities", self.activity_adherence),
+            ("facilities", self.facility_adherence),
+        )
+        return tuple(
+            name for name, pct in reported if pct is not None and pct < VOCABULARY_WARNING_BELOW
+        )
+
+    @property
     def reasons(self) -> tuple[str, ...]:
         """Why the row is not a pass, worst first, in plain words. Empty for a pass."""
         lines: list[str] = []
@@ -210,6 +235,11 @@ class ComplianceRow:
         if weak := self.weak_fields:
             labels = ", ".join(quality.field_label(field).lower() for field in weak)
             lines.append(f"Below {FIELD_WARNING_BELOW:.0f}% complete: {labels}")
+        if weak_vocabularies := self.weak_vocabularies:
+            lines.append(
+                f"Below {VOCABULARY_WARNING_BELOW:.0f}% vocabulary match: "
+                f"{', '.join(weak_vocabularies)}"
+            )
         if self.feed_version == UNKNOWN:
             lines.append("Feed version not reported")
         return tuple(lines)
@@ -356,6 +386,18 @@ def _share(part: int, whole: int) -> str:
     return f"{part / whole:.0%} of feeds checked" if whole else EMPTY
 
 
+def _vocabulary_tone(pct: float | None) -> Tone | None:
+    """Green at or above the bar, amber below it.
+
+    Not `score_tone`: that bands at 80 and 60, so an 85% average would read green while
+    every row carrying it warns. The figure above the table and the rows in it have to tell
+    the same story.
+    """
+    if pct is None:
+        return None
+    return Tone.GREEN if pct >= VOCABULARY_WARNING_BELOW else Tone.AMBER
+
+
 def _count_tone(count: int, tone: Tone) -> Tone:
     """A zero is nothing to flag.
 
@@ -389,6 +431,17 @@ def page_stats(rows: Sequence[ComplianceRow]) -> tuple[Stat, ...]:
     reported = bool(rows) and rows[0].properties_reported
     custom = sum(bool(row.custom_property_count) for row in rows) if reported else None
 
+    # Both vocabularies pooled: a feed reports activities or facilities depending on what it
+    # publishes, so averaging them separately would compare two different populations.
+    adherences = [
+        pct
+        for row in rows
+        for pct in (row.activity_adherence, row.facility_adherence)
+        if pct is not None
+    ]
+    vocabulary = fmean(adherences) if adherences else None
+    assessed = sum(row.vocabularies_reported for row in rows)
+
     return (
         Stat("Feeds checked", format_number(total), None, "from the quality assessment"),
         Stat(
@@ -401,13 +454,23 @@ def page_stats(rows: Sequence[ComplianceRow]) -> tuple[Stat, ...]:
             "Warnings",
             format_number(warning),
             _count_tone(warning, Tone.AMBER),
-            "key fields poorly covered",
+            "key fields or vocabularies poorly covered",
         ),
         Stat(
             "Key field completeness",
             EMPTY if average is None else f"{average:.0f}%",
             None if average is None else score_tone(average),
             "average across the key fields",
+        ),
+        Stat(
+            "Vocabulary match",
+            EMPTY if vocabulary is None else f"{vocabulary:.0f}%",
+            _vocabulary_tone(vocabulary),
+            (
+                f"mean across {format_number(assessed)} of {format_number(total)} feeds"
+                if vocabulary is not None
+                else "not reported for any feed yet"
+            ),
         ),
         Stat(
             "Non-standard properties",
@@ -504,8 +567,8 @@ def assess_compliance(rows: Sequence[ComplianceRow]) -> Health:
         )
     elif warning:
         reason = (
-            f"{format_number(warning)} of {format_number(total)} feeds fall short of "
-            "the key fields"
+            f"{format_number(warning)} of {format_number(total)} feeds fall short on "
+            "key fields or vocabularies"
         )
     else:
         reason = f"all {format_number(total)} feeds meet the standard"

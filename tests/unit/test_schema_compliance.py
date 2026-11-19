@@ -11,10 +11,13 @@ from stewards.api.models import (
     SchemaComplianceSnapshot,
 )
 from stewards.monitors.health import HealthState, Movement
+from stewards.monitors.quality import Stat
 from stewards.monitors.registry import Col, ColKind
 from stewards.monitors.schema_compliance import (
+    FIELD_WARNING_BELOW,
     KEY_FIELDS,
     NOT_ASSESSED,
+    VOCABULARY_WARNING_BELOW,
     ComplianceRow,
     Verdict,
     apply_filters,
@@ -30,6 +33,7 @@ from stewards.monitors.schema_compliance import (
     tone_frame,
 )
 from stewards.monitors.thresholds import Tone, status_label, status_tone
+from stewards.monitors.transforms import EMPTY
 
 SHARED_FEED = "api-letsride-co-uk-public-v1-rides"
 META = load_sample("feed_quality_quality")["meta"]
@@ -404,6 +408,116 @@ def test_an_unsettled_top_unmatched_does_not_cost_the_read() -> None:
     assert not hasattr(row.activity_vocabulary, "top_unmatched")
 
 
+# --- the vocabulary warning rule ------------------------------------------------------------
+
+
+def test_a_poorly_matched_vocabulary_warns_but_never_fails() -> None:
+    """A fail means a required field is absent. An unrecognised activity term is bad for
+    discovery but the data is there, so it must not be made to mean the same thing."""
+    poor = {**ADHERENCE, "adherence_pct": 40.0}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=poor))
+    assert row.verdict is Verdict.WARNING
+    assert row.weak_vocabularies == ("activities",)
+    assert "Below 90% vocabulary match: activities" in row.reasons
+
+
+def test_both_vocabularies_are_named_when_both_are_thin() -> None:
+    poor = {**ADHERENCE, "adherence_pct": 10.0}
+    (row,) = _rows(
+        _feed(activity_vocabulary_adherence=poor, facility_vocabulary_adherence=poor)
+    )
+    assert row.weak_vocabularies == ("activities", "facilities")
+    assert "Below 90% vocabulary match: activities, facilities" in row.reasons
+
+
+def test_the_bar_is_the_boundary_itself() -> None:
+    """At the bar is covered; a hair under it is not."""
+    at_bar = {**ADHERENCE, "adherence_pct": VOCABULARY_WARNING_BELOW}
+    (passing,) = _rows(_feed(activity_vocabulary_adherence=at_bar))
+    assert passing.weak_vocabularies == ()
+    assert passing.verdict is Verdict.PASS
+
+    under = {**ADHERENCE, "adherence_pct": VOCABULARY_WARNING_BELOW - 0.1}
+    (warning,) = _rows(_feed(activity_vocabulary_adherence=under))
+    assert warning.weak_vocabularies == ("activities",)
+    assert warning.verdict is Verdict.WARNING
+
+
+def test_the_vocabulary_bar_is_stricter_than_the_completeness_one() -> None:
+    """The two thresholds are separate constants on purpose: a figure that would pass as
+    field completeness still warns as a vocabulary match."""
+    assert VOCABULARY_WARNING_BELOW > FIELD_WARNING_BELOW
+    between = {**ADHERENCE, "adherence_pct": FIELD_WARNING_BELOW + 1}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=between))
+    assert row.weak_vocabularies == ("activities",)
+
+
+def test_a_vocabulary_the_window_did_not_reach_is_silent_not_a_warning() -> None:
+    """The asymmetry with the key fields: an unreported completeness figure warns, an
+    unreported vocabulary does not. Warning on silence would fail the fleet during the
+    backfill and then quietly un-fail it."""
+    (row,) = _rows(_feed())
+    assert row.weak_vocabularies == ()
+    assert row.verdict is Verdict.PASS
+    assert not any("vocabulary" in reason for reason in row.reasons)
+
+
+def test_nothing_matching_warns_rather_than_reading_as_unassessed() -> None:
+    nothing = {**ADHERENCE, "adherence_pct": 0.0, "valid_id": 0, "unrecognised": 12}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=nothing))
+    assert row.weak_vocabularies == ("activities",)
+    assert row.verdict is Verdict.WARNING
+
+
+def test_a_missing_required_field_still_outranks_a_thin_vocabulary() -> None:
+    poor = {**ADHERENCE, "adherence_pct": 10.0}
+    (row,) = _rows(
+        _feed(
+            activity_vocabulary_adherence=poor,
+            missing_required_fields={"SessionSeries": ["name"]},
+        )
+    )
+    assert row.verdict is Verdict.FAIL
+
+
+# --- the vocabulary figure ------------------------------------------------------------------
+
+
+def _stat(rows: tuple[ComplianceRow, ...], label: str) -> Stat:
+    return next(stat for stat in page_stats(rows) if stat.label == label)
+
+
+def test_the_figure_pools_both_vocabularies_across_the_feeds_that_reported() -> None:
+    stat = _stat(build_rows(_snapshot()), "Vocabulary match")
+    # 100.0, 66.67, 91.3 and 78.5 over four of the fifteen feeds.
+    assert stat.value == "84%"
+    assert stat.sub == "mean across 4 of 15 feeds"
+
+
+def test_the_figure_is_toned_against_the_rule_not_the_score_bands() -> None:
+    """85% is green to `score_tone` but every row carrying it warns, so the figure above the
+    table has to be amber."""
+    poor = {**ADHERENCE, "adherence_pct": 85.0}
+    assert _stat(_rows(_feed(activity_vocabulary_adherence=poor)), "Vocabulary match").tone is (
+        Tone.AMBER
+    )
+    good = {**ADHERENCE, "adherence_pct": 95.0}
+    assert _stat(_rows(_feed(activity_vocabulary_adherence=good)), "Vocabulary match").tone is (
+        Tone.GREEN
+    )
+
+
+def test_a_fleet_with_no_vocabulary_figures_reads_em_dash_not_zero() -> None:
+    stat = _stat(_rows(_feed()), "Vocabulary match")
+    assert stat.value == EMPTY
+    assert stat.tone is None
+    assert stat.sub == "not reported for any feed yet"
+
+
+def test_the_warnings_figure_no_longer_claims_to_be_only_about_key_fields() -> None:
+    assert _stat(_rows(_feed()), "Warnings").sub == "key fields or vocabularies poorly covered"
+
+
 # --- the overview card ---------------------------------------------------------------------
 
 
@@ -451,7 +565,7 @@ def test_a_clean_share_is_held_back_from_healthy_while_a_key_field_is_thin() -> 
     rows = _rows(_feed("a"), _feed("b", completeness={**FULL, "level": 10}))
     health = assess_compliance(rows)
     assert health.state is HealthState.WARNING
-    assert health.reason == "1 of 2 feeds fall short of the key fields"
+    assert health.reason == "1 of 2 feeds fall short on key fields or vocabularies"
 
 
 def test_the_compliant_share_bands_the_card_at_the_amber_edge() -> None:
