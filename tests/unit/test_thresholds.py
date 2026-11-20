@@ -12,6 +12,7 @@ from stewards.monitors.thresholds import (
     RISK_AMBER,
     RISK_RED,
     Tone,
+    band_tone,
     days_label,
     days_tone,
     is_past_threshold,
@@ -174,3 +175,24 @@ def test_risk_and_score_disagree_at_the_extremes() -> None:
     assert score_tone(100.0) is Tone.GREEN
     assert risk_tone(0.0) is Tone.GREEN
     assert score_tone(0.0) is Tone.RED
+
+
+def test_a_declared_bar_splits_green_from_amber_at_the_bar_itself() -> None:
+    assert band_tone(90.0, 90.0) is Tone.GREEN
+    assert band_tone(89.9, 90.0) is Tone.AMBER
+    assert band_tone(100.0, 90.0) is Tone.GREEN
+
+
+def test_a_bar_never_calls_a_figure_red() -> None:
+    """Two bands, not three: a bar says met or not met, and there is no second cut-off to
+    call red on."""
+    assert band_tone(0.0, 90.0) is Tone.AMBER
+
+
+def test_an_unreported_figure_is_grey_against_any_bar() -> None:
+    assert band_tone(None, 90.0) is Tone.GREY
+
+
+def test_a_bar_disagrees_with_the_score_bands_where_that_is_the_point() -> None:
+    assert score_tone(85.0) is Tone.GREEN
+    assert band_tone(85.0, 90.0) is Tone.AMBER

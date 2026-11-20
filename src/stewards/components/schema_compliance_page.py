@@ -45,6 +45,14 @@ COMPLETENESS = st.column_config.ProgressColumn(
     help="Share of the feed's sampled items carrying the field",
 )
 
+VOCABULARY_MATCH = st.column_config.ProgressColumn(
+    "Match",
+    min_value=0,
+    max_value=100,
+    format="%.0f%%",
+    help="Share of the feed's sampled terms matching the standard vocabulary",
+)
+
 #: Said above the table when the custom-property read failed, so the blank cells in the
 #: Custom properties column are not read as "this feed uses none".
 PROPERTIES_UNAVAILABLE = (
@@ -163,6 +171,19 @@ def render_row_detail(monitor: Monitor, row: ComplianceRow) -> None:
         hide_index=True,
         width="stretch",
         key=f"key_fields_{monitor.id}",
+    )
+
+    st.markdown("**Vocabulary match**")
+    vocabularies = schema_compliance.vocabulary_frame(row)
+    if vocabularies.empty:
+        st.caption(schema_compliance.NO_VOCABULARY_FIGURES)
+        return
+    st.dataframe(
+        vocabularies,
+        column_config={"Match": VOCABULARY_MATCH},
+        hide_index=True,
+        width="stretch",
+        key=f"vocabularies_{monitor.id}",
     )
 
 

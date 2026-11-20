@@ -40,7 +40,7 @@ from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.quality import UNKNOWN, QualityRow, Stat, format_number
 from stewards.monitors.registry import Col
 from stewards.monitors.schema_drift import PropertyRow
-from stewards.monitors.thresholds import Tone, score_tone
+from stewards.monitors.thresholds import Tone, band_tone, score_tone
 from stewards.monitors.transforms import EMPTY, format_cell
 
 #: The key fields the compliance view checks, in the order the page shows them. These are
@@ -387,15 +387,12 @@ def _share(part: int, whole: int) -> str:
 
 
 def _vocabulary_tone(pct: float | None) -> Tone | None:
-    """Green at or above the bar, amber below it.
+    """The figure above the table, shaded on the same bar as the cells beneath it.
 
     Not `score_tone`: that bands at 80 and 60, so an 85% average would read green while
-    every row carrying it warns. The figure above the table and the rows in it have to tell
-    the same story.
+    every row carrying it warns.
     """
-    if pct is None:
-        return None
-    return Tone.GREEN if pct >= VOCABULARY_WARNING_BELOW else Tone.AMBER
+    return None if pct is None else band_tone(pct, VOCABULARY_WARNING_BELOW)
 
 
 def _count_tone(count: int, tone: Tone) -> Tone:
@@ -523,6 +520,50 @@ def key_field_frame(row: ComplianceRow) -> pd.DataFrame:
         ],
         columns=["Field", "Completeness"],
     )
+
+
+#: Said in the pop-up for a feed the assessment's five-day window has not reached. Not
+#: "no match": the figures are absent, not zero.
+NO_VOCABULARY_FIGURES = (
+    "The vocabulary assessment has not reached this feed yet, so it reports no figures."
+)
+
+#: The vocabulary breakdown's count columns, in the order the pop-up reads them: how the
+#: assessment matched a term, from the cleanest match to no match at all.
+VOCABULARY_COUNTS = (
+    ("valid_id", "Matched by id"),
+    ("label_match_only", "Label only"),
+    ("other_scheme", "Other scheme"),
+    ("invalid_id", "Invalid id"),
+    ("unrecognised", "Unrecognised"),
+)
+
+#: The breakdown's columns, in order.
+VOCABULARY_COLUMNS = ("Vocabulary", "Match", "Items", *(head for _, head in VOCABULARY_COUNTS))
+
+
+def vocabulary_frame(row: ComplianceRow) -> pd.DataFrame:
+    """How the selected feed's activity and facility terms matched, one line per vocabulary.
+
+    Only the vocabularies the assessment reported: a feed it did not reach has no line at
+    all, rather than a line of zeros. A count it did not report stays an empty cell for the
+    same reason.
+    """
+    reported = (
+        ("Activities", row.activity_vocabulary),
+        ("Facilities", row.facility_vocabulary),
+    )
+    records = [
+        {
+            "Vocabulary": label,
+            "Match": adherence.adherence_pct,
+            "Items": adherence.items,
+            **{head: getattr(adherence, attr) for attr, head in VOCABULARY_COUNTS},
+        }
+        for label, adherence in reported
+        if adherence is not None
+    ]
+    return pd.DataFrame(records, columns=list(VOCABULARY_COLUMNS))
 
 
 def missing_field_lines(row: ComplianceRow) -> tuple[str, ...]:

@@ -1146,21 +1146,25 @@ def _schema_compliance_page_script() -> None:
 
 
 def test_the_compliance_page_renders_the_join_and_opens_the_worst_feed() -> None:
+    from stewards.monitors import schema_compliance
+
     app = run(_schema_compliance_page_script)
     markdown = " ".join(m.value for m in app.markdown)
     captions = [c.value for c in app.caption]
 
     # The header dates the quality read, which is the snapshot that decides the rows.
     assert "2026-08-21" in markdown
-    # Five figures above the table, the key field chart where a trend would be.
+    # Six figures above the table, the key field chart where a trend would be.
     assert len(app.get("vega_lite_chart")) == 1
     assert any("of 15 feeds shown" in c for c in captions)
     # Worst first, so the pop-up opens the feed that is missing a required field.
     assert "required field missing" in markdown
     assert "Missing required fields" in markdown
-    # The table, then the selected feed's key fields.
-    assert len(app.dataframe) == 2
+    # The table, then the selected feed's key fields, then how its terms matched.
+    assert len(app.dataframe) == 3
     assert list(app.dataframe[1].value.columns) == ["Field", "Completeness"]
+    assert list(app.dataframe[2].value.columns) == list(schema_compliance.VOCABULARY_COLUMNS)
+    assert "Vocabulary match" in markdown
 
 
 def _schema_compliance_no_properties_script() -> None:

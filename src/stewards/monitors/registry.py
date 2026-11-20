@@ -104,6 +104,11 @@ class Col:
     #: What a `LINK` cell reads, where "feed" is the wrong noun for what it opens.
     link_text: str | None = None
 
+    #: Shade a `PERCENT` cell amber below this figure and green at or above it, instead of
+    #: on the default score bands. For a column whose own rule is not the score's: the
+    #: table must not shade a cell green while the row carrying it warns.
+    warn_below: float | None = None
+
     @property
     def is_detail(self) -> bool:
         return self.field.startswith("detail.")
@@ -797,10 +802,11 @@ SCHEMA_COMPLIANCE = Monitor(
     blurb=(
         "How closely each feed follows the OpenActive standard: which version it publishes, "
         "which required fields it is missing, how complete its key recommended fields are, "
-        "and which non-standard properties it uses. A feed fails when a required field is "
-        "missing and warns when a key field is poorly covered. Checking that activities "
-        "and facilities use the standard vocabularies will follow once the nightly job "
-        "reports it."
+        "whether its activities and facilities use the standard vocabularies, and which "
+        "non-standard properties it uses. A feed fails when a required field is missing, "
+        "and warns when a key field is poorly covered or fewer than 90% of its terms match "
+        "a vocabulary. The vocabulary assessment works a rolling five-day window, so a feed "
+        "it has not reached yet shows no figure at all."
     ),
     unit="feeds failing",
     # The card is a set of figures and a verdict, as the quality and drift cards are.
@@ -838,6 +844,25 @@ SCHEMA_COMPLIANCE = Monitor(
         Col("completeness.level", "Level", ColKind.PERCENT),
         Col("completeness.accessibility_support", "Accessibility", ColKind.PERCENT),
         Col("completeness.gender_restriction", "Gender", ColKind.PERCENT),
+        # Shaded on their own bar rather than the score bands, so a cell cannot read green
+        # while the row it sits in warns. `warn_below` must stay level with
+        # `schema_compliance.VOCABULARY_WARNING_BELOW`; a test holds the two together.
+        Col(
+            "activity_adherence",
+            "Activity vocabulary",
+            ColKind.PERCENT,
+            help="Share of activity terms matching the standard vocabulary; blank where "
+            "the assessment has not reached this feed",
+            warn_below=90.0,
+        ),
+        Col(
+            "facility_adherence",
+            "Facility vocabulary",
+            ColKind.PERCENT,
+            help="Share of facility terms matching the standard vocabulary; blank where "
+            "the assessment has not reached this feed",
+            warn_below=90.0,
+        ),
         Col(
             "custom_property_count",
             "Custom properties",

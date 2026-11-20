@@ -111,6 +111,19 @@ def score_tone(score: float | None) -> Tone:
     return Tone.RED
 
 
+def band_tone(value: float | None, warn_below: float) -> Tone:
+    """A percentage shaded against one declared bar: green at or above it, amber below.
+
+    For a figure whose rule is its own rather than the score's. `score_tone` bands at 80 and
+    60, so a measure that warns at 90 would read green at 85 — the table shading a cell green
+    while the row carrying it warns. Two bands, not three: a bar says met or not met, and
+    there is no second cut-off to call red.
+    """
+    if value is None:
+        return Tone.GREY
+    return Tone.GREEN if value >= warn_below else Tone.AMBER
+
+
 #: Where a risk share stops being noise, and where it becomes the dataset's whole story.
 RISK_AMBER = 20.0
 RISK_RED = 50.0

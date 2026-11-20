@@ -35,7 +35,14 @@ from stewards.api.models import (
 from stewards.monitors.health import Health, HealthState, Movement
 from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.registry import Col, ColKind, Monitor
-from stewards.monitors.thresholds import Tone, risk_tone, score_tone, status_label, status_tone
+from stewards.monitors.thresholds import (
+    Tone,
+    band_tone,
+    risk_tone,
+    score_tone,
+    status_label,
+    status_tone,
+)
 from stewards.monitors.transforms import EMPTY, format_cell
 
 #: What a categorical field reads as when the assessment did not report one. A real string
@@ -229,7 +236,10 @@ def cell_tone(col: Col, value: Any) -> Tone | None:
         case ColKind.STATUS:
             return status_tone(str(value or ""))
         case ColKind.PERCENT | ColKind.SCORE:
-            return score_tone(None if value is None else float(value))
+            figure = None if value is None else float(value)
+            if col.warn_below is not None:
+                return band_tone(figure, col.warn_below)
+            return score_tone(figure)
         case ColKind.RISK:
             return risk_tone(None if value is None else float(value))
         case _:

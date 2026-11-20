@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pandas as pd
+
 from fixture_loader import load_sample
 from stewards.api.models import (
     CustomPropertyResponse,
@@ -17,6 +19,7 @@ from stewards.monitors.schema_compliance import (
     FIELD_WARNING_BELOW,
     KEY_FIELDS,
     NOT_ASSESSED,
+    VOCABULARY_COLUMNS,
     VOCABULARY_WARNING_BELOW,
     ComplianceRow,
     Verdict,
@@ -31,6 +34,7 @@ from stewards.monitors.schema_compliance import (
     tile_note,
     to_dataframe,
     tone_frame,
+    vocabulary_frame,
 )
 from stewards.monitors.thresholds import Tone, status_label, status_tone
 from stewards.monitors.transforms import EMPTY
@@ -516,6 +520,79 @@ def test_a_fleet_with_no_vocabulary_figures_reads_em_dash_not_zero() -> None:
 
 def test_the_warnings_figure_no_longer_claims_to_be_only_about_key_fields() -> None:
     assert _stat(_rows(_feed()), "Warnings").sub == "key fields or vocabularies poorly covered"
+
+
+# --- the vocabulary columns and breakdown ---------------------------------------------------
+
+
+def _col(label: str) -> Col:
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    return next(col for col in SCHEMA_COMPLIANCE.columns if col.label == label)
+
+
+def test_both_vocabularies_have_a_column_shaded_on_their_own_bar() -> None:
+    """A `PERCENT` column defaults to the score bands, which call 85% green. These columns
+    warn at 90, so the cell and the row it sits in must agree."""
+    for label in ("Activity vocabulary", "Facility vocabulary"):
+        col = _col(label)
+        assert col.kind is ColKind.PERCENT
+        assert col.warn_below == VOCABULARY_WARNING_BELOW
+
+
+def test_the_column_bar_and_the_rule_cannot_drift_apart() -> None:
+    """`registry.py` cannot import the constant without a cycle, so it repeats the number.
+    This is the guard that keeps the two level."""
+    assert _col("Activity vocabulary").warn_below == VOCABULARY_WARNING_BELOW
+    assert _col("Facility vocabulary").warn_below == VOCABULARY_WARNING_BELOW
+
+
+def test_a_cell_is_shaded_against_the_bar_rather_than_the_score_bands() -> None:
+    eighty_five = {**ADHERENCE, "adherence_pct": 85.0}
+    rows = _rows(_feed(activity_vocabulary_adherence=eighty_five))
+    frame = tone_frame([_col("Activity vocabulary")], rows)
+    assert frame.iloc[0]["Activity vocabulary"] == Tone.AMBER.value
+
+
+def test_an_unassessed_cell_carries_no_tone_at_all() -> None:
+    frame = tone_frame([_col("Activity vocabulary")], _rows(_feed()))
+    assert frame.iloc[0]["Activity vocabulary"] == Tone.GREY.value
+
+
+def test_the_breakdown_has_a_line_per_vocabulary_reported() -> None:
+    row = _row(build_rows(_snapshot()), ACTIVITY_FEED)
+    frame = vocabulary_frame(row)
+    assert list(frame.columns) == list(VOCABULARY_COLUMNS)
+    assert list(frame["Vocabulary"]) == ["Activities"]
+    assert frame.iloc[0]["Match"] == 66.67
+    assert frame.iloc[0]["Items"] == 12
+    assert frame.iloc[0]["Matched by id"] == 8
+    assert frame.iloc[0]["Unrecognised"] == 4
+
+
+def test_a_feed_reporting_both_gets_both_lines_in_order() -> None:
+    (row,) = _rows(
+        _feed(
+            activity_vocabulary_adherence=ADHERENCE,
+            facility_vocabulary_adherence={**ADHERENCE, "adherence_pct": 100.0},
+        )
+    )
+    frame = vocabulary_frame(row)
+    assert list(frame["Vocabulary"]) == ["Activities", "Facilities"]
+
+
+def test_an_unassessed_feed_gets_no_lines_rather_than_a_line_of_zeros() -> None:
+    frame = vocabulary_frame(_rows(_feed())[0])
+    assert frame.empty
+    assert list(frame.columns) == list(VOCABULARY_COLUMNS)
+
+
+def test_a_count_the_assessment_omitted_stays_blank() -> None:
+    (row,) = _rows(_feed(activity_vocabulary_adherence={"adherence_pct": 50.0}))
+    frame = vocabulary_frame(row)
+    assert frame.iloc[0]["Match"] == 50.0
+    assert pd.isna(frame.iloc[0]["Items"])
+    assert pd.isna(frame.iloc[0]["Unrecognised"])
 
 
 # --- the overview card ---------------------------------------------------------------------

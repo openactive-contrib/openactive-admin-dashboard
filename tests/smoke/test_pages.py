@@ -364,7 +364,10 @@ def test_the_join_carries_custom_property_counts_onto_the_quality_feeds() -> Non
     assert counts.count(0) == 12
     text = text_of(app)
     assert "20% of feeds checked" in text
-    assert "blank rather than zero" not in text
+    # The counts are real, so the page must not be carrying the read-failed caveat.
+    from stewards.components.schema_compliance_page import PROPERTIES_UNAVAILABLE
+
+    assert PROPERTIES_UNAVAILABLE not in text
 
 
 def test_overview_shows_four_fleet_metrics_and_a_tile_per_monitor() -> None:
