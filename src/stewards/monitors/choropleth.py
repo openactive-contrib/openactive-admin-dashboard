@@ -200,6 +200,12 @@ def value_domain(values: Iterable[float | None], *, step: float = 10.0) -> tuple
     return (0.0, math.ceil(top / step) * step)
 
 
+def log_position(value: float) -> float:
+    """A count's place on a log scale: its base-10 logarithm, with anything below one at
+    zero. A count of zero therefore shades as one does — still a figure, never no data."""
+    return math.log10(value) if value > 1 else 0.0
+
+
 def rgb(hex_colour: str) -> list[int]:
     """A six-digit hex colour, with or without its hash, as [red, green, blue]."""
     value = hex_colour.lstrip("#")
@@ -309,6 +315,7 @@ def choropleth(
     style: ChoroplethStyle,
     focus: str | None = None,
     domain: tuple[float, float] | None = None,
+    log_scale: bool = False,
 ) -> Choropleth | None:
     """Every area in `boundaries`, shaded by `value_field` where a row reports it.
 
@@ -316,12 +323,18 @@ def choropleth(
     zero one. None when no row reports the figure at all, matching every other builder, so
     the caller draws a caption instead of a grey country. `focus` is the area the view opens
     on; the user zooms and pans from there.
+
+    `log_scale` shades by order of magnitude, for a count skewed enough that a linear ramp
+    would leave all but a handful of areas at its pale end. `domain`, where given, is then in
+    powers of ten.
     """
     joined = join(boundaries, rows, code_key=code_key)
     values = [_number(feature["properties"].get(value_field)) for feature in joined.features]
     if all(value is None for value in values):
         return None
-    scale = domain or value_domain(values)
+    if log_scale:
+        values = [None if value is None else log_position(value) for value in values]
+    scale = domain or value_domain(values, step=1.0 if log_scale else 10.0)
     no_data = rgb(style.no_data)
 
     features = [
@@ -395,7 +408,7 @@ def choropleth(
             },
         },
     )
-    return Choropleth(deck=deck, legend=legend_chart(scale, style))
+    return Choropleth(deck=deck, legend=legend_chart(scale, style, log_scale=log_scale))
 
 
 def legend_ticks(domain: tuple[float, float], *, most: int = 7) -> list[float]:
@@ -415,17 +428,41 @@ def legend_ticks(domain: tuple[float, float], *, most: int = 7) -> list[float]:
     return [round(first + i * step, 10) for i in range(count)]
 
 
+def log_ticks(domain: tuple[float, float]) -> list[float]:
+    """The whole powers of ten inside a log domain — 1, 10, 100 — and nothing between them,
+    which would label as 3.16."""
+    low, high = domain
+    return [float(power) for power in range(math.ceil(low), math.floor(high) + 1)]
+
+
 def _tick_label(value: float) -> str:
     return f"{value:g}"
 
 
-def legend_chart(domain: tuple[float, float], style: ChoroplethStyle) -> alt.LayerChart:
+def compact_count(value: float) -> str:
+    """1, 10, 100, 1k, 10k, 100k, 1M: a count short enough for a legend tick."""
+    for threshold, suffix in ((1_000_000, "M"), (1_000, "k")):
+        if value >= threshold:
+            return f"{value / threshold:g}{suffix}"
+    return f"{value:g}"
+
+
+def _log_tick_label(value: float) -> str:
+    return compact_count(round(10**value))
+
+
+def legend_chart(
+    domain: tuple[float, float], style: ChoroplethStyle, *, log_scale: bool = False
+) -> alt.LayerChart:
     """The ramp as a thin gradient bar, its title above and its tick values below.
 
     Every part sits at a fixed pixel position, with no Vega axis: `st.altair_chart` fits a
     chart *including* its axes into the declared size, which squeezes an axis-bearing bar to
     nothing. Each segment runs two steps long, under the next one, so no hairline of
     background shows between neighbours where antialiasing would otherwise leave one.
+
+    On a log scale the bar is laid out in powers of ten and each tick reads as the count it
+    stands for: 1, 10, 100, 1k.
     """
     low, high = domain
     step = (high - low) / LEGEND_STEPS
@@ -435,9 +472,9 @@ def legend_chart(domain: tuple[float, float], style: ChoroplethStyle) -> alt.Lay
             "end": [min(low + (i + 2) * step, high) for i in range(LEGEND_STEPS)],
         }
     )
-    ticks = pd.DataFrame(
-        {"value": (values := legend_ticks(domain)), "label": [_tick_label(v) for v in values]}
-    )
+    values = log_ticks(domain) if log_scale else legend_ticks(domain)
+    label = _log_tick_label if log_scale else _tick_label
+    ticks = pd.DataFrame({"value": values, "label": [label(v) for v in values]})
     x_scale = alt.Scale(domain=[low, high], nice=False, zero=False)
 
     title = (

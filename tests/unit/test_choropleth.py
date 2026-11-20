@@ -388,3 +388,79 @@ def test_the_legend_is_its_title_the_ramp_and_its_ticks_with_no_vega_axis() -> N
     rows = [row for dataset in spec["datasets"].values() for row in dataset]
     assert {"title": "Share %"} in rows
     assert [row["label"] for row in rows if "label" in row] == ["0", "10", "20", "30", "40"]
+
+
+# --- log scale ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(1000.0, 3.0), (10.0, 1.0), (1.0, 0.0), (0.0, 0.0), (0.5, 0.0)],
+)
+def test_a_log_position_is_the_power_of_ten_and_never_negative(
+    value: float, expected: float
+) -> None:
+    assert choropleth.log_position(value) == pytest.approx(expected)
+
+
+def test_a_log_scale_shades_by_order_of_magnitude() -> None:
+    """On a linear ramp 10 and 100 would both sit at the pale end beside 10,000; on a log
+    one they sit a quarter and half way along it."""
+    figure = build(
+        [
+            {"code_x": "A", "share": 10},
+            {"code_x": "B", "share": 100},
+            {"code_x": "C", "share": 10_000},
+        ],
+        log_scale=True,
+    )
+    assert figure is not None
+    features = features_of(figure)
+    assert features["A"]["fill"] == choropleth.ramp_colour(1.0, (0.0, 4.0), STYLE.ramp)
+    assert features["B"]["fill"] == choropleth.ramp_colour(2.0, (0.0, 4.0), STYLE.ramp)
+    assert features["C"]["fill"] == choropleth.ramp_colour(4.0, (0.0, 4.0), STYLE.ramp)
+    # The tooltip still states the figure itself, not its logarithm.
+    assert "Share: 100.0%" in features["B"]["tooltip"]
+
+
+def test_a_log_scale_keeps_a_missing_figure_as_no_data() -> None:
+    figure = build([{"code_x": "A", "share": 50}], log_scale=True)
+    assert figure is not None
+    assert features_of(figure)["B"]["fill"] == choropleth.rgb(STYLE.no_data)
+
+
+def test_a_log_scale_with_no_figure_anywhere_is_no_map() -> None:
+    assert build([], log_scale=True) is None
+
+
+@pytest.mark.parametrize(
+    ("domain", "expected"),
+    [((0.0, 5.0), [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]), ((0.0, 1.0), [0.0, 1.0]), ((0.5, 0.9), [])],
+)
+def test_log_ticks_are_whole_powers_of_ten(
+    domain: tuple[float, float], expected: list[float]
+) -> None:
+    assert choropleth.log_ticks(domain) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(1, "1"), (100, "100"), (1_000, "1k"), (25_000, "25k"), (1_000_000, "1M")],
+)
+def test_a_compact_count_is_short_enough_for_a_tick(value: float, expected: str) -> None:
+    assert choropleth.compact_count(value) == expected
+
+
+def test_a_log_legend_labels_each_tick_with_the_count_it_stands_for() -> None:
+    figure = build([{"code_x": "A", "share": 30_319}], log_scale=True)
+    assert figure is not None
+    spec = figure.legend.to_dict()
+    rows = [row for dataset in spec["datasets"].values() for row in dataset]
+    assert [row["label"] for row in rows if "label" in row] == [
+        "1",
+        "10",
+        "100",
+        "1k",
+        "10k",
+        "100k",
+    ]

@@ -1457,3 +1457,82 @@ def test_a_map_card_with_no_chart_says_so_and_draws_nothing_else() -> None:
     assert len(app.selectbox) == 0
     assert len(app.button) == 0
     assert [c.value for c in app.caption] == ["Nothing to draw."]
+
+
+# --- the activity coverage page -------------------------------------------------------------
+
+
+def _activity_page_with_a_failing_read(failing: str) -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.activity_coverage_page import render_activity_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = getattr(repository, failing)
+    setattr(repository, failing, boom)
+    try:
+        render_activity_coverage_page(get_monitor("activity_coverage"))
+    finally:
+        setattr(repository, failing, original)
+        st.cache_data.clear()
+
+
+def test_an_activity_page_whose_summary_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_activity_summary")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not app.get("vega_lite_chart")
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def test_a_ranking_that_is_not_live_costs_the_chart_and_not_the_map() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_top_activities")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert any("Snapshot" in m.value for m in app.markdown)
+    assert "Top 20 activities" not in [h.value for h in app.subheader]
+    # The map's legend only; the ranking is gone.
+    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert len(app.dataframe) == 1
+
+
+def test_district_rows_that_are_not_live_cost_the_map_and_not_the_figures() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_activity_districts")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert "683,255" in " ".join(m.value for m in app.markdown)
+    assert len(app.get("vega_lite_chart")) == 1
+    assert not app.get("deck_gl_json_chart")
+    assert not app.dataframe
+
+
+def _activity_empty_ranking_script() -> None:
+    from stewards.components.activity_coverage_page import render_top_activities
+    from stewards.monitors.registry import get_monitor
+
+    render_top_activities(get_monitor("activity_coverage"), ())
+
+
+def test_an_empty_ranking_says_so_rather_than_drawing_an_empty_axis() -> None:
+    app = run(_activity_empty_ranking_script)
+    assert not app.get("vega_lite_chart")
+    assert any("does not report a national ranking" in c.value for c in app.caption)
+
+
+def _activity_empty_map_script() -> None:
+    from stewards.components.activity_coverage_page import render_map_section
+    from stewards.monitors.registry import get_monitor
+
+    render_map_section(get_monitor("activity_coverage"), ())
+
+
+def test_no_district_rows_draw_a_caption_and_an_empty_table_not_a_grey_country() -> None:
+    app = run(_activity_empty_map_script)
+    assert not app.get("deck_gl_json_chart")
+    assert any("No local authority reports this activity" in c.value for c in app.caption)
+    assert any("No activity is reported" in i.value for i in app.info)

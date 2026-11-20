@@ -41,6 +41,15 @@ filter reruns).
 one paginated read of every feed publishing a property outside the OpenActive vocabulary, with
 a fleet-wide `summary` block beside the rows, no history and no `/summary` entry; it is
 informational like the coverage monitor.
+`activity_coverage` (the "Activity coverage" page) reads three live endpoints under
+`/admin/activity-coverage`: `/summary` (national figures, which also make its overview card),
+`/top-activities` (the national top 20, a bar chart) and the bare path (one row per district
+and activity, paged, ~5k rows, loaded with the page). Its page draws a UK district map on a
+log scale, filtered by activity (a selectbox) and by local authority (the map's own "centre
+on" picker), with a table of the same rows below it. A total across activities counts
+**activity tags**, not opportunities — an opportunity tagged with two activities counts under
+both — and the page says so wherever one is drawn. It is informational, with no history and
+no `/summary` entry.
 
 The publisher notification list reads and writes `/admin/publisher-notifications`: stored
 steward rows, not the daily batch, so its page names its own source and its reads are cached
@@ -142,6 +151,9 @@ src/stewards/
                              paginated rows -> rows, figures, region chart, card
   monitors/schema_drift.py   the fourth: a custom-property snapshot -> feed rows, list
                              filters, figures, property chart, property table, card
+  monitors/activity_coverage.py
+                             the fifth: national figures, a ranking and district rows ->
+                             figures, ranking chart, district map rows, table, card
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/publisher_notifications.py
                              the notification list: alert rule, table, filters, KPIs,
@@ -154,7 +166,8 @@ src/stewards/
                              a pydeck slippy map + Altair legend (any view, not just coverage)
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
-                             quality_page, coverage_page, schema_drift_page, overview_page,
+                             quality_page, coverage_page, schema_drift_page,
+                             activity_coverage_page, overview_page,
                              publisher_notifications_page, notebooks_page, ecosystem_page,
                              map_chart (the map card + theme-built `map_style`)
   views/…                    one 3-line module per page, zero logic
@@ -228,7 +241,7 @@ Env vars, or a `[stewards]` section in `.streamlit/secrets.toml` (env wins). See
 ## The backing reads
 
 `Monitor.source` says which read backs a monitor, and therefore which shaping module and
-which page renderer it gets. Four exist:
+which page renderer it gets. Five exist:
 
 - `Source.INCIDENTS` (the default) — a list of faults that age.
   `repository.fetch_incidents` + `fetch_trend_points`, `monitors/transforms.py`,
@@ -244,6 +257,10 @@ which page renderer it gets. Four exist:
   `fetch_custom_properties`, `monitors/schema_drift.py`, `components/schema_drift_page.py`.
   Its list-valued row fields (`namespaces`, `property_names`, `entity_types`) filter by
   membership.
+- `Source.ACTIVITY_COVERAGE` — which activities the fleet's opportunities name: national
+  figures, a national ranking and paginated district-activity rows, three resources with no
+  history. `fetch_activity_summary` + `fetch_top_activities` + `fetch_activity_districts`,
+  `monitors/activity_coverage.py`, `components/activity_coverage_page.py`.
 
 None are interchangeable: a quality, coverage or schema drift row has no `first_detected`,
 `days_open` or `past_threshold`, and folding any into an `Incident` would mean inventing all three; and a
@@ -256,9 +273,9 @@ RAG-shade the table identically, `filters` become the same selectboxes, and the 
 is a `Health`, so the chip, the tone and the sidebar pill run through untouched code. A
 quality, coverage or schema drift column path is a plain attribute name (`score`, `dataset_score`,
 `match_label`) — there is no `detail.` or `part.` prefix on such a row.
-`tests/unit/test_registry.py` is parametrised over all four kinds and skips the checks that
+`tests/unit/test_registry.py` is parametrised over all five kinds and skips the checks that
 do not apply, keyed off the declared source. `docs/adding-a-dashboard.md` "The backing reads"
-is the full account. **Adding a fifth read is not a registry entry** — it is a `Source`
+is the full account. **Adding a sixth read is not a registry entry** — it is a `Source`
 member, a shaping module, a page renderer, both URL shapes, models, repository reads and a
 branch in `overview_page.tile_cards`.
 
@@ -284,7 +301,7 @@ path for it.
 A monitor whose figure `/summary` does not describe at all is the other exception:
 `viz=Facts()` says the card draws no chart and reads no count, and the monitor hands the whole
 card over ready-made as an `overview.TileCard` — headline, a few supporting figures, the note,
-the sidebar pill and the verdict. Three monitors do this today.
+the sidebar pill and the verdict. Four monitors do this today.
 `monitors.quality.assess_quality` produces `feed_quality`'s `Health` from the fleet average
 score on the same bands `thresholds.score_tone` shades the Score column with, so the card and
 the table cannot tell different stories. `monitors.coverage.assess_coverage` makes the other
@@ -292,8 +309,9 @@ choice deliberately: coverage is a measurement, not a fault queue, so the monito
 `Severity.INFORMATIONAL` and the card renders a grey "Info" chip — the one place `severity`
 changes behaviour — rather than claiming a RAG verdict there is no defensible number to
 support. `monitors.schema_drift.assess_drift` makes the same choice for the same reason: a
-custom property is not a fault. `overview_page.tile_cards` collects every such card, one
-branch per source.
+custom property is not a fault. `monitors.activity_coverage.assess_activity_coverage` does the
+same for the labelled share. `overview_page.tile_cards` collects every such card, one branch
+per source.
 
 A monitor with **no series at all** is the other exception: `viz=Gauge(benchmark=…)` makes
 `monitors/gauge.assess_benchmark` produce the verdict from that benchmark instead, returning
@@ -405,8 +423,10 @@ uv run mypy src
   per feature in Python too, and the legend is a small pixel-placed Altair chart (an axis
   would be squeezed to nothing by Streamlit's fit-autosize). The features go to deck.gl as a
   compact `data:` URL: pydeck indents its JSON, which would quadruple the payload. A
-  sequential ramp (`theme.COVERAGE_RAMP`) for a measurement; grey (`MAP_NO_DATA`) for a null,
-  never the ramp's low end. The basemap is Carto Positron (loaded by the user's browser from
+  sequential ramp (`theme.COVERAGE_RAMP`) for a measurement, shaded by order of magnitude
+  (`choropleth(..., log_scale=True)`) for a count too skewed for a linear one; grey
+  (`MAP_NO_DATA`) for a null, never the ramp's low end. `render_map` takes `controls` (filters
+  drawn inside the map's fragment) and `after` (content below the map, given its focused area). The basemap is Carto Positron (loaded by the user's browser from
   basemaps.cartocdn.com, no token); its attribution and the boundaries' must be shown
   wherever a map is. "Centre on" and "show the whole map" live in an `st.fragment` and set
   the map's opening view; the map sits in a container keyed on a view revision, so each

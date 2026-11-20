@@ -579,6 +579,64 @@ class SiteMappingPage(ApiModel):
     meta: Meta
 
 
+# --- activity coverage --------------------------------------------------------------------
+#
+# The fifth backing read: which activities the fleet's opportunities name, from three
+# resources. A summary object of national figures, the nationally ranked activities, and one
+# paginated row per local authority district and activity. None has history. A district row's
+# `opportunity_count` counts opportunities tagged with that activity there, so an opportunity
+# tagged with two activities counts once under each — the rows do not add up to an
+# opportunity total, and nothing here pretends they do.
+
+
+class ActivityCoverageSummary(NullTolerantModel):
+    """The national figures. `linked_*` is reported too and deliberately not declared: the
+    page leaves it out, and a field earns a line here when something draws it."""
+
+    activity_opportunities: int | None = None
+    labelled_opportunities: int | None = None
+    labelled_percentage: float | None = None
+    activities_offered: int | None = None
+    vocabulary_size: int | None = None
+
+
+class ActivityCoverageSummaryResponse(ApiModel):
+    data: ActivityCoverageSummary = Field(default_factory=ActivityCoverageSummary)
+    meta: Meta
+
+
+class TopActivity(NullTolerantModel):
+    """One activity in the national ranking."""
+
+    rank: int | None = None
+    activity: str = ""
+    activity_id: str = ""
+    opportunity_count: int | None = None
+    district_count: int | None = None
+
+
+class TopActivityPage(ApiModel):
+    data: tuple[TopActivity, ...] = ()
+    meta: Meta
+
+
+class ActivityDistrict(NullTolerantModel):
+    """One activity in one local authority district, keyed by the district's ONS code."""
+
+    district_code: str = ""
+    district_name: str = ""
+    region_name: str = ""
+    country_name: str = ""
+    activity: str = ""
+    activity_id: str = ""
+    opportunity_count: int | None = None
+
+
+class ActivityDistrictPage(ApiModel):
+    data: tuple[ActivityDistrict, ...] = ()
+    meta: Meta
+
+
 # --- feed custom properties (schema drift) ------------------------------------------------
 #
 # The fourth backing read. Like the quality snapshot it arrives as one envelope with a

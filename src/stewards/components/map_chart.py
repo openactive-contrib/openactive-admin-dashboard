@@ -101,9 +101,11 @@ def render_map(
     areas: Boundaries,
     height: int,
     focus_placeholder: str = "Centre on an area…",
-    caption: str = "",
+    caption: str | Callable[[], str] = "",
     attribution: str = "",
     empty_message: str,
+    controls: Callable[[], None] | None = None,
+    after: Callable[[str | None], None] | None = None,
 ) -> None:
     """Title and controls, the legend and the map (or `empty_message` when there is none),
     any caption, and the attribution.
@@ -112,25 +114,39 @@ def render_map(
     the areas it draws, which the "centre on" list offers. The attribution is not optional:
     the open licences the boundaries and the basemap come under require it wherever the map
     is shown.
+
+    `controls` draws further widgets under the title, inside the map's fragment, so a filter
+    that recolours the map reruns the map alone; `build` reads them from session state.
+    `after` draws below the card, in the same fragment, given the area the map is centred on
+    — content that follows the map's own selection, such as a table narrowed to that area.
+    A callable `caption` is worked out after `controls`, so it can describe what they chose.
     """
 
     @st.fragment
     def body() -> None:
+        focus = st.session_state.get(focus_key(key))
         with card(key):
-            figure = build(st.session_state.get(focus_key(key)))
-            heading, controls = st.columns([1, 1], vertical_alignment="center")
+            heading, picker = st.columns([1, 1], vertical_alignment="center")
             heading.subheader(title, anchor=False, divider=False, help=MAP_HELP)
+            if controls is not None:
+                controls()
+            figure = build(focus)
             if figure is None:
                 st.caption(empty_message)
-                return
-            with controls:
-                render_controls(key, areas, focus_placeholder)
-            st.altair_chart(figure.legend, width="content")
-            with st.container(key=f"{key}_map_{st.session_state.get(revision_key(key), 0)}"):
-                st.pydeck_chart(figure.deck, height=height)
-            if caption:
-                st.caption(caption)
-            if attribution:
-                st.caption(attribution)
+            else:
+                with picker:
+                    render_controls(key, areas, focus_placeholder)
+                st.altair_chart(figure.legend, width="content")
+                with st.container(
+                    key=f"{key}_map_{st.session_state.get(revision_key(key), 0)}"
+                ):
+                    st.pydeck_chart(figure.deck, height=height)
+                text = caption() if callable(caption) else caption
+                if text:
+                    st.caption(text)
+                if attribution:
+                    st.caption(attribution)
+        if after is not None:
+            after(focus)
 
     body()

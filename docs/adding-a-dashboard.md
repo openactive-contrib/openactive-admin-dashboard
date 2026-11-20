@@ -98,10 +98,22 @@ is no `detail.` or `part.` prefix to learn.
 do not apply, keyed off the declared source, so the next monitor of any shape is validated
 the moment it lands.
 
-**Adding a fourth read is not a registry entry.** It is a `Source` member, a shaping module
+Two further reads exist beyond the table: `Source.SCHEMA_DRIFT` (see CLAUDE.md) and
+`Source.ACTIVITY_COVERAGE`. An **activity coverage** monitor reads three resources with no
+history — national figures (`activity_summary`), the nationally ranked activities
+(`top_activities`, one page of `repository.TOP_ACTIVITY_LIMIT`) and one row per local
+authority district and activity (`activity_districts`, paged) — shaped by
+`monitors/activity_coverage.py` and drawn by `components/activity_coverage_page.py`: three
+figures, the ranking chart, the UK district map with its activity filter, and the table
+beneath it. Its rows count *activity tags*: an opportunity tagged with two activities appears
+under both, so any total across activities is labelled "activity tags", never
+"opportunities". Its card is `Facts`, informational like the Active Places card. Sample
+payloads are `<id>_summary.json`, `<id>_top_activities.json` and `<id>_districts.json`.
+
+**Adding another read is not a registry entry.** It is a `Source` member, a shaping module
 under `monitors/`, a page renderer under `components/`, endpoint functions for *both* URL
 shapes, models, repository reads and a branch in `overview_page.tile_cards`. Only reach for
-one when the data genuinely cannot be any of the three — as `COVERAGE` could not, because its
+one when the data genuinely cannot be any of the existing ones — as `COVERAGE` could not, because its
 rows page and its figures come from somewhere else.
 
 The rest of this page is the incident procedure. Where a step differs for a quality monitor
@@ -478,6 +490,30 @@ any other CRS is refused.
 
 The rows endpoint has its own name, so the registry entry declares `rows_id`. Deriving a
 suffix from the monitor id would point the read at a path that does not exist.
+
+`choropleth(..., log_scale=True)` shades by order of magnitude, for a count too skewed for a
+linear ramp (district activity totals run from 1 to tens of thousands); the legend then
+labels whole powers of ten as counts (1, 10, 100, 1k). `map_chart.render_map` takes
+`controls`, drawn under the title inside the map's fragment (a filter that recolours the
+map), and `after`, drawn below the card in the same fragment and handed the area the map is
+centred on (a table narrowed to it). The activity coverage page uses both: its local
+authority filter *is* the map's "centre on" picker, so the map and the table cannot disagree.
+
+### The activity coverage reads
+
+| Read | Admin path | Contract path |
+|---|---|---|
+| National figures | `/admin/<slug>/summary` | `/monitors/<id>/summary` |
+| Ranking | `/admin/<slug>/top-activities?page=1&page_size=20` | `/monitors/<id>/top-activities` |
+| District rows (paged, ≤1000) | `/admin/<slug>` | `/monitors/<id>/districts` |
+
+The summary is `{activity_opportunities, labelled_opportunities, labelled_percentage,
+activities_offered, vocabulary_size}` (plus `linked_*`, which the page deliberately leaves
+out). A ranking row is `{rank, activity, activity_id, opportunity_count, district_count}`; a
+district row is `{district_code, district_name, region_name, country_name, activity,
+activity_id, opportunity_count}`. `region_name` is null outside England, where ONS regions do
+not exist, and the row then takes its nation as its region. The summary failing costs the
+page; the ranking or the rows failing costs only their own section.
 
 ### Publisher notification list
 
