@@ -21,8 +21,8 @@ Everything below is achievable with native widgets — do not write custom compo
    drop its grey plot panel); y starts at 0; x labels are snapshot dates.
 5. **Filters** — a `st.text_input` search, 2–3 `st.selectbox`, and a
    `st.toggle("Past threshold only")` **only when `monitor.has_threshold_filter`**
-   (informational monitors like schema drift and Active Places coverage do not get it, and
-   it defaults to off everywhere).
+   (snapshot monitors like Feed quality, Schema compliance and Active Places coverage do not
+   get it, and it defaults to off everywhere).
 6. **Table** — `st.dataframe(..., hide_index=True, use_container_width=True,
    on_select="rerun", selection_mode="single-row")`.
 7. **Footer** — "Read-only view. Actions: export, draft publisher email." + query/version id.
