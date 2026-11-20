@@ -1233,6 +1233,10 @@ def test_a_passing_feed_says_so_and_an_unreported_chart_is_a_caption() -> None:
     assert "Every required field is present" in markdown
     # The verdict still renders, and the key fields still tabulate.
     assert len(app.dataframe) == 1
+    # The third custom-property state: the snapshot covers this feed and found nothing.
+    from stewards.components.schema_compliance_page import NO_FEED_PROPERTIES
+
+    assert NO_FEED_PROPERTIES in captions
 
 
 def test_a_failed_custom_property_read_is_said_rather_than_shown_as_zero() -> None:
@@ -1250,6 +1254,66 @@ def test_a_failed_custom_property_read_is_said_rather_than_shown_as_zero() -> No
     # Only the Feeds tab draws: its table and its key field chart, and nothing beside them.
     assert [frame.key for frame in app.dataframe] == ["table_schema_compliance"]
     assert len(app.get("vega_lite_chart")) == 1
+
+
+def _schema_compliance_feed_properties_script() -> None:
+    from stewards.api.models import CustomPropertyFeed, FeedQualityFeed
+    from stewards.components.schema_compliance_page import render_feed_properties
+    from stewards.monitors import quality, schema_compliance, schema_drift
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    base = quality.build_rows(
+        (FeedQualityFeed.model_validate({"feed_id": "f", "feed_name": "A feed"}),)
+    )[0]
+
+    # The custom-property read failed, so nothing can be said about this feed either way.
+    render_feed_properties(
+        SCHEMA_COMPLIANCE,
+        schema_compliance.ComplianceRow(
+            quality=base, properties=None, properties_reported=False
+        ),
+    )
+    # The read arrived and carries this feed.
+    properties = schema_drift.build_row(
+        CustomPropertyFeed.model_validate(
+            {
+                "feed_id": "f",
+                "sampled_items": 100,
+                "custom_properties": [
+                    {
+                        "property": "beta:attendeeCount",
+                        "namespace": "beta",
+                        "entity_type": "Event",
+                        "presence_pct": 80,
+                    }
+                ],
+            }
+        )
+    )
+    render_feed_properties(
+        SCHEMA_COMPLIANCE,
+        schema_compliance.ComplianceRow(
+            quality=base, properties=properties, properties_reported=True
+        ),
+    )
+
+
+def test_the_pop_up_tells_a_failed_property_read_from_a_feed_that_publishes_none() -> None:
+    """Two different statements, so two different messages, and the second feed gets its
+    properties listed rather than a caption."""
+    from stewards.components.schema_compliance_page import (
+        NO_FEED_PROPERTIES,
+        NO_FEED_PROPERTIES_SNAPSHOT,
+    )
+
+    app = run(_schema_compliance_feed_properties_script)
+    captions = [c.value for c in app.caption]
+    assert captions == [NO_FEED_PROPERTIES_SNAPSHOT]
+    assert NO_FEED_PROPERTIES not in captions
+    assert len(app.dataframe) == 1
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == ["Property", "Namespace", "Entity type", "Presence"]
+    assert list(frame["Property"]) == ["beta:attendeeCount"]
 
 
 def _schema_compliance_unused_property_script() -> None:

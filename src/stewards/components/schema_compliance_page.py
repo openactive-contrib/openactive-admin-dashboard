@@ -83,6 +83,18 @@ NO_PROPERTIES_SNAPSHOT = (
     "compliance assessment on the Feeds tab is unaffected."
 )
 
+#: The pop-up's own custom-property section when that read failed. Distinct from a feed that
+#: publishes none, which `ComplianceRow.properties_reported` is what tells apart.
+NO_FEED_PROPERTIES_SNAPSHOT = (
+    "The custom-property snapshot was not available, so this feed's properties could not be "
+    "listed."
+)
+
+#: The same section for a feed the snapshot does cover and found nothing on.
+NO_FEED_PROPERTIES = (
+    "This feed publishes no property the OpenActive vocabulary does not define."
+)
+
 
 def render_blurb(monitor: Monitor) -> None:
     with card(f"blurb_{monitor.id}"):
@@ -169,8 +181,9 @@ def render_filters(monitor: Monitor, rows: Sequence[ComplianceRow]) -> FilterSta
 
 
 def render_row_detail(monitor: Monitor, row: ComplianceRow) -> None:
-    """Why the selected feed got its verdict, which required fields it is missing, and its
-    completeness per key field. Shown in the row pop-up."""
+    """Why the selected feed got its verdict, which required fields it is missing, its
+    completeness per key field, how its terms matched the vocabularies, and which properties
+    it publishes outside them. Shown in the row pop-up."""
     st.caption(
         f"{row.publisher_name} · {row.dataset_name} · {row.feed_type} · "
         f"version {row.feed_version}"
@@ -196,6 +209,12 @@ def render_row_detail(monitor: Monitor, row: ComplianceRow) -> None:
         key=f"key_fields_{monitor.id}",
     )
 
+    render_vocabularies(monitor, row)
+    render_feed_properties(monitor, row)
+
+
+def render_vocabularies(monitor: Monitor, row: ComplianceRow) -> None:
+    """How the feed's activity and facility terms matched the standard vocabularies."""
     st.markdown("**Vocabulary match**")
     vocabularies = schema_compliance.vocabulary_frame(row)
     if vocabularies.empty:
@@ -207,6 +226,33 @@ def render_row_detail(monitor: Monitor, row: ComplianceRow) -> None:
         hide_index=True,
         width="stretch",
         key=f"vocabularies_{monitor.id}",
+    )
+
+
+def render_feed_properties(monitor: Monitor, row: ComplianceRow) -> None:
+    """The feed's own custom properties, one line per entity type.
+
+    The blurb promises this, and the Properties tab does not answer it: that tab is the
+    fleet's properties and which feeds carry each one, read off the summary block. This is
+    the other direction — one feed, every property it publishes.
+
+    A feed the snapshot covers and found nothing on, and a snapshot that never arrived, are
+    not the same statement, so they do not share a message.
+    """
+    st.markdown("**Custom properties**")
+    if not row.properties_reported:
+        st.caption(NO_FEED_PROPERTIES_SNAPSHOT)
+        return
+    frame = None if row.properties is None else schema_drift.use_frame(row.properties)
+    if frame is None or frame.empty:
+        st.caption(NO_FEED_PROPERTIES)
+        return
+    st.dataframe(
+        frame,
+        column_config={"Presence": PRESENCE},
+        hide_index=True,
+        width="stretch",
+        key=f"uses_{monitor.id}",
     )
 
 
