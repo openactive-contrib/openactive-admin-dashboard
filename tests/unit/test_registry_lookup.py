@@ -57,6 +57,7 @@ def test_monitor_ids_narrow_to_one_backing_read() -> None:
     assert by_source[Source.QUALITY] == {"feed_quality"}
     assert by_source[Source.COVERAGE] == {"active_places_coverage"}
     assert by_source[Source.SCHEMA_DRIFT] == {"feed_custom_properties"}
+    assert by_source[Source.ACTIVITY_COVERAGE] == {"activity_coverage"}
 
 
 def test_column_lookup_by_label() -> None:

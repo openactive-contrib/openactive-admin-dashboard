@@ -103,6 +103,49 @@ def test_admin_quality_is_the_monitor_slug_itself() -> None:
     assert endpoint.params == {"as_of": "2026-09-02"}
 
 
+# --- activity coverage --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("style", "summary", "top", "rows"),
+    [
+        (
+            Style.ADMIN,
+            "/admin/activity-coverage/summary",
+            "/admin/activity-coverage/top-activities",
+            "/admin/activity-coverage",
+        ),
+        (
+            Style.CONTRACT,
+            "/monitors/activity_coverage/summary",
+            "/monitors/activity_coverage/top-activities",
+            "/monitors/activity_coverage/districts",
+        ),
+    ],
+)
+def test_activity_coverage_routes_in_both_shapes(
+    style: Style, summary: str, top: str, rows: str
+) -> None:
+    assert endpoints.activity_summary(style, "activity_coverage", as_of=AS_OF).path == summary
+    ranking = endpoints.top_activities(style, "activity_coverage", as_of=AS_OF, limit=20)
+    assert ranking.path == top
+    assert ranking.params["page_size"] == 20
+    assert ranking.params["page"] == 1
+    page = endpoints.activity_districts(style, "activity_coverage", as_of=AS_OF, page=4)
+    assert page.path == rows
+    assert page.params["page"] == 4
+    assert page.params["page_size"] == 1000
+
+
+def test_admin_activity_coverage_names_the_snapshot_on_every_read() -> None:
+    for endpoint in (
+        endpoints.activity_summary(Style.ADMIN, "activity_coverage", as_of=AS_OF),
+        endpoints.top_activities(Style.ADMIN, "activity_coverage", as_of=AS_OF, limit=20),
+        endpoints.activity_districts(Style.ADMIN, "activity_coverage", as_of=AS_OF),
+    ):
+        assert endpoint.params["as_of"] == "2026-09-02"
+
+
 # --- coverage -----------------------------------------------------------------------------
 
 
@@ -184,6 +227,9 @@ def test_every_style_routes_every_read() -> None:
             style, "active_places_coverage", "active_places_site_mappings", as_of=AS_OF
         ).path
         assert endpoints.custom_properties(style, "feed_custom_properties", as_of=AS_OF).path
+        assert endpoints.activity_summary(style, "activity_coverage", as_of=AS_OF).path
+        assert endpoints.top_activities(style, "activity_coverage", as_of=AS_OF, limit=20).path
+        assert endpoints.activity_districts(style, "activity_coverage", as_of=AS_OF).path
         assert endpoints.summary(style, as_of=AS_OF).path
 
 

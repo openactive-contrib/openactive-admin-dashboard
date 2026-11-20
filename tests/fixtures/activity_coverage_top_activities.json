@@ -1,0 +1,151 @@
+{
+  "data": [
+    {
+      "rank": 1,
+      "activity": "Swimming",
+      "activity_id": "https://openactive.io/activity-list#2750229d-b725-4171-9276-376be913957c",
+      "opportunity_count": 146673,
+      "district_count": 172
+    },
+    {
+      "rank": 2,
+      "activity": "Gym Workout",
+      "activity_id": "https://openactive.io/activity-list#08d9368c-6c6c-44a3-84ef-a42ed00d529a",
+      "opportunity_count": 66317,
+      "district_count": 142
+    },
+    {
+      "rank": 3,
+      "activity": "Group Exercise",
+      "activity_id": "https://openactive.io/activity-list#984068a7-5b7b-4989-bb33-f96953d8960c",
+      "opportunity_count": 26584,
+      "district_count": 116
+    },
+    {
+      "rank": 4,
+      "activity": "Soft Play",
+      "activity_id": "https://openactive.io/activity-list#b3a34a20-b4ef-402c-8763-a54ce9da422d",
+      "opportunity_count": 18620,
+      "district_count": 97
+    },
+    {
+      "rank": 5,
+      "activity": "Power Assisted Exercise",
+      "activity_id": "https://openactive.io/activity-list#5705d900-36a2-4fab-a98b-ca197a53397c",
+      "opportunity_count": 15335,
+      "district_count": 2
+    },
+    {
+      "rank": 6,
+      "activity": "Sauna",
+      "activity_id": "https://openactive.io/activity-list#2aceb439-6903-4cdc-b64b-f1717c961148",
+      "opportunity_count": 12879,
+      "district_count": 52
+    },
+    {
+      "rank": 7,
+      "activity": "Spa",
+      "activity_id": "https://openactive.io/activity-list#58e03697-1fdb-4c9f-bcf4-ffef6944fab4",
+      "opportunity_count": 9673,
+      "district_count": 16
+    },
+    {
+      "rank": 8,
+      "activity": "Indoor Cycling",
+      "activity_id": "https://openactive.io/activity-list#5f09c2ca-ceeb-4e0c-871f-e2d0b9971317",
+      "opportunity_count": 6938,
+      "district_count": 121
+    },
+    {
+      "rank": 9,
+      "activity": "Cycling",
+      "activity_id": "https://openactive.io/activity-list#4a19873e-118e-43f4-b86e-05acba8fb1de",
+      "opportunity_count": 6453,
+      "district_count": 36
+    },
+    {
+      "rank": 10,
+      "activity": "Personal Training",
+      "activity_id": "https://openactive.io/activity-list#22ca9f17-edda-4425-b905-3867e19d4873",
+      "opportunity_count": 6132,
+      "district_count": 65
+    },
+    {
+      "rank": 11,
+      "activity": "Pilates",
+      "activity_id": "https://openactive.io/activity-list#3a6b1c08-7aa6-48d4-9690-dca9e0133057",
+      "opportunity_count": 5063,
+      "district_count": 142
+    },
+    {
+      "rank": 12,
+      "activity": "Athletics",
+      "activity_id": "https://openactive.io/activity-list#4d280e1b-a370-4582-ab4d-442b2eeaf5d4",
+      "opportunity_count": 4157,
+      "district_count": 22
+    },
+    {
+      "rank": 13,
+      "activity": "Yoga",
+      "activity_id": "https://openactive.io/activity-list#bf1a5e00-cdcf-465d-8c5a-6f57040b7f7e",
+      "opportunity_count": 4081,
+      "district_count": 142
+    },
+    {
+      "rank": 14,
+      "activity": "Bodypump™",
+      "activity_id": "https://openactive.io/activity-list#5e78bcbe-36db-425a-9064-bf96d09cc351",
+      "opportunity_count": 4079,
+      "district_count": 109
+    },
+    {
+      "rank": 15,
+      "activity": "Zumba®",
+      "activity_id": "https://openactive.io/activity-list#78503fa2-ed24-4a80-a224-e2e94581d8a8",
+      "opportunity_count": 3989,
+      "district_count": 111
+    },
+    {
+      "rank": 16,
+      "activity": "Squash",
+      "activity_id": "https://openactive.io/activity-list#b7845b8a-4c0c-4a8f-93d3-d41d62eec889",
+      "opportunity_count": 3850,
+      "district_count": 16
+    },
+    {
+      "rank": 17,
+      "activity": "Golf",
+      "activity_id": "https://openactive.io/activity-list#7ae6067a-07f7-4aea-9e1f-eeeea5ae9047",
+      "opportunity_count": 3575,
+      "district_count": 6
+    },
+    {
+      "rank": 18,
+      "activity": "Aerobics",
+      "activity_id": "https://openactive.io/activity-list#678b9fc4-1860-4377-85b9-e4c01628582a",
+      "opportunity_count": 3563,
+      "district_count": 93
+    },
+    {
+      "rank": 19,
+      "activity": "Steam Room",
+      "activity_id": "https://openactive.io/activity-list#c8bf1529-5c39-4eeb-870a-8c61924c9a23",
+      "opportunity_count": 3516,
+      "district_count": 5
+    },
+    {
+      "rank": 20,
+      "activity": "Dance Fitness",
+      "activity_id": "https://openactive.io/activity-list#d3b5104a-2e31-4cca-a278-ef8e0987a764",
+      "opportunity_count": 3245,
+      "district_count": 76
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T04:12:00Z",
+    "page": 1,
+    "page_size": 20,
+    "total": 288
+  }
+}

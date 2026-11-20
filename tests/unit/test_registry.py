@@ -8,6 +8,8 @@ import pytest
 
 from fixture_loader import load_sample
 from stewards.api.models import (
+    ActivityCoverageSummaryResponse,
+    ActivityDistrictPage,
     CoverageResponse,
     CustomPropertyResponse,
     DetailModel,
@@ -15,7 +17,7 @@ from stewards.api.models import (
     IncidentPage,
     SiteMappingPage,
 )
-from stewards.monitors import coverage, quality, schema_drift
+from stewards.monitors import activity_coverage, coverage, quality, schema_drift
 from stewards.monitors.registry import (
     MONITOR_REGISTRY,
     Group,
@@ -36,7 +38,7 @@ pytestmark = pytest.mark.parametrize(
 def backed_by(monitor: Monitor, source: Source) -> None:
     """Skip a check that only means something for one kind of backing read.
 
-    The registry holds all four kinds, and a quality, coverage or schema drift monitor has
+    The registry holds all five kinds, and a non-incident monitor has
     no incidents to validate — no `monitor_id` on its rows, no detail blob, no contact
     threshold and no publisher email. Gating on the declared source rather than on the
     monitor id keeps this module parametrised over the whole registry, so a future monitor
@@ -421,3 +423,66 @@ def test_a_schema_drift_payload_carries_a_summary_block(monitor: Monitor) -> Non
     assert summary.property_breakdown
     assert summary.namespace_breakdown
     assert summary.entity_type_breakdown
+
+
+# --- activity coverage monitors -----------------------------------------------------------
+#
+# The fifth backing read: three resources. The district rows carry the columns and the
+# filters; the summary carries the page's figures and the whole of the card.
+
+
+def activity_rows(monitor: Monitor) -> tuple[activity_coverage.ActivityRow, ...]:
+    payload = ActivityDistrictPage.model_validate(load_sample(f"{monitor.id}_districts"))
+    return activity_coverage.build_rows(payload.data)
+
+
+def test_an_activity_coverage_monitor_ships_all_three_sample_payloads(monitor: Monitor) -> None:
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    for resource in ("summary", "top_activities", "districts"):
+        assert (SAMPLE_DIR / f"{monitor.id}_{resource}.json").is_file()
+
+
+def test_every_activity_column_field_reports_a_value_somewhere(monitor: Monitor) -> None:
+    """A column no payload row can fill is a typo in the field name, not a sparse column."""
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    rows = activity_rows(monitor)
+    assert rows, f"{monitor.id} sample payload has no district rows"
+    for col in monitor.columns:
+        assert any(activity_coverage.resolve(row, col.field) is not None for row in rows), (
+            f"{monitor.id} column {col.field!r} resolves to None on every payload row"
+        )
+
+
+def test_declared_activity_filters_resolve_and_are_labelled(monitor: Monitor) -> None:
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    rows = activity_rows(monitor)
+    assert monitor.filters
+    for spec in monitor.filters:
+        assert spec.label
+        assert activity_coverage.filter_options(rows, spec.field), (
+            f"{monitor.id} filter {spec.field!r} has no options in the payload"
+        )
+
+
+def test_an_activity_coverage_monitor_sorts_on_a_field_its_rows_report(
+    monitor: Monitor,
+) -> None:
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    rows = activity_rows(monitor)
+    assert any(activity_coverage.resolve(row, monitor.sort_field) is not None for row in rows)
+
+
+def test_an_activity_coverage_monitor_states_no_contact_threshold(monitor: Monitor) -> None:
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    assert not monitor.has_threshold_filter
+    assert not any(chip.startswith("contact after") for chip in monitor.meta_chips)
+
+
+def test_an_activity_coverage_summary_carries_the_card_figures(monitor: Monitor) -> None:
+    backed_by(monitor, Source.ACTIVITY_COVERAGE)
+    payload = ActivityCoverageSummaryResponse.model_validate(
+        load_sample(f"{monitor.id}_summary")
+    )
+    assert payload.data.labelled_percentage is not None
+    assert payload.data.activity_opportunities
+    assert payload.data.activities_offered

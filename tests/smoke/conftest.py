@@ -33,6 +33,10 @@ COVERAGE_IDS = ("active_places_coverage",)
 #: Monitors backed by a custom-property snapshot: one read, rows and a summary block, and no
 #: incidents, no trend and no `/summary` entry.
 SCHEMA_DRIFT_IDS = ("feed_custom_properties",)
+
+#: Monitors backed by activity coverage: three reads — national figures, the ranking and the
+#: district rows — and no incidents, no trend and no `/summary` entry.
+ACTIVITY_COVERAGE_IDS = ("activity_coverage",)
 TREND_IDS = (
     "dataset_stall",
     "single_feed_stall",
@@ -42,8 +46,12 @@ TREND_IDS = (
 
 
 @pytest.fixture(autouse=True)
-def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Mock the API responses page smoke tests expect under a live-only config."""
+def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[respx.MockRouter]:
+    """Mock the API responses page smoke tests expect under a live-only config.
+
+    Yields the router, so a test that requests `smoke_env` can ask whether a route was hit.
+    Routes worth asking about are named.
+    """
     monkeypatch.setenv("STEWARDS_API_BASE_URL", "https://api.test")
     monkeypatch.setenv("STEWARDS_API_TOKEN", "test-token")
     monkeypatch.setenv("STEWARDS_ENV", "dev")
@@ -77,13 +85,19 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             mock.get(f"{BASE}/monitors/{monitor_id}/coverage").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_coverage"))
             )
-            mock.get(f"{BASE}/monitors/{monitor_id}/mappings").mock(
-                return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings"))
-            )
+            mock.get(
+                f"{BASE}/monitors/{monitor_id}/mappings", name=f"{monitor_id}_mappings"
+            ).mock(return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings")))
         for monitor_id in SCHEMA_DRIFT_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
             )
+        for monitor_id in ACTIVITY_COVERAGE_IDS:
+            for resource in ("summary", "top-activities", "districts"):
+                fixture = f"{monitor_id}_{resource.replace('-', '_')}"
+                mock.get(f"{BASE}/monitors/{monitor_id}/{resource}").mock(
+                    return_value=httpx.Response(200, json=load_sample(fixture))
+                )
         mock.get(f"{BASE}/ecosystem/growth").mock(
             return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
         )
@@ -99,7 +113,7 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
                 200, json=load_sample("publisher_notifications_summary")
             )
         )
-        yield
+        yield mock
 
     client_module.reset_client()
     config.get_settings.cache_clear()

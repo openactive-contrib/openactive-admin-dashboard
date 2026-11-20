@@ -1,0 +1,4 @@
+from stewards.components.activity_coverage_page import render_activity_coverage_page
+from stewards.monitors.registry import get_monitor
+
+render_activity_coverage_page(get_monitor("activity_coverage"))
