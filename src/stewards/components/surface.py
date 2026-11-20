@@ -156,9 +156,26 @@ _STYLES = f"""
   div[class*="st-key-oakpirow"] {{
       gap: 0.4rem;
   }}
-  /* KPI cards stack label / value / sub tightly. */
-  div[class*="st-key-{CARD_PREFIX}_kpi"] > div > div[data-testid="stVerticalBlock"] {{
+  /* Every KPI card, whichever row it is in: the key carries `kpi` somewhere, so the page's
+     own figures and a tab's both match. */
+  div[class*="st-key-{CARD_PREFIX}"][class*="kpi"] > div > div[data-testid="stVerticalBlock"] {{
       gap: 0.15rem;
+  }}
+  /* Equal height across a row. Streamlit stretches the columns to the tallest card, but the
+     blocks inside a column size to their content, so a card whose label wraps or whose sub
+     runs to three lines left its neighbours short of the row. Both levels under the column
+     need the height for the card to reach the bottom of it. */
+  div[data-testid="stLayoutWrapper"]:has(> div[class*="st-key-{CARD_PREFIX}"][class*="kpi"]) {{
+      height: 100%;
+  }}
+  div[class*="st-key-{CARD_PREFIX}"][class*="kpi"] {{
+      height: 100%;
+  }}
+  /* Two lines reserved for every label, so the values sit on one line across the row whether
+     or not a particular label wraps. Equal heights alone would not do it: the cards would
+     match while the numbers inside them stepped up and down. */
+  div[class*="st-key-oakpilabel"] {{
+      min-height: 2.2rem;
   }}
   div[class*="st-key-oakpivalue"] p {{
       margin: 0;
