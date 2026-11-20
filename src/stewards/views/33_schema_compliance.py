@@ -1,0 +1,4 @@
+from stewards.components.schema_compliance_page import render_schema_compliance_page
+from stewards.monitors.registry import get_monitor
+
+render_schema_compliance_page(get_monitor("schema_compliance"))

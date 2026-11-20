@@ -19,6 +19,7 @@ from stewards.api.client import StewardsClient
 from stewards.api.endpoints import Style
 from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
+    CUSTOM_PROPERTIES_MONITOR_ID,
     _fetch_coverage,
     _fetch_custom_properties,
     _fetch_ecosystem_growth,
@@ -30,11 +31,7 @@ from stewards.api.repository import (
 )
 from stewards.config import Settings
 from stewards.monitors import coverage, schema_drift
-from stewards.monitors.registry import (
-    ACTIVE_PLACES_COVERAGE,
-    FEED_CUSTOM_PROPERTIES,
-    SINGLE_FEED_STALL,
-)
+from stewards.monitors.registry import ACTIVE_PLACES_COVERAGE, SINGLE_FEED_STALL
 from stewards.monitors.transforms import to_dataframe
 
 BASE = "http://localhost:5268"
@@ -334,7 +331,7 @@ def test_the_custom_property_snapshot_comes_from_the_monitor_slug_with_no_suffix
     route = respx.get(PROPERTIES).mock(
         return_value=httpx.Response(200, json=payload("feed_custom_properties_properties"))
     )
-    response = _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
+    response = _fetch_custom_properties(CUSTOM_PROPERTIES_MONITOR_ID, client, as_of=AS_OF)
 
     assert response.data
     request = route.calls.last.request
@@ -350,22 +347,23 @@ def test_a_custom_property_endpoint_this_deployment_has_not_built_raises_not_fou
 ) -> None:
     respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
     with pytest.raises(ApiNotFound):
-        _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
+        _fetch_custom_properties(CUSTOM_PROPERTIES_MONITOR_ID, client, as_of=AS_OF)
 
 
 @respx.mock
-def test_the_real_custom_property_payload_fills_every_declared_column(
+def test_the_real_custom_property_payload_fills_the_property_table(
     client: StewardsClient, payload
 ) -> None:
-    """The live rows, through the models and the shaping, into the declared table."""
+    """The live snapshot, through the models and the shaping, into the two things the
+    compliance page makes of it: the property table, and one row per feed for the join."""
     respx.get(PROPERTIES).mock(
         return_value=httpx.Response(200, json=payload("feed_custom_properties_properties"))
     )
-    response = _fetch_custom_properties("feed_custom_properties", client, as_of=AS_OF)
-    rows = schema_drift.build_rows(response.data)
-    frame = schema_drift.to_dataframe(FEED_CUSTOM_PROPERTIES, rows)
-    assert list(frame.columns) == [c.label for c in FEED_CUSTOM_PROPERTIES.columns]
-    assert len(frame) == len(response.data)
+    response = _fetch_custom_properties(CUSTOM_PROPERTIES_MONITOR_ID, client, as_of=AS_OF)
+    frame = schema_drift.property_frame(schema_drift.sort_properties(response.summary))
+    assert list(frame.columns) == [c.label for c in schema_drift.PROPERTY_COLUMNS]
+    assert len(frame) == len(response.summary.property_breakdown)
+    assert len(schema_drift.build_rows(response.data)) == len(response.data)
 
 
 # --- the ecosystem growth series -----------------------------------------------------------

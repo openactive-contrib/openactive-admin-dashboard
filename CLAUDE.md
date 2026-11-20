@@ -34,10 +34,15 @@ beside the rows and no history at all. `active_places_coverage` reads two live e
 `/admin/active-places-coverage` for the run's figures and `/admin/active-places-site-mappings`
 for the ~10k site-venue pairs behind them, paginated — with no history either and no
 `/summary` entry, so it supplies its whole card itself and carries no sidebar pill.
-`feed_custom_properties` (the "Schema drift" page) reads the live `/admin/feed-custom-properties`:
-one paginated read of every feed publishing a property outside the OpenActive vocabulary, with
-a fleet-wide `summary` block beside the rows, no history and no `/summary` entry; it is
-informational like the coverage monitor.
+`schema_compliance` has **no endpoint of its own**: it joins the quality snapshot with the
+live `/admin/feed-custom-properties` — one paginated read of every feed publishing a property
+outside the OpenActive vocabulary, with a fleet-wide `summary` block beside the rows — into
+one row per feed, judged against the standard's required and recommended fields. It has no
+history and no `/summary` entry either. The quality read decides which feeds are on the page,
+so its failure is the page's; the custom-property read failing costs only the Properties tab
+and the custom-property column, which the page says rather than showing as zero. There is no
+"Schema drift" page: that monitor was retired into this one, and `monitors/schema_drift.py`
+outlived it as the shaping behind the Properties tab and the join.
 
 The publisher notification list reads and writes `/admin/publisher-notifications`: stored
 steward rows, not the daily batch, so its page names its own source and its reads are cached
@@ -131,8 +136,12 @@ src/stewards/
                              card and summary charts
   monitors/coverage.py       the third backing read: an estate coverage snapshot plus its
                              paginated rows -> rows, figures, region chart, card
-  monitors/schema_drift.py   the fourth: a custom-property snapshot -> feed rows, list
-                             filters, figures, property chart, property table, card
+  monitors/schema_drift.py   a custom-property snapshot -> feed rows, figures, property
+                             chart and property table. No monitor of its own since the
+                             schema drift page was retired into the compliance page
+  monitors/schema_compliance.py
+                             the fourth backing read: the quality and custom-property
+                             snapshots joined -> one row per feed, verdicts, figures, card
   monitors/overview.py       tiles, tile state, sidebar labels
   monitors/publisher_notifications.py
                              the notification list: alert rule, table, filters, KPIs,
@@ -143,8 +152,8 @@ src/stewards/
                              (not a monitor: no registry entry, no card)
   components/…               theme, surface, layout, nav, filters, incident_table,
                              trend_chart, email_draft, errors, loading, monitor_page,
-                             quality_page, coverage_page, schema_drift_page, overview_page,
-                             publisher_notifications_page, notebooks_page, ecosystem_page
+                             quality_page, coverage_page, schema_compliance_page,
+                             overview_page, publisher_notifications_page, notebooks_page, ecosystem_page
   views/…                    one 3-line module per page, zero logic
                              (NOT `pages/` — see hard rule 8)
 tests/
@@ -227,13 +236,16 @@ which page renderer it gets. Four exist:
   and rows from a second, paginated one, and no history either. `fetch_coverage` +
   `fetch_site_mappings`, `monitors/coverage.py`, `components/coverage_page.py`. The rows
   resource has its own name, declared as `Monitor.rows_id`.
-- `Source.SCHEMA_DRIFT` — the custom properties each feed publishes outside the OpenActive
-  vocabulary: rows and a `summary` block in one paginated read, no history, nothing scored.
-  `fetch_custom_properties`, `monitors/schema_drift.py`, `components/schema_drift_page.py`.
-  Its list-valued row fields (`namespaces`, `property_names`, `entity_types`) filter by
-  membership.
+- `Source.SCHEMA_COMPLIANCE` — how closely each feed follows the standard. The only read
+  with no endpoint of its own: it joins the quality snapshot with the custom-property one,
+  under the ids `repository._fetch_schema_compliance` holds, into one row per feed.
+  `fetch_schema_compliance`, `monitors/schema_compliance.py`,
+  `components/schema_compliance_page.py`, with `monitors/schema_drift.py` shaping the
+  custom-property half and the page's Properties tab. The quality read is required; the
+  custom-property read failing leaves `SchemaComplianceSnapshot.custom_properties` as `None`
+  for the page to explain.
 
-None are interchangeable: a quality, coverage or schema drift row has no `first_detected`,
+None are interchangeable: a quality, coverage or compliance row has no `first_detected`,
 `days_open` or `past_threshold`, and folding any into an `Incident` would mean inventing all three; and a
 coverage monitor's figures do not arrive beside its rows, so it cannot be one request. Such a
 monitor has no trend, no contact threshold, no email draft and no place on the publisher notification list,
@@ -242,7 +254,7 @@ would be.
 Everything the registry already drove is unchanged: `columns` and `ColKind` format and
 RAG-shade the table identically, `filters` become the same selectboxes, and the card's verdict
 is a `Health`, so the chip, the tone and the sidebar pill run through untouched code. A
-quality, coverage or schema drift column path is a plain attribute name (`score`, `dataset_score`,
+quality, coverage or compliance column path is a plain attribute name (`score`, `dataset_score`,
 `match_label`) — there is no `detail.` or `part.` prefix on such a row.
 `tests/unit/test_registry.py` is parametrised over all four kinds and skips the checks that
 do not apply, keyed off the declared source. `docs/adding-a-dashboard.md` "The backing reads"
@@ -279,9 +291,11 @@ the table cannot tell different stories. `monitors.coverage.assess_coverage` mak
 choice deliberately: coverage is a measurement, not a fault queue, so the monitor declares
 `Severity.INFORMATIONAL` and the card renders a grey "Info" chip — the one place `severity`
 changes behaviour — rather than claiming a RAG verdict there is no defensible number to
-support. `monitors.schema_drift.assess_drift` makes the same choice for the same reason: a
-custom property is not a fault. `overview_page.tile_cards` collects every such card, one
-branch per source.
+support. `monitors.schema_compliance.assess_compliance` makes the opposite choice, and
+deliberately: a missing required field breaks the standard, so that monitor declares
+`Severity.MEDIUM` and its card carries a RAG chip. Its level is the compliant share on the
+same `score_tone` bands, held back from `HEALTHY` while any feed falls short of the key
+fields. `overview_page.tile_cards` collects every such card, one branch per source.
 
 A monitor with **no series at all** is the other exception: `viz=Gauge(benchmark=…)` makes
 `monitors/gauge.assess_benchmark` produce the verdict from that benchmark instead, returning
@@ -324,8 +338,8 @@ the "Publishers with issues" card was removed on request — do not reintroduce 
   asserted to be a mirror of itself rather than a second code path.
 - `tests/unit/test_registry.py` parametrises over the whole registry, so every future
   monitor is validated for free — ids, page module, sample payload, resolvable column and
-  filter fields, detail model. It covers both backing reads, skipping whichever checks do
-  not apply to the monitor's declared `source`.
+  filter fields, detail model. It covers all four backing reads, skipping whichever checks
+  do not apply to the monitor's declared `source`.
 - Smoke tests use `AppTest`. `AppTest.from_function` re-executes the function's own source,
   so such a script must import everything it uses and annotate its parameters with builtins
   only (`exc: object`) — a quoted annotation gets unquoted again by ruff's UP037 fix.

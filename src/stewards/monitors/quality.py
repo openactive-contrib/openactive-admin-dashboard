@@ -26,11 +26,23 @@ from urllib.parse import urlparse
 import altair as alt
 import pandas as pd
 
-from stewards.api.models import FeedQualityFeed, FeedQualitySummary, QualityBreakdown
+from stewards.api.models import (
+    FeedQualityFeed,
+    FeedQualitySummary,
+    QualityBreakdown,
+    VocabularyAdherence,
+)
 from stewards.monitors.health import Health, HealthState, Movement
 from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.registry import Col, ColKind, Monitor
-from stewards.monitors.thresholds import Tone, risk_tone, score_tone, status_label, status_tone
+from stewards.monitors.thresholds import (
+    Tone,
+    band_tone,
+    risk_tone,
+    score_tone,
+    status_label,
+    status_tone,
+)
 from stewards.monitors.transforms import EMPTY, format_cell
 
 #: What a categorical field reads as when the assessment did not report one. A real string
@@ -77,6 +89,12 @@ class QualityRow:
     completeness: Mapping[str, float | None]
     missing_required_fields: Mapping[str, tuple[str, ...]]
     last_assessed: str
+
+    #: Vocabulary adherence for the feed's activities and facilities, as the assessment
+    #: reported it. None for a feed its five-day window did not reach. Carried here so the
+    #: compliance monitor can read it; the quality table does not draw it.
+    activity_vocabulary: VocabularyAdherence | None = None
+    facility_vocabulary: VocabularyAdherence | None = None
 
     @property
     def error_count(self) -> int:
@@ -164,6 +182,8 @@ def build_rows(feeds: Sequence[FeedQualityFeed]) -> tuple[QualityRow, ...]:
             last_assessed=(
                 feed.last_assessed.date().isoformat() if feed.last_assessed else EMPTY
             ),
+            activity_vocabulary=feed.activity_vocabulary_adherence,
+            facility_vocabulary=feed.facility_vocabulary_adherence,
         )
         for feed in feeds
     )
@@ -216,7 +236,10 @@ def cell_tone(col: Col, value: Any) -> Tone | None:
         case ColKind.STATUS:
             return status_tone(str(value or ""))
         case ColKind.PERCENT | ColKind.SCORE:
-            return score_tone(None if value is None else float(value))
+            figure = None if value is None else float(value)
+            if col.warn_below is not None:
+                return band_tone(figure, col.warn_below)
+            return score_tone(figure)
         case ColKind.RISK:
             return risk_tone(None if value is None else float(value))
         case _:

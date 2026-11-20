@@ -26,7 +26,6 @@ from stewards.api.models import (
     CoverageSnapshot,
     CustomPropertyFeed,
     CustomPropertyResponse,
-    CustomPropertySummary,
     EcosystemGrowthResponse,
     FeedQualityResponse,
     FeedQualitySummary,
@@ -36,6 +35,7 @@ from stewards.api.models import (
     PublisherNotificationDocument,
     PublisherNotificationPage,
     PublisherNotificationSummaryResponse,
+    SchemaComplianceSnapshot,
     SiteMapping,
     SiteMappingPage,
     SummaryResponse,
@@ -332,25 +332,54 @@ def _fetch_custom_properties(
     return CustomPropertyResponse(data=tuple(feeds), summary=first.summary, meta=first.meta)
 
 
-def _fetch_custom_property_summaries(
+# --- schema compliance --------------------------------------------------------------------
+#
+# No endpoint of its own: the page joins two snapshots the API already serves.
+
+QUALITY_MONITOR_ID = "feed_quality"
+CUSTOM_PROPERTIES_MONITOR_ID = "feed_custom_properties"
+
+
+def _fetch_schema_compliance(
+    client: StewardsClient | None = None, as_of: date | None = None
+) -> SchemaComplianceSnapshot:
+    """The quality and custom-property snapshots, read together for the compliance page.
+
+    The quality read carries the checks themselves, so its failure is the page's failure
+    and raises. The custom-property read only adds the non-standard properties, so its
+    failure is logged and left as `None` for the page to explain.
+    """
+    client = client or get_client()
+    quality = _fetch_quality(QUALITY_MONITOR_ID, client=client, as_of=as_of)
+    try:
+        custom = _fetch_custom_properties(
+            CUSTOM_PROPERTIES_MONITOR_ID, client=client, as_of=as_of
+        )
+    except ApiError as exc:
+        log.info("No custom-property snapshot for schema compliance: %s", exc)
+        custom = None
+    return SchemaComplianceSnapshot(quality=quality, custom_properties=custom)
+
+
+def _fetch_schema_compliance_snapshots(
     monitor_ids: Sequence[str],
     client: StewardsClient | None = None,
     as_of: date | None = None,
-) -> dict[str, CustomPropertySummary]:
-    """Each custom-property monitor's summary block, for its overview card.
+) -> dict[str, SchemaComplianceSnapshot]:
+    """Each compliance monitor's joined snapshot, for its overview card.
 
-    Tolerant in the same way as `_fetch_quality_summaries`: a monitor whose endpoint this
-    deployment has not built yet is left out of the mapping rather than costing the whole
-    overview.
+    The monitor id is only the key here, never a path: this read has no endpoint of its own
+    and always joins the same two. Tolerant in the same way as `_fetch_quality_summaries` —
+    a monitor whose quality endpoint this deployment has not built yet is left out of the
+    mapping rather than costing the whole overview.
     """
-    summaries: dict[str, CustomPropertySummary] = {}
+    snapshots: dict[str, SchemaComplianceSnapshot] = {}
     for monitor_id in monitor_ids:
         try:
-            response = _fetch_custom_properties(monitor_id, client=client, as_of=as_of)
-            summaries[monitor_id] = response.summary
+            snapshots[monitor_id] = _fetch_schema_compliance(client=client, as_of=as_of)
         except ApiError as exc:
-            log.info("No custom-property snapshot for %s: %s", monitor_id, exc)
-    return summaries
+            log.info("No compliance snapshot for %s: %s", monitor_id, exc)
+    return snapshots
 
 
 def _fetch_ecosystem_growth(
@@ -503,15 +532,15 @@ def fetch_coverage_snapshots(monitor_ids: tuple[str, ...]) -> dict[str, Coverage
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_custom_properties(monitor_id: str) -> CustomPropertyResponse:
-    return _fetch_custom_properties(monitor_id)
+def fetch_schema_compliance() -> SchemaComplianceSnapshot:
+    return _fetch_schema_compliance()
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_custom_property_summaries(
+def fetch_schema_compliance_snapshots(
     monitor_ids: tuple[str, ...],
-) -> dict[str, CustomPropertySummary]:
-    return _fetch_custom_property_summaries(monitor_ids)
+) -> dict[str, SchemaComplianceSnapshot]:
+    return _fetch_schema_compliance_snapshots(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)

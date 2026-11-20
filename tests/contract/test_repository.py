@@ -37,6 +37,7 @@ from stewards.api.models import (
     TrendResponse,
 )
 from stewards.api.repository import (
+    CUSTOM_PROPERTIES_MONITOR_ID,
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
     _create_publisher_notification,
@@ -44,7 +45,6 @@ from stewards.api.repository import (
     _fetch_coverage,
     _fetch_coverage_snapshots,
     _fetch_custom_properties,
-    _fetch_custom_property_summaries,
     _fetch_ecosystem_growth,
     _fetch_incidents,
     _fetch_monitor_trends,
@@ -52,6 +52,8 @@ from stewards.api.repository import (
     _fetch_publisher_notifications,
     _fetch_quality,
     _fetch_quality_summaries,
+    _fetch_schema_compliance,
+    _fetch_schema_compliance_snapshots,
     _fetch_site_mappings,
     _fetch_summary,
     _fetch_trend,
@@ -598,10 +600,12 @@ def test_coverage_snapshots_return_one_entry_per_monitor(client: StewardsClient)
 # --- custom properties ---------------------------------------------------------------------
 
 PROPERTIES = f"{BASE}/monitors/feed_custom_properties/properties"
-DRIFT_ID = "feed_custom_properties"
+#: The endpoint slug, not a monitor: nothing is named after it since the drift page was
+#: retired, but the compliance join still reads it.
+PROPERTIES_ID = CUSTOM_PROPERTIES_MONITOR_ID
 
 
-def _drift_page(page: int, rows: slice, total: int) -> dict[str, object]:
+def _properties_page(page: int, rows: slice, total: int) -> dict[str, object]:
     """One page of the sample snapshot. Every page carries the summary block, as the live
     endpoint does."""
     sample = load_sample("feed_custom_properties_properties")
@@ -614,7 +618,7 @@ def test_custom_properties_return_rows_and_the_summary_block(client: StewardsCli
     route = respx.get(PROPERTIES).mock(
         return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
     )
-    response = _fetch_custom_properties(DRIFT_ID, client)
+    response = _fetch_custom_properties(PROPERTIES_ID, client)
     assert isinstance(response, CustomPropertyResponse)
     assert response.meta.snapshot_date == date(2026, 8, 21)
     assert len(response.data) == 12
@@ -627,12 +631,13 @@ def test_custom_properties_return_rows_and_the_summary_block(client: StewardsCli
 @respx.mock
 def test_custom_properties_follow_the_total_across_pages(client: StewardsClient) -> None:
     """The rows page; the summary describes the whole fleet, so the first page's is kept."""
-    first, second = _drift_page(1, slice(0, 7), 12), _drift_page(2, slice(7, None), 12)
+    first = _properties_page(1, slice(0, 7), 12)
+    second = _properties_page(2, slice(7, None), 12)
     second["summary"] = {}  # a later page's summary is not read
     route = respx.get(PROPERTIES).mock(
         side_effect=[httpx.Response(200, json=first), httpx.Response(200, json=second)]
     )
-    response = _fetch_custom_properties(DRIFT_ID, client)
+    response = _fetch_custom_properties(PROPERTIES_ID, client)
     assert len(response.data) == 12
     assert route.call_count == 2
     assert route.calls.last.request.url.params["page"] == "2"
@@ -643,11 +648,11 @@ def test_custom_properties_follow_the_total_across_pages(client: StewardsClient)
 def test_custom_properties_stop_on_an_empty_page_short_of_the_total(
     client: StewardsClient, caplog: pytest.LogCaptureFixture
 ) -> None:
-    first, empty = _drift_page(1, slice(0, 7), 20), _drift_page(2, slice(0, 0), 20)
+    first, empty = _properties_page(1, slice(0, 7), 20), _properties_page(2, slice(0, 0), 20)
     respx.get(PROPERTIES).mock(
         side_effect=[httpx.Response(200, json=first), httpx.Response(200, json=empty)]
     )
-    response = _fetch_custom_properties(DRIFT_ID, client)
+    response = _fetch_custom_properties(PROPERTIES_ID, client)
     assert len(response.data) == 7
     assert "Fetched 7 of 20" in caplog.text
 
@@ -656,7 +661,7 @@ def test_custom_properties_stop_on_an_empty_page_short_of_the_total(
 def test_custom_properties_reject_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
     respx.get(PROPERTIES).mock(return_value=httpx.Response(200, json={"data": []}))
     with pytest.raises(ApiContractError):
-        _fetch_custom_properties(DRIFT_ID, client)
+        _fetch_custom_properties(PROPERTIES_ID, client)
 
 
 @respx.mock
@@ -668,35 +673,78 @@ def test_custom_properties_tolerate_a_snapshot_with_no_summary_block(
     respx.get(PROPERTIES).mock(
         return_value=httpx.Response(200, json={"data": [], "meta": {**meta, "total": 0}})
     )
-    response = _fetch_custom_properties(DRIFT_ID, client)
+    response = _fetch_custom_properties(PROPERTIES_ID, client)
     assert response.data == ()
     assert response.summary.datasets_with_custom_properties is None
 
 
 @respx.mock
-def test_custom_property_summaries_skip_a_monitor_whose_endpoint_is_not_live(
+def test_schema_compliance_reads_quality_and_custom_properties_together(
     client: StewardsClient,
 ) -> None:
-    respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
-    assert _fetch_custom_property_summaries((DRIFT_ID,), client) == {}
-
-
-@respx.mock
-def test_custom_property_summaries_return_one_entry_per_monitor(
-    client: StewardsClient,
-) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
     respx.get(PROPERTIES).mock(
         return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
     )
-    summaries = _fetch_custom_property_summaries((DRIFT_ID,), client)
-    assert set(summaries) == {DRIFT_ID}
-    assert summaries[DRIFT_ID].publishers_with_custom_properties == 61
+    snapshot = _fetch_schema_compliance(client)
+    assert isinstance(snapshot.quality, FeedQualityResponse)
+    assert len(snapshot.quality.data) == 15
+    assert snapshot.custom_properties is not None
+    assert len(snapshot.custom_properties.data) == 12
 
 
-def test_custom_property_summaries_of_nothing_is_an_empty_mapping(
+@respx.mock
+def test_schema_compliance_survives_a_missing_custom_properties_endpoint(
     client: StewardsClient,
 ) -> None:
-    assert _fetch_custom_property_summaries((), client) == {}
+    """The properties only add detail: losing them must not cost the compliance checks."""
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    respx.get(PROPERTIES).mock(return_value=httpx.Response(404))
+    snapshot = _fetch_schema_compliance(client)
+    assert len(snapshot.quality.data) == 15
+    assert snapshot.custom_properties is None
+
+
+@respx.mock
+def test_schema_compliance_fails_when_quality_fails(client: StewardsClient) -> None:
+    """Quality carries the checks themselves, so without it there is no page to show."""
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    properties = respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    with pytest.raises(ApiNotFound):
+        _fetch_schema_compliance(client)
+    assert properties.call_count == 0
+
+
+@respx.mock
+def test_compliance_snapshots_return_one_entry_per_monitor(client: StewardsClient) -> None:
+    respx.get(QUALITY).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_quality_quality"))
+    )
+    respx.get(PROPERTIES).mock(
+        return_value=httpx.Response(200, json=load_sample("feed_custom_properties_properties"))
+    )
+    snapshots = _fetch_schema_compliance_snapshots(("schema_compliance",), client)
+    assert set(snapshots) == {"schema_compliance"}
+    assert len(snapshots["schema_compliance"].quality.data) == 15
+
+
+@respx.mock
+def test_compliance_snapshots_skip_a_monitor_whose_quality_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    """The overview must survive it, as it does a missing trend."""
+    respx.get(QUALITY).mock(return_value=httpx.Response(404))
+    assert _fetch_schema_compliance_snapshots(("schema_compliance",), client) == {}
+
+
+def test_compliance_snapshots_of_nothing_is_an_empty_mapping(client: StewardsClient) -> None:
+    assert _fetch_schema_compliance_snapshots((), client) == {}
 
 
 # --- publisher notifications --------------------------------------------------------------

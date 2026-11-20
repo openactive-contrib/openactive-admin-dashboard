@@ -34,6 +34,7 @@ data. The complete file list, for any new monitor:
 | `tests/unit/test_<id>.py` | happy path, empty input, threshold boundary |
 | *(a quality monitor instead)* | `<id>_quality.json` in place of the two payloads above, and no `summary.json` entry — see "The backing reads" |
 | *(a coverage monitor instead)* | `<id>_coverage.json` and `<id>_mappings.json`, and no `summary.json` entry — same section |
+| *(a compliance monitor instead)* | no payload of its own, and no `summary.json` entry: it reuses the payloads of the two reads it joins — same section |
 | `src/stewards/api/models.py` *(only if the monitor has `detail` fields)* | a `DetailModel` subclass |
 | `src/stewards/monitors/email_draft.py` *(optional)* | a check-specific observation sentence |
 
@@ -55,54 +56,65 @@ endpoint in both URL shapes, a repository read, a Streamlit-free shaping module 
 
 ## The backing reads
 
-Most monitors report **incidents**, and everything below assumes that shape. Two other shapes
-exist, declared as `source=` on the registry entry:
+Most monitors report **incidents**, and everything below assumes that shape. Three other
+shapes exist, declared as `source=` on the registry entry:
 
 - `Source.QUALITY` — a **quality snapshot**: one row per feed carrying this snapshot's
   measurements, a fleet-wide `summary` block beside the rows, and no history at all.
 - `Source.COVERAGE` — a **coverage snapshot**: how much of an external estate the fleet
   reaches. Its figures and its rows are *two* endpoints — one object of totals and a
   paginated list of rows — and it has no history either.
+- `Source.SCHEMA_COMPLIANCE` — a **join**, and the only read with no endpoint of its own. It
+  reads the quality snapshot and the custom-property snapshot under the ids
+  `repository._fetch_schema_compliance` holds, and matches them into one row per feed. The
+  quality read decides which feeds exist; the custom-property read only adds to them, so its
+  failure costs a column and a tab rather than the page.
 
-None of the three are interchangeable. A quality row and a coverage row both lack
+None of the four are interchangeable. A quality row and a coverage row both lack
 `first_detected`, `days_open` and `past_threshold`, and folding either into an `Incident`
 would mean inventing all three. A coverage monitor is not a quality monitor because its
 figures do not arrive beside its rows, so it cannot be one request and its rows must page.
+A compliance monitor is neither, because no single endpoint reports what it shows.
 
 So a non-incident monitor swaps the parts of the app that depend on an incident ageing, and
 keeps everything else:
 
-| | `Source.INCIDENTS` (default) | `Source.QUALITY` | `Source.COVERAGE` |
-|---|---|---|---|
-| Read | `incidents` + `trend` | `quality` (one request; see §2) | `coverage` + `coverage_mappings` (paged) |
-| Shaping | `monitors/transforms.py` | `monitors/quality.py` | `monitors/coverage.py` |
-| Page | `components/monitor_page.py` | `components/quality_page.py` | `components/coverage_page.py` |
-| Above the table | 3 KPIs, then the trend chart | 5 figures off the `summary` block, then 4 summary charts | 4 figures off the `headline` block, then the regional chart |
-| Table | incidents, worst-first on `sort_field` | feeds, grouped by dataset | rows, worst-first on `sort_field`, a key's own rows together |
-| Threshold toggle | "Past threshold only" | "Issues only" | "Primary pairs only" |
-| Row selection | the publisher email draft | the feed's own assessment | the row's own evidence |
-| Contact queue | included | never | never |
-| Card | `Sparkline` or `Gauge` off `/summary` | `Facts` — the monitor supplies the card, verdict included | `Facts`, the same way |
-| Sample payload | `<id>_incidents.json`, `<id>_trend.json` | `<id>_quality.json` | `<id>_coverage.json`, `<id>_mappings.json` |
-| Extra registry field | — | — | `rows_id`, naming the rows' own resource |
+| | `Source.INCIDENTS` (default) | `Source.QUALITY` | `Source.COVERAGE` | `Source.SCHEMA_COMPLIANCE` |
+|---|---|---|---|---|
+| Read | `incidents` + `trend` | `quality` (one request; see §2) | `coverage` + `coverage_mappings` (paged) | another monitor's `quality` + another's `properties` (paged) |
+| Shaping | `monitors/transforms.py` | `monitors/quality.py` | `monitors/coverage.py` | `monitors/schema_compliance.py`, over `quality.py` and `schema_drift.py` |
+| Page | `components/monitor_page.py` | `components/quality_page.py` | `components/coverage_page.py` | `components/schema_compliance_page.py` |
+| Above the table | 3 KPIs, then the trend chart | 5 figures off the `summary` block, then 4 summary charts | 4 figures off the `headline` block, then the regional chart | 6 figures off the rows, then the key-field chart |
+| Table | incidents, worst-first on `sort_field` | feeds, grouped by dataset | rows, worst-first on `sort_field`, a key's own rows together | feeds, least compliant first, in a Feeds tab beside a Properties tab |
+| Threshold toggle | "Past threshold only" | "Issues only" | "Primary pairs only" | "Not passing only" |
+| Row selection | the publisher email draft | the feed's own assessment | the row's own evidence | the feed's verdict, key fields, vocabularies and custom properties |
+| Contact queue | included | never | never | never |
+| Card | `Sparkline` or `Gauge` off `/summary` | `Facts` — the monitor supplies the card, verdict included | `Facts`, the same way | `Facts`, the same way |
+| Sample payload | `<id>_incidents.json`, `<id>_trend.json` | `<id>_quality.json` | `<id>_coverage.json`, `<id>_mappings.json` | none of its own: the two it joins |
+| Extra registry field | — | — | `rows_id`, naming the rows' own resource | — |
 
 What is unchanged is everything the registry already drove: `columns` and `ColKind` format
 and RAG-shade the table exactly as they do an incident table, `filters` become the same
 selectboxes, `thresholds.py` supplies every tone, and the card's verdict is a `Health`, so
 the chip, the tone and the sidebar pill run through the code every other monitor uses. A
-column path on a quality or coverage row is a plain attribute name — `score`,
+column path on a quality, coverage or compliance row is a plain attribute name — `score`,
 `dataset_score`, `match_label` — because every figure such a row reports is on the row; there
 is no `detail.` or `part.` prefix to learn.
 
-`tests/unit/test_registry.py` is parametrised over all three kinds and skips whichever checks
+`tests/unit/test_registry.py` is parametrised over all four kinds and skips whichever checks
 do not apply, keyed off the declared source, so the next monitor of any shape is validated
 the moment it lands.
 
-**Adding a fourth read is not a registry entry.** It is a `Source` member, a shaping module
+**Adding a fifth read is not a registry entry.** It is a `Source` member, a shaping module
 under `monitors/`, a page renderer under `components/`, endpoint functions for *both* URL
 shapes, models, repository reads and a branch in `overview_page.tile_cards`. Only reach for
-one when the data genuinely cannot be any of the three — as `COVERAGE` could not, because its
+one when the data genuinely cannot be any of the four — as `COVERAGE` could not, because its
 rows page and its figures come from somewhere else.
+
+A read can also be retired. `Source.SCHEMA_DRIFT` backed a monitor of its own until its page
+became the compliance page's Properties tab: the registry entry, the page renderer, the view
+and the `tile_cards` branch went, the shaping module stayed under its old name, and the
+endpoint kept its slug because the join still reads it.
 
 The rest of this page is the incident procedure. Where a step differs for a quality monitor
 it says so.
@@ -113,7 +125,7 @@ Settle these before writing anything. Every one of them is a field on the regist
 
 | Decision | Field | Notes |
 |---|---|---|
-| Backing read | `source` | `Source.INCIDENTS` (default), `Source.QUALITY` or `Source.COVERAGE`. See "The backing reads" above; it decides which read, which shaping module and which page renderer the monitor gets. |
+| Backing read | `source` | `Source.INCIDENTS` (default), `Source.QUALITY`, `Source.COVERAGE` or `Source.SCHEMA_COMPLIANCE`. See "The backing reads" above; it decides which read, which shaping module and which page renderer the monitor gets. |
 | Rows resource | `rows_id` | `COVERAGE` only: the rows' own id, because they are a second endpoint with a name of their own and no suffix rule would produce it. |
 | Machine id | `id` | snake_case. **It is the API path segment**: `/monitors/<id>/incidents`. It also names the sample payloads and keys the sidebar badge. |
 | Display name | `name` | Sentence case, e.g. `Zero future opportunities`. Used on the page, the tile and the sidebar. |
@@ -236,6 +248,8 @@ logged: every error message names the path, which carries no query string.
 | coverage snapshot | a coverage monitor's figures and chart | `fetch_coverage(id)` |
 | coverage rows | that monitor's table | `fetch_site_mappings(id, rows_id)` |
 | coverage snapshot, every coverage monitor | their home-page cards | `fetch_coverage_snapshots(ids)` |
+| the compliance join | that page's rows, figures and both tabs | `fetch_schema_compliance()` |
+| the compliance join, every compliance monitor | their home-page cards | `fetch_schema_compliance_snapshots(ids)` |
 
 Every response is an envelope: `{"data": ..., "meta": {...}}`.
 
@@ -660,9 +674,23 @@ the entry back to `viz=Sparkline()` is what returns it to trend-based judgement 
 and `tests/unit/test_overview.py` asserts both paths so they cannot silently converge.
 
 The form is a meter rather than a dial deliberately: the reader's job is "above or below the
-benchmark", which position on a track answers at a glance and at tile size. Adding a third
+benchmark", which position on a track answers at a glance and at tile size. Adding another
 visualisation is one variant in `monitors/tile_viz.py`, one builder returning
 `alt.Chart | None`, and one `case` in `components/overview_page.tile_chart`.
+
+#### A monitor `/summary` does not describe: the `Facts` path
+
+A snapshot monitor has no `/summary` entry at all, so there is no count for a card to read
+and no sparkline for it to draw. It declares `viz=Facts()` and hands the whole card over
+ready-made as an `overview.TileCard` — headline, supporting figures, note, sidebar pill and
+verdict — from its own shaping module's `tile_card`. The three non-incident reads all take
+this path, and `overview_page.tile_cards` collects them, one branch per source.
+
+The verdict is still a `Health`, so the chip and the tone run through unchanged code. What
+each monitor puts in it is its own call: `quality.assess_quality` and
+`schema_compliance.assess_compliance` claim a RAG verdict off `thresholds.score_tone`, while
+`coverage.assess_coverage` declines to, declares `Severity.INFORMATIONAL` and renders a grey
+"Info" chip, because coverage is a measurement rather than a fault queue.
 
 The only thing needed to make the card show real figures is the `/summary` entry for the new
 `monitor_id` — from the live API, or from `summary.json` in sample-data mode (next step).

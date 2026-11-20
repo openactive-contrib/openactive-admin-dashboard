@@ -42,16 +42,16 @@ class Source(StrEnum):
     from one read and rows from a second, paginated one, and no history either. It is
     neither of the others — its rows do not age, and its figures do not arrive beside them.
     See `monitors.coverage`.
-    `SCHEMA_DRIFT` is a snapshot of the custom properties the fleet publishes: rows and a
-    summary block in one paginated read, and no history. It arrives shaped like a quality
-    snapshot but measures nothing a score describes — each row is a feed and the properties
-    it uses that the OpenActive vocabulary does not define. See `monitors.schema_drift`.
+    `SCHEMA_COMPLIANCE` has no read of its own: it joins the quality and custom-property
+    snapshots into one row per feed, judged against the standard's required and
+    recommended fields. The custom-property half is shaped by `monitors.schema_drift`,
+    which outlived the monitor that was named after it. See `monitors.schema_compliance`.
     """
 
     INCIDENTS = "incidents"
     QUALITY = "quality"
     COVERAGE = "coverage"
-    SCHEMA_DRIFT = "schema_drift"
+    SCHEMA_COMPLIANCE = "schema_compliance"
 
 
 class Severity(StrEnum):
@@ -99,6 +99,11 @@ class Col:
 
     #: What a `LINK` cell reads, where "feed" is the wrong noun for what it opens.
     link_text: str | None = None
+
+    #: Shade a `PERCENT` cell amber below this figure and green at or above it, instead of
+    #: on the default score bands. For a column whose own rule is not the score's: the
+    #: table must not shade a cell green while the row carrying it warns.
+    warn_below: float | None = None
 
     @property
     def is_detail(self) -> bool:
@@ -178,8 +183,8 @@ class Monitor:
     #: Which read backs this monitor. `QUALITY` swaps the incident machinery — ageing,
     #: contact threshold, trend, email draft — for the fleet snapshot `monitors.quality`
     #: shapes, and routes the page to `components.quality_page`; `COVERAGE` does the same
-    #: through `monitors.coverage` and `components.coverage_page`, and `SCHEMA_DRIFT`
-    #: through `monitors.schema_drift` and `components.schema_drift_page`.
+    #: through `monitors.coverage` and `components.coverage_page`, and `SCHEMA_COMPLIANCE`
+    #: through `monitors.schema_compliance` and `components.schema_compliance_page`.
     source: Source = Source.INCIDENTS
 
     #: The row resource's own id, for a monitor whose rows are a second endpoint rather than
@@ -724,61 +729,99 @@ ACTIVE_PLACES_COVERAGE = Monitor(
 )
 
 
-FEED_CUSTOM_PROPERTIES = Monitor(
-    id="feed_custom_properties",
-    name="Schema drift",
+SCHEMA_COMPLIANCE = Monitor(
+    id="schema_compliance",
+    name="Schema compliance",
     group=Group.COVERAGE,
-    # Context, not a queue: the beta namespace is how the specification is meant to grow, so
-    # a custom property is not a fault a publisher is contacted about. The card stays grey.
-    # See `monitors.schema_drift.assess_drift`.
-    severity=Severity.INFORMATIONAL,
-    # Neither an incident list nor a quality snapshot: rows and a summary block in one read,
-    # with nothing that ages and nothing scored. See `monitors.schema_drift`.
-    source=Source.SCHEMA_DRIFT,
+    # A failing feed breaks the standard, which is worth a steward's attention, but it is a
+    # snapshot rather than a fault that ages, so it is not a contact queue.
+    severity=Severity.MEDIUM,
+    source=Source.SCHEMA_COMPLIANCE,
     blurb=(
-        "Which feeds publish data beyond the OpenActive specification, and what that extra "
-        "data is. It shows where publishers are extending the standard, which extensions "
-        "are most widely used, and which datasets rely on them."
+        "How closely each feed follows the OpenActive standard: which version it publishes, "
+        "which required fields it is missing, how complete its key recommended fields are, "
+        "whether its activities and facilities use the standard vocabularies, and which "
+        "non-standard properties it uses. A feed fails when a required field is missing, "
+        "and warns when a key field is poorly covered or fewer than 90% of its terms match "
+        "a vocabulary. The vocabulary assessment works a rolling five-day window, so a feed "
+        "it has not reached yet shows no figure at all."
     ),
-    unit="datasets using custom properties",
-    # The card is a set of figures rather than a count, and the monitor supplies it along
-    # with its verdict. See `monitors.schema_drift.tile_card`.
+    unit="feeds failing",
+    # The card is a set of figures and a verdict, as the quality and drift cards are.
     viz=Facts(),
     columns=(
         Col("publisher_name", "Publisher", ColKind.TEXT, primary=True),
         Col("dataset_name", "Dataset", ColKind.TEXT),
         Col("feed_name", "Feed", ColKind.MONO),
         Col("feed_type", "Type", ColKind.TEXT),
+        Col("feed_version", "Version", ColKind.TEXT),
         Col(
-            "property_count",
+            "status",
+            "Compliance",
+            ColKind.STATUS,
+            help="Fail: a required field is missing. Warning: a key field is poorly covered",
+        ),
+        Col(
+            "missing_required_count",
+            "Missing required",
+            ColKind.NUMBER,
+            help="Distinct required fields missing; select a row to see which",
+        ),
+        Col(
+            "mean_key_completeness",
+            "Key fields",
+            ColKind.PERCENT,
+            help="Mean completeness of the key recommended fields",
+        ),
+        Col("completeness.location", "Location", ColKind.PERCENT),
+        Col("completeness.start_date", "Start date", ColKind.PERCENT),
+        Col("completeness.end_date", "End date", ColKind.PERCENT),
+        Col("completeness.activities", "Activities", ColKind.PERCENT),
+        Col("completeness.facilities", "Facilities", ColKind.PERCENT),
+        Col("completeness.age_range", "Age range", ColKind.PERCENT),
+        Col("completeness.level", "Level", ColKind.PERCENT),
+        Col("completeness.accessibility_support", "Accessibility", ColKind.PERCENT),
+        Col("completeness.gender_restriction", "Gender", ColKind.PERCENT),
+        # Shaded on their own bar rather than the score bands, so a cell cannot read green
+        # while the row it sits in warns. `warn_below` must stay level with
+        # `schema_compliance.VOCABULARY_WARNING_BELOW`; a test holds the two together.
+        Col(
+            "activity_adherence",
+            "Activity vocabulary",
+            ColKind.PERCENT,
+            help="Share of activity terms matching the standard vocabulary; blank where "
+            "the assessment has not reached this feed",
+            warn_below=90.0,
+        ),
+        Col(
+            "facility_adherence",
+            "Facility vocabulary",
+            ColKind.PERCENT,
+            help="Share of facility terms matching the standard vocabulary; blank where "
+            "the assessment has not reached this feed",
+            warn_below=90.0,
+        ),
+        Col(
+            "custom_property_count",
             "Custom properties",
             ColKind.NUMBER,
-            help="Distinct property names this feed uses outside the OpenActive vocabulary",
+            help="Distinct properties outside the OpenActive vocabulary",
         ),
-        Col(
-            "property_label",
-            "Properties",
-            ColKind.TEXT,
-            help="Every custom property this feed uses; hover a cell to read it in full",
-        ),
-        Col("namespace_label", "Namespaces", ColKind.TEXT),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
     ),
-    # List-valued fields filter by membership: a feed matches a namespace it uses anywhere.
     filters=(
-        FilterSpec("namespaces", "Namespace"),
-        FilterSpec("property_names", "Property"),
-        FilterSpec("entity_types", "Entity type"),
+        FilterSpec("status", "Compliance"),
+        FilterSpec("feed_version", "Version"),
         FilterSpec("feed_type", "Feed type"),
     ),
-    sort_field="property_count",
-    # Nothing here ages, so there is no contact threshold to filter on; the page offers an
-    # "outside beta only" toggle in its place.
+    # Worst first is the module's own order. See `monitors.schema_compliance.sort_rows`.
+    sort_field="missing_required_count",
+    # Nothing here ages; the page offers a "not passing only" toggle instead.
     has_threshold_filter=False,
     summary_field="feed_name",
-    schedule="daily snapshot",
-    query="monitor_feed_custom_properties_v1",
-    page="views/32_feed_custom_properties.py",
+    schedule="nightly assessment",
+    query="monitor_feed_quality_v1 + monitor_feed_custom_properties_v1",
+    page="views/33_schema_compliance.py",
 )
 
 
@@ -791,7 +834,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_FUTURE_DECLINE,
     FEED_QUALITY,
     ACTIVE_PLACES_COVERAGE,
-    FEED_CUSTOM_PROPERTIES,
+    SCHEMA_COMPLIANCE,
 )
 
 _BY_ID: Mapping[str, Monitor] = {m.id: m for m in MONITOR_REGISTRY}

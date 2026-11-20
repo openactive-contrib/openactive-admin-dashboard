@@ -27,6 +27,29 @@ def test_the_sidebar_footer_is_pinned_to_the_bottom() -> None:
     assert f'div[class*="st-key-{SIDEBAR_FOOT_KEY}"] {{\n      margin-top: auto;' in _STYLES
 
 
+def test_kpi_cards_fill_their_column_so_a_row_is_level() -> None:
+    """Both rules are needed. Streamlit stretches the columns to the tallest card already;
+    the card's own height resolves against the wrapper above it, which sizes to its content
+    until it is given a height too, so dropping either leaves the row ragged."""
+    card = f'div[class*="st-key-{CARD_PREFIX}"][class*="kpi"]'
+    wrapper = f'div[data-testid="stLayoutWrapper"]:has(> {card})'
+    assert f"{wrapper} {{\n      height: 100%;" in _STYLES
+    assert f"\n  {card} {{\n      height: 100%;" in _STYLES
+
+
+def test_a_kpi_label_reserves_two_lines_so_the_values_line_up() -> None:
+    """Equal card heights alone are not enough: without this the cards match while the
+    numbers inside them step up and down as one label wraps and the next does not."""
+    assert 'div[class*="st-key-oakpilabel"] {\n      min-height: 2.2rem;' in _STYLES
+
+
+def test_every_kpi_card_matches_whichever_row_it_is_in() -> None:
+    """The selectors key off `kpi` appearing anywhere in the card's key, so a tab's own
+    figures are styled by the same rules as the page's. Matching `{CARD_PREFIX}_kpi` would
+    silently miss them."""
+    assert f'st-key-{CARD_PREFIX}_kpi"' not in _STYLES
+
+
 def test_the_login_note_is_the_sunken_tint_not_an_alert_colour() -> None:
     """Reassurance is not a state, so the note must not borrow st.info's teal."""
     assert 'div[class*="st-key-oaloginnote"]' in _STYLES
