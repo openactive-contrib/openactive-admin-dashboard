@@ -26,7 +26,6 @@ from stewards.api.models import (
     CoverageSnapshot,
     CustomPropertyFeed,
     CustomPropertyResponse,
-    CustomPropertySummary,
     EcosystemGrowthResponse,
     FeedQualityResponse,
     FeedQualitySummary,
@@ -333,27 +332,6 @@ def _fetch_custom_properties(
     return CustomPropertyResponse(data=tuple(feeds), summary=first.summary, meta=first.meta)
 
 
-def _fetch_custom_property_summaries(
-    monitor_ids: Sequence[str],
-    client: StewardsClient | None = None,
-    as_of: date | None = None,
-) -> dict[str, CustomPropertySummary]:
-    """Each custom-property monitor's summary block, for its overview card.
-
-    Tolerant in the same way as `_fetch_quality_summaries`: a monitor whose endpoint this
-    deployment has not built yet is left out of the mapping rather than costing the whole
-    overview.
-    """
-    summaries: dict[str, CustomPropertySummary] = {}
-    for monitor_id in monitor_ids:
-        try:
-            response = _fetch_custom_properties(monitor_id, client=client, as_of=as_of)
-            summaries[monitor_id] = response.summary
-        except ApiError as exc:
-            log.info("No custom-property snapshot for %s: %s", monitor_id, exc)
-    return summaries
-
-
 # --- schema compliance --------------------------------------------------------------------
 #
 # No endpoint of its own: the page joins two snapshots the API already serves.
@@ -551,18 +529,6 @@ def fetch_site_mappings(monitor_id: str, rows_id: str) -> SiteMappingPage:
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_coverage_snapshots(monitor_ids: tuple[str, ...]) -> dict[str, CoverageSnapshot]:
     return _fetch_coverage_snapshots(monitor_ids)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_custom_properties(monitor_id: str) -> CustomPropertyResponse:
-    return _fetch_custom_properties(monitor_id)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_custom_property_summaries(
-    monitor_ids: tuple[str, ...],
-) -> dict[str, CustomPropertySummary]:
-    return _fetch_custom_property_summaries(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)

@@ -1,15 +1,15 @@
 """The custom-property snapshot -> rows, figures, charts and the property table.
 
-No Streamlit, no I/O. This is the fourth backing read's shaping, beside `transforms.py`
-(incidents), `quality.py` and `coverage.py`. The payload looks like a quality snapshot — one
-row per feed, a fleet-wide `summary` block beside the rows, no history — but what it measures
-is different: which properties each feed publishes that the OpenActive vocabulary does not
-define, and in which namespace. Nothing here is scored and nothing ages, so there is no
-`first_detected`, no contact threshold and no RAG verdict to invent.
+No Streamlit, no I/O. This was the shaping behind a monitor of its own, the schema drift
+page. That monitor is retired and the module outlived it: the compliance page reads the
+same snapshot, so `monitors.schema_compliance` builds its rows from `build_row`, and the
+page's Properties tab is `page_stats`, `property_chart`, `property_frame` and `feeds_using`.
+The module keeps its name because the payload has not changed.
 
-What it shares is everything below the data: the registry declares the columns, the column
-kinds format the cells, and the card's verdict is a `Health`, so the chip, the tone and the
-sidebar pill run through the code every other monitor uses.
+What it measures: which properties each feed publishes that the OpenActive vocabulary does
+not define, and in which namespace. Nothing here is scored and nothing ages, so there is no
+`first_detected`, no contact threshold and no RAG verdict to invent. The figures describe
+the fleet the batch analysed and are read off the `summary` block rather than recomputed.
 
 Pure, as `trend.py` and `quality.py` are: the chart builders take their colours from the
 caller rather than importing the theme.
@@ -17,7 +17,7 @@ caller rather than importing the theme.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -31,10 +31,7 @@ from stewards.api.models import (
     CustomPropertyUse,
     PropertyUsage,
 )
-from stewards.monitors.health import Health, HealthState, Movement
-from stewards.monitors.overview import Fact, TileCard
-from stewards.monitors.quality import cell_tone
-from stewards.monitors.registry import Col, ColKind, Monitor
+from stewards.monitors.registry import Col, ColKind
 from stewards.monitors.thresholds import Tone
 from stewards.monitors.transforms import EMPTY, format_cell
 
@@ -52,8 +49,6 @@ UNPREFIXED = "Unprefixed"
 #: Sorts a row reporting no figure after every row that does, without conflating it with a
 #: genuine zero.
 NO_FIGURE = -1.0
-
-NOT_REPORTED = "custom properties not reported in this snapshot"
 
 #: Bars shown on the property chart. The full property list is the table
 #: beside the feeds; a chart of 57 bars is a table drawn badly.
@@ -173,131 +168,6 @@ def build_rows(feeds: Sequence[CustomPropertyFeed]) -> tuple[PropertyRow, ...]:
     return tuple(build_row(feed) for feed in feeds)
 
 
-def resolve(row: PropertyRow, field: str) -> Any:
-    """Read a declared column or filter field off a row. Flat by design, as on a quality row:
-    every figure is an attribute of the row, so there is no path syntax to learn."""
-    return getattr(row, field, None)
-
-
-def _numeric(value: Any) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    return float(value)
-
-
-def sort_rows(monitor: Monitor, rows: Sequence[PropertyRow]) -> list[PropertyRow]:
-    """Most custom properties first, then by publisher, dataset and feed.
-
-    A row reporting no figure for the sort field sorts after every row that does, rather
-    than as a zero.
-    """
-
-    def key(row: PropertyRow) -> tuple[float, str, str, str]:
-        value = _numeric(resolve(row, monitor.sort_field))
-        return (
-            -(value if value is not None else NO_FIGURE),
-            row.publisher_name.lower(),
-            row.dataset_name.lower(),
-            row.feed_name.lower(),
-        )
-
-    return sorted(rows, key=key)
-
-
-# --- the table ----------------------------------------------------------------------------
-
-
-def to_dataframe(monitor: Monitor, rows: Sequence[PropertyRow]) -> pd.DataFrame:
-    """One line per feed, columns in the order the registry declares.
-
-    Zero rows yields an empty frame with the declared columns, so the table renders empty
-    instead of raising.
-    """
-    labels = [col.label for col in monitor.columns]
-    records = [
-        {col.label: format_cell(col, resolve(row, col.field)) for col in monitor.columns}
-        for row in rows
-    ]
-    return pd.DataFrame(records, columns=labels)
-
-
-def tone_frame(monitor: Monitor, rows: Sequence[PropertyRow]) -> pd.DataFrame:
-    """Tone name per cell, aligned with `to_dataframe`; empty string where unstyled."""
-    labels = [col.label for col in monitor.columns]
-    records = [
-        {
-            col.label: (tone.value if (tone := cell_tone(col, resolve(row, col.field))) else "")
-            for col in monitor.columns
-        }
-        for row in rows
-    ]
-    return pd.DataFrame(records, columns=labels).fillna("")
-
-
-# --- filtering ----------------------------------------------------------------------------
-
-
-def _values(row: PropertyRow, field: str) -> tuple[str, ...]:
-    """A field's values as strings: every member of a list field, or the one scalar."""
-    value = resolve(row, field)
-    if isinstance(value, tuple):
-        return tuple(str(item) for item in value if item not in (None, ""))
-    return () if value in (None, "") else (str(value),)
-
-
-def filter_options(rows: Sequence[PropertyRow], field: str) -> list[str]:
-    """Distinct values for a filter field, sorted, for a selectbox. A list field offers
-    every member it holds on any row."""
-    options = {value for row in rows for value in _values(row, field)}
-    if field == "namespaces":
-        return sorted(options, key=_namespace_order)
-    return sorted(options, key=str.lower)
-
-
-def search_rows(rows: Iterable[PropertyRow], term: str) -> list[PropertyRow]:
-    """Case-insensitive substring match on publisher, dataset, feed and property names."""
-    needle = term.strip().lower()
-    if not needle:
-        return list(rows)
-    return [
-        row
-        for row in rows
-        if needle
-        in " ".join(
-            part.lower()
-            for part in (
-                row.publisher_name,
-                row.dataset_name,
-                row.feed_name,
-                row.feed_id,
-                *row.property_names,
-            )
-        )
-    ]
-
-
-def apply_filters(
-    rows: Sequence[PropertyRow],
-    *,
-    search: str = "",
-    selections: Mapping[str, str] | None = None,
-    outside_beta_only: bool = False,
-) -> list[PropertyRow]:
-    """Search, per-field selections and the outside-beta toggle, applied in that order.
-
-    A selection on a list field keeps the feeds holding that value anywhere in the list.
-    Local to the cached snapshot, as on every other page.
-    """
-    result = search_rows(rows, search)
-    for field, wanted in (selections or {}).items():
-        if not wanted:
-            continue
-        result = [row for row in result if wanted in _values(row, field)]
-    if outside_beta_only:
-        result = [row for row in result if row.uses_outside_beta]
-    return result
-
-
 # --- the figures --------------------------------------------------------------------------
 
 
@@ -351,55 +221,6 @@ def page_stats(summary: CustomPropertySummary) -> tuple[Stat, ...]:
             format_number(summary.publishers_with_custom_properties),
             sub="publishing the feeds below",
         ),
-    )
-
-
-def assess_drift(summary: CustomPropertySummary) -> Health:
-    """The card's verdict.
-
-    Deliberately not a RAG judgement, for the reason `coverage.assess_coverage` gives: a
-    custom property is not a fault. The beta namespace is how the specification is meant to
-    grow, and there is no count of datasets at which somebody is contacted. The monitor
-    declares `Severity.INFORMATIONAL`, so a warning here renders as the grey "Info" chip.
-    Do not "fix" this to `HEALTHY`: that would claim an all-clear the figure cannot support.
-
-    `movement` stays unknown: one snapshot carries a level and says nothing about direction.
-    """
-    datasets = summary.datasets_with_custom_properties
-    if datasets is None:
-        return Health(HealthState.UNKNOWN, Movement.UNKNOWN, NOT_REPORTED)
-    reason = (
-        f"{format_number(datasets)} of {format_number(summary.datasets_assessed)} datasets "
-        "publish a property the OpenActive vocabulary does not define"
-    )
-    return Health(HealthState.WARNING, Movement.UNKNOWN, reason, current=float(datasets))
-
-
-def tile_note(summary: CustomPropertySummary) -> str:
-    if summary.datasets_with_custom_properties is None:
-        return NOT_REPORTED
-    return (
-        f"of {format_number(summary.datasets_assessed)} datasets assessed · this snapshot only"
-    )
-
-
-def tile_card(summary: CustomPropertySummary) -> TileCard:
-    """The overview card: datasets using custom properties, three figures and the verdict.
-
-    `badge=None`: the sidebar pill counts what needs working through, and a custom property
-    is not a queue. See `tile_viz.Facts`.
-    """
-    return TileCard(
-        value=format_number(summary.datasets_with_custom_properties),
-        unit="datasets using custom properties",
-        health=assess_drift(summary),
-        facts=(
-            Fact("Feeds", format_number(summary.feeds_with_custom_properties)),
-            Fact("Distinct properties", format_number(summary.distinct_custom_properties)),
-            Fact("Publishers", format_number(summary.publishers_with_custom_properties)),
-        ),
-        note=tile_note(summary),
-        badge=None,
     )
 
 
