@@ -1146,7 +1146,7 @@ def _schema_compliance_page_script() -> None:
 
 
 def test_the_compliance_page_renders_the_join_and_opens_the_worst_feed() -> None:
-    from stewards.monitors import schema_compliance
+    from stewards.monitors import schema_compliance, schema_drift
 
     app = run(_schema_compliance_page_script)
     markdown = " ".join(m.value for m in app.markdown)
@@ -1154,16 +1154,22 @@ def test_the_compliance_page_renders_the_join_and_opens_the_worst_feed() -> None
 
     # The header dates the quality read, which is the snapshot that decides the rows.
     assert "2026-08-21" in markdown
-    # Six figures above the table, the key field chart where a trend would be.
-    assert len(app.get("vega_lite_chart")) == 1
+    # The key field chart where a trend would be, and the property chart in the other tab.
+    assert len(app.get("vega_lite_chart")) == 2
     assert any("of 15 feeds shown" in c for c in captions)
     # Worst first, so the pop-up opens the feed that is missing a required field.
     assert "required field missing" in markdown
     assert "Missing required fields" in markdown
-    # The table, then the selected feed's key fields, then how its terms matched.
-    assert len(app.dataframe) == 3
-    assert list(app.dataframe[1].value.columns) == ["Field", "Completeness"]
-    assert list(app.dataframe[2].value.columns) == list(schema_compliance.VOCABULARY_COLUMNS)
+    # The feeds table, the selected feed's key fields and how its terms matched, then the
+    # Properties tab: every property, and the feeds using the one the stub selects.
+    # The feeds table, then the Properties tab's own table and the feeds using the property
+    # the stub selects, then the pop-up, which `AppTest` renders last.
+    columns = [list(frame.value.columns) for frame in app.dataframe]
+    assert len(columns) == 5
+    assert columns[1] == [col.label for col in schema_drift.PROPERTY_COLUMNS]
+    assert columns[2] == ["Publisher", "Dataset", "Feed", "Entity type", "Presence"]
+    assert columns[3] == ["Field", "Completeness"]
+    assert columns[4] == list(schema_compliance.VOCABULARY_COLUMNS)
     assert "Vocabulary match" in markdown
 
 
@@ -1230,12 +1236,48 @@ def test_a_passing_feed_says_so_and_an_unreported_chart_is_a_caption() -> None:
 
 
 def test_a_failed_custom_property_read_is_said_rather_than_shown_as_zero() -> None:
+    from stewards.components.schema_compliance_page import NO_PROPERTIES_SNAPSHOT
+
     app = run(_schema_compliance_no_properties_script)
     captions = [c.value for c in app.caption]
     markdown = " ".join(m.value for m in app.markdown)
     assert any("blank rather than zero" in c for c in captions)
     # The figure above the table says the same thing, so it is not read as a real zero.
     assert "custom properties not reported" in markdown
+    # And the Properties tab has nothing at all to draw, so it says so rather than
+    # rendering an empty table that would read as "the fleet uses none".
+    assert NO_PROPERTIES_SNAPSHOT in captions
+    # Only the Feeds tab draws: its table and its key field chart, and nothing beside them.
+    assert [frame.key for frame in app.dataframe] == ["table_schema_compliance"]
+    assert len(app.get("vega_lite_chart")) == 1
+
+
+def _schema_compliance_unused_property_script() -> None:
+    from stewards.api.models import CustomPropertyFeed, CustomPropertySummary, PropertyUsage
+    from stewards.components import schema_compliance_page
+    from stewards.components.schema_compliance_page import render_property_table
+    from stewards.monitors import schema_drift
+    from stewards.monitors.registry import SCHEMA_COMPLIANCE
+
+    bare = schema_drift.build_row(
+        CustomPropertyFeed.model_validate({"feed_id": "bare", "custom_properties": []})
+    )
+    original = schema_compliance_page.render_table
+    schema_compliance_page.render_table = lambda *a, **k: 0  # type: ignore[assignment]
+    try:
+        unused = CustomPropertySummary(property_breakdown=(PropertyUsage(property="x:y"),))
+        render_property_table(SCHEMA_COMPLIANCE, unused, (bare,))
+    finally:
+        schema_compliance_page.render_table = original
+
+
+def test_a_property_no_feed_in_the_snapshot_lists_is_a_caption_not_an_empty_table() -> None:
+    """The summary block and the rows are two halves of one read, but a property the block
+    names need not appear on a row the filters left in hand."""
+    app = run(_schema_compliance_unused_property_script)
+    captions = [c.value for c in app.caption]
+    assert any("None of the feeds in this snapshot lists this property" in c for c in captions)
+    assert not app.dataframe
 
 
 # --- the loading card ----------------------------------------------------------------------

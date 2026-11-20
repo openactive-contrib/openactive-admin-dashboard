@@ -1,10 +1,15 @@
 """The whole of the schema compliance page.
 
-`quality_page.py` and `schema_drift_page.py` are this module's neighbours, and the page is
-deliberately their shape: header, blurb, five figures, one chart where a trend would be,
-filters, the table, and the selected feed in a pop-up. What differs is the source. The page
-has no endpoint of its own, so it reads the joined snapshot, and it dates the header from
-the quality read — the one that decides which feeds are on the page.
+`quality_page.py` is this module's nearest neighbour, and the page is deliberately its
+shape: header, blurb, six figures, one chart where a trend would be, then two views of the
+snapshot — the feeds, with the selected feed in a pop-up, and the fleet-wide custom
+properties, with the feeds using the selected one. What differs is the source. The page has
+no endpoint of its own, so it reads the joined snapshot, and it dates the header from the
+quality read — the one that decides which feeds are on the page.
+
+The Properties tab is the whole of what the retired schema drift page showed, and it reads
+nothing extra: the custom-property snapshot arrives beside the quality one, summary block
+and all, so the tab is a second view of a payload the page already holds.
 
 No email draft: the registry entry declares no email fields, and a compliance verdict is a
 reading of the feed against the standard rather than a fault that ages into a contact queue.
@@ -18,10 +23,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import altair as alt
+import pandas as pd
 import streamlit as st
 
 from stewards.api import repository
 from stewards.api.errors import ApiError
+from stewards.api.models import CustomPropertyResponse, CustomPropertySummary
 from stewards.components import layout, theme
 from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
@@ -29,9 +36,10 @@ from stewards.components.incident_table import render_table
 from stewards.components.loading import loading
 from stewards.components.row_dialog import render_row_dialog
 from stewards.components.surface import card
-from stewards.monitors import schema_compliance, transforms
+from stewards.monitors import schema_compliance, schema_drift, transforms
 from stewards.monitors.registry import Monitor
 from stewards.monitors.schema_compliance import ComplianceRow
+from stewards.monitors.schema_drift import PropertyRow
 from stewards.monitors.thresholds import status_label, status_tone
 
 #: The registry entry declares no email fields, so the footer must not claim a draft.
@@ -53,11 +61,26 @@ VOCABULARY_MATCH = st.column_config.ProgressColumn(
     help="Share of the feed's sampled terms matching the standard vocabulary",
 )
 
+PRESENCE = st.column_config.ProgressColumn(
+    "Presence",
+    min_value=0,
+    max_value=100,
+    format="%.0f%%",
+    help="Share of the feed's sampled items carrying the property",
+)
+
 #: Said above the table when the custom-property read failed, so the blank cells in the
 #: Custom properties column are not read as "this feed uses none".
 PROPERTIES_UNAVAILABLE = (
     "The custom-property snapshot was not available, so the custom property counts are "
     "blank rather than zero."
+)
+
+#: The Properties tab when that same read failed. It has nothing to draw at all, so it says
+#: so rather than rendering an empty table that reads as "the fleet uses none".
+NO_PROPERTIES_SNAPSHOT = (
+    "The custom-property snapshot was not available, so this tab has nothing to show. The "
+    "compliance assessment on the Feeds tab is unaffected."
 )
 
 
@@ -187,25 +210,10 @@ def render_row_detail(monitor: Monitor, row: ComplianceRow) -> None:
     )
 
 
-def render_schema_compliance_page(monitor: Monitor) -> None:
-    """Header, blurb, figures, the key field chart, filters, table, selected feed, footer."""
-    try:
-        with loading("Loading the compliance snapshot"):
-            snapshot = repository.fetch_schema_compliance()
-    except ApiError as exc:
-        layout.render_error_header(monitor.crumb, monitor.name)
-        render_api_error(exc)
-        return
-
-    # The quality read decides which feeds are on the page, so its snapshot is the one the
-    # header dates. See `monitors.schema_compliance`.
-    layout.render_header(monitor.crumb, monitor.name, snapshot.quality.meta)
-    render_blurb(monitor)
-
-    rows = schema_compliance.build_rows(snapshot)
-    render_stats(monitor, rows)
-    render_summary_chart(monitor, rows)
-
+def render_feeds(
+    monitor: Monitor, rows: Sequence[ComplianceRow], *, properties_reported: bool
+) -> None:
+    """Filters, the table of assessed feeds and the selected feed."""
     state = render_filters(monitor, rows)
     shown = schema_compliance.sort_rows(
         schema_compliance.apply_filters(
@@ -216,7 +224,7 @@ def render_schema_compliance_page(monitor: Monitor) -> None:
         )
     )
 
-    unavailable = "" if snapshot.custom_properties is not None else f" {PROPERTIES_UNAVAILABLE}"
+    unavailable = "" if properties_reported else f" {PROPERTIES_UNAVAILABLE}"
     st.caption(
         f"{len(shown):,} of {len(rows):,} feeds shown, least compliant first. Select a row "
         f"to open it.{unavailable}"
@@ -241,5 +249,112 @@ def render_schema_compliance_page(monitor: Monitor) -> None:
         title=lambda row: f"Compliance · {row.feed_name}",
         render=lambda row: render_row_detail(monitor, row),
     )
+
+
+def render_property_stats(monitor: Monitor, summary: CustomPropertySummary) -> None:
+    """The Properties tab's own figures, straight off the custom-property summary block.
+
+    Deliberately not recomputed from the table below, for the reason `render_stats` gives:
+    they describe the fleet the batch analysed. They are also not the page's headline
+    figures, which is why they sit inside the tab rather than above it — nothing a publisher
+    is contacted about, and nothing that moves the compliance verdict.
+    """
+    stats = schema_drift.page_stats(summary)
+    for index, (column, stat) in enumerate(zip(st.columns(len(stats)), stats, strict=True)):
+        with column, card(f"propkpi_{monitor.id}_{index}"):
+            layout.tone_metric(
+                stat.label,
+                stat.value,
+                stat.tone,
+                slug=f"{monitor.id}prop{index}",
+                sub=stat.sub,
+            )
+
+
+def render_property_chart(monitor: Monitor, summary: CustomPropertySummary) -> None:
+    """Which custom properties are used most widely."""
+    render_chart(
+        "Most used custom properties",
+        f"Feeds carrying each property, the {schema_drift.CHART_LIMIT} most widely used. "
+        "Every property is in the table below.",
+        schema_drift.property_chart(
+            summary,
+            theme.TEAL,
+            label_colour=theme.MUTED,
+            grid_colour=theme.BORDER_SUBTLE,
+        ),
+        f"chart_{monitor.id}_properties",
+    )
+
+
+def render_property_table(
+    monitor: Monitor, summary: CustomPropertySummary, rows: Sequence[PropertyRow]
+) -> None:
+    """Every custom property in the fleet, and the feeds using the selected one."""
+    properties = schema_drift.sort_properties(summary)
+    st.caption(
+        f"{len(properties):,} custom properties, most widely used first. Select a row to see "
+        "which feeds publish it."
+    )
+    frame = schema_drift.property_frame(properties)
+    selected = render_table(
+        frame,
+        pd.DataFrame("", index=frame.index, columns=frame.columns),
+        columns=schema_drift.PROPERTY_COLUMNS,
+        rag_columns=[],
+        key=f"properties_{monitor.id}",
+        empty_message="This snapshot reports no property breakdown.",
+    )
+    if selected is None or selected >= len(properties):
+        return
+    name = properties[selected].property
+    with st.expander(f"Feeds using · {name}", expanded=True):
+        using = schema_drift.feeds_using(rows, name)
+        if using.empty:
+            st.caption("None of the feeds in this snapshot lists this property.")
+            return
+        st.dataframe(
+            using,
+            column_config={"Presence": PRESENCE},
+            hide_index=True,
+            width="stretch",
+            key=f"using_{monitor.id}",
+        )
+
+
+def render_properties(monitor: Monitor, properties: CustomPropertyResponse | None) -> None:
+    """The Properties tab: the fleet's custom properties, or why there are none to show."""
+    if properties is None:
+        st.caption(NO_PROPERTIES_SNAPSHOT)
+        return
+    render_property_stats(monitor, properties.summary)
+    render_property_chart(monitor, properties.summary)
+    render_property_table(monitor, properties.summary, schema_drift.build_rows(properties.data))
+
+
+def render_schema_compliance_page(monitor: Monitor) -> None:
+    """Header, blurb, figures, the key field chart, the two tabs, footer."""
+    try:
+        with loading("Loading the compliance snapshot"):
+            snapshot = repository.fetch_schema_compliance()
+    except ApiError as exc:
+        layout.render_error_header(monitor.crumb, monitor.name)
+        render_api_error(exc)
+        return
+
+    # The quality read decides which feeds are on the page, so its snapshot is the one the
+    # header dates. See `monitors.schema_compliance`.
+    layout.render_header(monitor.crumb, monitor.name, snapshot.quality.meta)
+    render_blurb(monitor)
+
+    rows = schema_compliance.build_rows(snapshot)
+    render_stats(monitor, rows)
+    render_summary_chart(monitor, rows)
+
+    feeds_tab, properties_tab = st.tabs(["Feeds", "Properties"])
+    with feeds_tab:
+        render_feeds(monitor, rows, properties_reported=snapshot.custom_properties is not None)
+    with properties_tab:
+        render_properties(monitor, snapshot.custom_properties)
 
     layout.render_footer(monitor.query, actions=NO_ACTIONS)

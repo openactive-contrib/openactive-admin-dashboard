@@ -414,7 +414,7 @@ def key_field_averages(rows: Sequence[ComplianceRow]) -> dict[str, float | None]
 
 
 def page_stats(rows: Sequence[ComplianceRow]) -> tuple[Stat, ...]:
-    """The five figures above the table.
+    """The six figures above the table.
 
     Worked out from the rows rather than read from a summary block, because the page joins
     two snapshots and neither block describes the join. Pass in every row, not the

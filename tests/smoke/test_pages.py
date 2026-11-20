@@ -306,14 +306,23 @@ def test_the_schema_drift_page_states_the_fleet_figures_not_the_filtered_ones() 
 
 
 @pytest.mark.parametrize("name", SCHEMA_COMPLIANCE_PAGES)
-def test_schema_compliance_page_has_five_figures_one_chart_and_one_table(name: str) -> None:
+def test_schema_compliance_page_has_two_tabs_each_with_a_chart_and_a_table(name: str) -> None:
+    """`AppTest` renders both tabs, so the counts are the two of them together: the feeds
+    table and the key field chart, then the fleet's properties and the chart above them.
+
+    The selected feed's key fields and the feeds using a selected property render only once
+    a row is selected, so neither is here.
+    """
     from stewards.monitors.registry import get_monitor
 
     monitor = get_monitor(MONITOR_IDS[name])
     app = run(name)
-    # One table: the selected feed's key fields render only once a row is selected.
-    assert len(app.dataframe) == 1
-    assert len(app.get("vega_lite_chart")) == 1
+    assert [frame.key for frame in app.dataframe] == [
+        f"table_{monitor.id}",
+        f"properties_{monitor.id}",
+    ]
+    assert len(app.get("vega_lite_chart")) == 2
+    # The filters belong to the Feeds tab; the Properties tab narrows nothing.
     assert len(app.selectbox) == len(monitor.filters)
     # "not passing only" stands where the threshold toggle would
     assert len(app.toggle) == 1
@@ -353,6 +362,21 @@ def test_the_compliance_page_states_the_fleet_figures_not_the_filtered_ones() ->
     assert markdown[markdown.index("FAILING") + 1] == ":red[1]"
     assert markdown[markdown.index("WARNINGS") + 1] == ":orange[14]"
     assert "Actions available: none" in text
+
+
+def test_the_properties_tab_states_the_fleet_figures_and_lists_every_property() -> None:
+    """The whole of what the retired schema drift page showed, on the same payload: the
+    fleet figures off the summary block, and one line per custom property."""
+    from stewards.monitors import schema_drift
+
+    app = run("33_schema_compliance.py")
+    frame = app.dataframe[1].value
+    assert list(frame.columns) == [col.label for col in schema_drift.PROPERTY_COLUMNS]
+    text = text_of(app)
+    assert "62" in text  # datasets with custom properties, fleet-wide
+    assert "of 159 datasets assessed" in text
+    assert "40.6% of 397 feeds assessed" in text
+    assert "custom properties, most widely used first" in text
 
 
 def test_the_join_carries_custom_property_counts_onto_the_quality_feeds() -> None:
