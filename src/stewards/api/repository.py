@@ -22,6 +22,10 @@ from stewards.api import endpoints
 from stewards.api.client import StewardsClient, get_client
 from stewards.api.errors import ApiContractError, ApiError
 from stewards.api.models import (
+    ActivityCoverageSummary,
+    ActivityCoverageSummaryResponse,
+    ActivityDistrict,
+    ActivityDistrictPage,
     CoverageResponse,
     CoverageSnapshot,
     CustomPropertyFeed,
@@ -39,6 +43,7 @@ from stewards.api.models import (
     SiteMapping,
     SiteMappingPage,
     SummaryResponse,
+    TopActivityPage,
     TrendPoint,
     TrendResponse,
 )
@@ -53,6 +58,9 @@ MAX_PAGES = 20
 #: so asking for more would silently get this anyway. Ten thousand pairs is eleven requests,
 #: comfortably inside `MAX_PAGES`.
 MAPPING_PAGE_SIZE = 1000
+
+#: How many activities the national ranking chart shows.
+TOP_ACTIVITY_LIMIT = 20
 
 
 def _parse[T: BaseModel](model: type[T], payload: object, endpoint: str) -> T:
@@ -287,6 +295,93 @@ def _fetch_coverage_snapshots(
     return snapshots
 
 
+def _fetch_activity_summary(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> ActivityCoverageSummaryResponse:
+    """An activity coverage monitor's national figures: one object, no paging."""
+    client = client or get_client()
+    endpoint = endpoints.activity_summary(client.style, monitor_id, as_of=as_of or date.today())
+    payload = client.get(endpoint.path, endpoint.params)
+    return _parse(ActivityCoverageSummaryResponse, payload, endpoint.path)
+
+
+def _fetch_top_activities(
+    monitor_id: str,
+    limit: int = TOP_ACTIVITY_LIMIT,
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> TopActivityPage:
+    """The first `limit` activities of the national ranking, in one request.
+
+    Deliberately not a paging loop: the ranking is the head of a long list, and the rest of
+    it is what the per-district rows describe.
+    """
+    client = client or get_client()
+    endpoint = endpoints.top_activities(
+        client.style, monitor_id, as_of=as_of or date.today(), limit=limit
+    )
+    return _parse(TopActivityPage, client.get(endpoint.path, endpoint.params), endpoint.path)
+
+
+def _fetch_activity_districts(
+    monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
+) -> ActivityDistrictPage:
+    """Every district-activity row, paging inside this function as `_fetch_site_mappings`
+    does: the caller never loops, and the page filters the returned snapshot locally."""
+    client = client or get_client()
+    as_of = as_of or date.today()
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.activity_districts(
+            client.style, monitor_id, as_of=as_of, page=page, page_size=MAPPING_PAGE_SIZE
+        )
+
+    endpoint = request(1)
+    payload = client.get(endpoint.path, endpoint.params)
+    first = _parse(ActivityDistrictPage, payload, endpoint.path)
+
+    rows: list[ActivityDistrict] = list(first.data)
+    page = 1
+    while len(rows) < first.meta.total and rows and page < MAX_PAGES:
+        page += 1
+        nxt_endpoint = request(page)
+        nxt = _parse(
+            ActivityDistrictPage,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
+        )
+        if not nxt.data:
+            break
+        rows.extend(nxt.data)
+    if len(rows) < first.meta.total:
+        log.warning(
+            "Fetched %d of %d activity district rows for %s",
+            len(rows),
+            first.meta.total,
+            monitor_id,
+        )
+    return ActivityDistrictPage(data=tuple(rows), meta=first.meta)
+
+
+def _fetch_activity_summaries(
+    monitor_ids: Sequence[str],
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+) -> dict[str, ActivityCoverageSummary]:
+    """Each activity coverage monitor's national figures, for its overview card.
+
+    Tolerant as the other card reads are: a monitor whose endpoint this deployment has not
+    built is left out, and its card reads "not reported" rather than costing the overview.
+    """
+    summaries: dict[str, ActivityCoverageSummary] = {}
+    for monitor_id in monitor_ids:
+        try:
+            summaries[monitor_id] = _fetch_activity_summary(monitor_id, client, as_of).data
+        except ApiError as exc:
+            log.info("No activity coverage summary for %s: %s", monitor_id, exc)
+    return summaries
+
+
 def _fetch_custom_properties(
     monitor_id: str, client: StewardsClient | None = None, as_of: date | None = None
 ) -> CustomPropertyResponse:
@@ -500,6 +595,28 @@ def fetch_site_mappings(monitor_id: str, rows_id: str) -> SiteMappingPage:
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_coverage_snapshots(monitor_ids: tuple[str, ...]) -> dict[str, CoverageSnapshot]:
     return _fetch_coverage_snapshots(monitor_ids)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_activity_summary(monitor_id: str) -> ActivityCoverageSummaryResponse:
+    return _fetch_activity_summary(monitor_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_top_activities(monitor_id: str, limit: int = TOP_ACTIVITY_LIMIT) -> TopActivityPage:
+    return _fetch_top_activities(monitor_id, limit)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_activity_districts(monitor_id: str) -> ActivityDistrictPage:
+    return _fetch_activity_districts(monitor_id)
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_activity_summaries(
+    monitor_ids: tuple[str, ...],
+) -> dict[str, ActivityCoverageSummary]:
+    return _fetch_activity_summaries(monitor_ids)
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)

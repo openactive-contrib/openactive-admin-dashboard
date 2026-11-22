@@ -39,8 +39,12 @@ from stewards.api.models import (
 from stewards.api.repository import (
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
+    TOP_ACTIVITY_LIMIT,
     _create_publisher_notification,
     _delete_publisher_notification,
+    _fetch_activity_districts,
+    _fetch_activity_summaries,
+    _fetch_activity_summary,
     _fetch_coverage,
     _fetch_coverage_snapshots,
     _fetch_custom_properties,
@@ -54,6 +58,7 @@ from stewards.api.repository import (
     _fetch_quality_summaries,
     _fetch_site_mappings,
     _fetch_summary,
+    _fetch_top_activities,
     _fetch_trend,
     _fetch_trend_points,
     _update_publisher_notification,
@@ -593,6 +598,142 @@ def test_coverage_snapshots_return_one_entry_per_monitor(client: StewardsClient)
     snapshots = _fetch_coverage_snapshots(("active_places_coverage",), client)
     assert set(snapshots) == {"active_places_coverage"}
     assert snapshots["active_places_coverage"].headline.coverage_pct == 26.4
+
+
+# --- activity coverage ---------------------------------------------------------------------
+
+ACTIVITY_SUMMARY = f"{BASE}/monitors/activity_coverage/summary"
+TOP_ACTIVITIES = f"{BASE}/monitors/activity_coverage/top-activities"
+ACTIVITY_DISTRICTS = f"{BASE}/monitors/activity_coverage/districts"
+
+
+@respx.mock
+def test_activity_summary_returns_the_national_figures(client: StewardsClient) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(
+        return_value=httpx.Response(200, json=load_sample("activity_coverage_summary"))
+    )
+    response = _fetch_activity_summary("activity_coverage", client)
+    assert response.data.activity_opportunities == 683255
+    assert response.data.labelled_percentage == 65.5
+    assert response.meta.snapshot_date == date(2026, 8, 21)
+
+
+@respx.mock
+def test_activity_summary_rejects_a_payload_of_the_wrong_shape(client: StewardsClient) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(return_value=httpx.Response(200, json={"data": {}}))
+    with pytest.raises(ApiContractError):
+        _fetch_activity_summary("activity_coverage", client)
+
+
+@respx.mock
+def test_activity_summary_tolerates_null_figures(client: StewardsClient) -> None:
+    """A null is a figure the batch did not compute: em dash on the page, never a crash."""
+    body = load_sample("activity_coverage_summary")
+    body["data"] = dict.fromkeys(body["data"])
+    respx.get(ACTIVITY_SUMMARY).mock(return_value=httpx.Response(200, json=body))
+    response = _fetch_activity_summary("activity_coverage", client)
+    assert response.data.activity_opportunities is None
+    assert response.data.labelled_percentage is None
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [(401, ApiUnauthorized), (404, ApiNotFound), (500, ApiUnavailable)],
+)
+@respx.mock
+def test_activity_summary_errors_map_to_typed_errors(
+    client: StewardsClient, status: int, error: type[Exception]
+) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(return_value=httpx.Response(status))
+    with pytest.raises(error):
+        _fetch_activity_summary("activity_coverage", client)
+
+
+@respx.mock
+def test_activity_summary_timeout_is_unavailable(client: StewardsClient) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(side_effect=httpx.ConnectTimeout("slow"))
+    with pytest.raises(ApiUnavailable):
+        _fetch_activity_summary("activity_coverage", client)
+
+
+@respx.mock
+def test_top_activities_ask_for_one_page_of_the_ranking(client: StewardsClient) -> None:
+    route = respx.get(TOP_ACTIVITIES).mock(
+        return_value=httpx.Response(200, json=load_sample("activity_coverage_top_activities"))
+    )
+    response = _fetch_top_activities("activity_coverage", client=client)
+    assert len(response.data) == TOP_ACTIVITY_LIMIT == 20
+    assert response.data[0].activity == "Swimming"
+    # The ranking's total is every activity; the chart wants only its head.
+    assert response.meta.total == 288
+    assert route.call_count == 1
+    assert route.calls[0].request.url.params["page_size"] == str(TOP_ACTIVITY_LIMIT)
+
+
+@respx.mock
+def test_activity_districts_follow_every_page(client: StewardsClient) -> None:
+    page1 = load_sample("activity_districts_page1")
+    page2 = load_sample("activity_districts_page2")
+    route = respx.get(ACTIVITY_DISTRICTS)
+    route.side_effect = [httpx.Response(200, json=page1), httpx.Response(200, json=page2)]
+    response = _fetch_activity_districts("activity_coverage", client)
+    assert len(response.data) == len(page1["data"]) + len(page2["data"])
+    assert route.call_count == 2
+    assert route.calls[0].request.url.params["page"] == "1"
+    assert route.calls[1].request.url.params["page"] == "2"
+    assert route.calls[0].request.url.params["page_size"] == str(MAPPING_PAGE_SIZE)
+
+
+@respx.mock
+def test_activity_districts_stop_rather_than_loop_on_an_empty_page(
+    client: StewardsClient,
+) -> None:
+    first = load_sample("activity_districts_page1")
+    first["meta"] = {**first["meta"], "total": 10_000}
+    route = respx.get(ACTIVITY_DISTRICTS)
+    route.side_effect = [
+        httpx.Response(200, json=first),
+        httpx.Response(200, json={"data": [], "meta": first["meta"]}),
+    ]
+    response = _fetch_activity_districts("activity_coverage", client)
+    assert len(response.data) == len(first["data"])
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_activity_districts_of_nothing_are_an_empty_page(client: StewardsClient) -> None:
+    meta = load_sample("activity_coverage_districts")["meta"]
+    respx.get(ACTIVITY_DISTRICTS).mock(
+        return_value=httpx.Response(200, json={"data": [], "meta": {**meta, "total": 0}})
+    )
+    assert _fetch_activity_districts("activity_coverage", client).data == ()
+
+
+@respx.mock
+def test_activity_districts_reject_a_malformed_row(client: StewardsClient) -> None:
+    body = load_sample("activity_coverage_districts")
+    body["data"][0]["opportunity_count"] = "many"
+    respx.get(ACTIVITY_DISTRICTS).mock(return_value=httpx.Response(200, json=body))
+    with pytest.raises(ApiContractError):
+        _fetch_activity_districts("activity_coverage", client)
+
+
+@respx.mock
+def test_activity_summaries_skip_a_monitor_whose_endpoint_is_not_live(
+    client: StewardsClient,
+) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(return_value=httpx.Response(404))
+    assert _fetch_activity_summaries(("activity_coverage",), client) == {}
+
+
+@respx.mock
+def test_activity_summaries_return_one_entry_per_monitor(client: StewardsClient) -> None:
+    respx.get(ACTIVITY_SUMMARY).mock(
+        return_value=httpx.Response(200, json=load_sample("activity_coverage_summary"))
+    )
+    summaries = _fetch_activity_summaries(("activity_coverage",), client)
+    assert set(summaries) == {"activity_coverage"}
+    assert summaries["activity_coverage"].activities_offered == 288
 
 
 # --- custom properties ---------------------------------------------------------------------

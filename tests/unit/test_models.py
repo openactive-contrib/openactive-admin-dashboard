@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from stewards.api.models import (
+    CoverageSnapshot,
     DetailModel,
     Incident,
     NotificationProblem,
@@ -300,3 +301,37 @@ def test_summary_counts_stay_unknown_when_not_reported() -> None:
     summary = PublisherNotificationSummary.model_validate({"publishers": 7})
     assert summary.publishers == 7
     assert summary.alerts is None
+
+
+# --- the coverage breakdown by local authority --------------------------------------------
+
+
+def test_the_local_authority_breakdown_parses_with_nulls_kept() -> None:
+    snapshot = CoverageSnapshot.model_validate(
+        {
+            "coverage_by_local_authority": [
+                {
+                    "local_authority_code": "E07000063",
+                    "local_authority_name": "Lewes",
+                    "sites_total": 62,
+                    "coverage_pct": None,
+                    "oa_venues": 6,
+                    "undeclared": "ignored",
+                }
+            ]
+        }
+    )
+    (lewes,) = snapshot.coverage_by_local_authority
+    assert lewes.local_authority_code == "E07000063"
+    assert lewes.sites_total == 62
+    assert lewes.coverage_pct is None
+    assert lewes.sites_matched is None
+
+
+def test_a_snapshot_without_the_breakdown_has_none() -> None:
+    assert CoverageSnapshot.model_validate({}).coverage_by_local_authority == ()
+
+
+def test_a_null_breakdown_reads_as_none_rather_than_failing() -> None:
+    snapshot = CoverageSnapshot.model_validate({"coverage_by_local_authority": None})
+    assert snapshot.coverage_by_local_authority == ()

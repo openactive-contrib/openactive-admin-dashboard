@@ -26,6 +26,14 @@ import altair as alt
 import pandas as pd
 
 from stewards.api.models import CoverageGroup, CoverageSnapshot, SiteMapping
+from stewards.geography import Boundaries
+from stewards.monitors.choropleth import (
+    Choropleth,
+    ChoroplethStyle,
+    TooltipField,
+    choropleth,
+    join,
+)
 from stewards.monitors.health import Health, HealthState, Movement
 from stewards.monitors.overview import Fact, TileCard
 from stewards.monitors.quality import BAR_CORNER, CHART_HEIGHT
@@ -508,3 +516,93 @@ def region_chart(
         )
     )
     return chart
+
+
+# --- the local authority map --------------------------------------------------------------
+
+#: The row key a local authority is joined to its boundary on.
+LA_CODE = "local_authority_code"
+
+#: ONS codes lead with the nation; the batch measures England's estate only, so the map draws
+#: England rather than three nations of grey.
+ENGLAND = ("E",)
+
+#: The hover, under the district's name.
+LA_TOOLTIP: tuple[TooltipField, ...] = (
+    TooltipField("coverage_pct", "Coverage", ".1f", "%"),
+    TooltipField("sites_total", "Active Places sites", ","),
+    TooltipField("oa_venues", "OpenActive venues", ","),
+    TooltipField("sites_matched", "Sites matched", ","),
+)
+
+#: What the pairs card says before the table is asked for. No count: the run's own pair count
+#: and the rows actually fetched can differ, and two disagreeing numbers read as a bug.
+PAIRS_PROMPT = (
+    "Every site-venue pair the run matched, with filters and the detail of each match. "
+    "The full list takes a while to fetch, so it loads on request."
+)
+
+
+def local_authority_rows(snapshot: CoverageSnapshot) -> list[dict[str, Any]]:
+    """One plain row per reported local authority, keyed for `choropleth.join`.
+
+    A row with no code is dropped: there is nothing to draw it on. A blank name is left out
+    so the boundary's own name shows instead.
+    """
+    rows: list[dict[str, Any]] = []
+    for authority in snapshot.coverage_by_local_authority:
+        code = authority.local_authority_code.strip()
+        if not code:
+            continue
+        row: dict[str, Any] = {
+            LA_CODE: code,
+            "coverage_pct": authority.coverage_pct,
+            "sites_total": authority.sites_total,
+            "sites_matched": authority.sites_matched,
+            "oa_venues": authority.oa_venues,
+        }
+        if name := authority.local_authority_name.strip():
+            row["name"] = name
+        rows.append(row)
+    return rows
+
+
+def map_areas(boundaries: Boundaries) -> Boundaries:
+    """The districts the map draws, and so the ones its controls can centre on."""
+    return boundaries.only(prefixes=ENGLAND)
+
+
+def local_authority_map(
+    snapshot: CoverageSnapshot,
+    boundaries: Boundaries,
+    style: ChoroplethStyle,
+    focus: str | None = None,
+) -> Choropleth | None:
+    """England's districts shaded by coverage rate, opening on `focus` or on all of England.
+    None when no authority reports a rate."""
+    return choropleth(
+        map_areas(boundaries),
+        local_authority_rows(snapshot),
+        code_key=LA_CODE,
+        value_field="coverage_pct",
+        tooltip=LA_TOOLTIP,
+        style=style,
+        focus=focus,
+    )
+
+
+def unmapped_authorities(snapshot: CoverageSnapshot, boundaries: Boundaries) -> tuple[str, ...]:
+    """Codes the snapshot reports that no English boundary carries — a boundary file older
+    or newer than the batch's codes. The page names them rather than dropping them silently."""
+    return join(
+        map_areas(boundaries), local_authority_rows(snapshot), code_key=LA_CODE
+    ).unmatched
+
+
+def map_note(snapshot: CoverageSnapshot, boundaries: Boundaries) -> str:
+    """Empty unless the snapshot reports an authority the map cannot draw — then it names
+    them, rather than leaving a steward to wonder where a district went."""
+    missing = unmapped_authorities(snapshot, boundaries)
+    if not missing:
+        return ""
+    return f"Not on the map, as the boundaries carry no such code: {', '.join(missing)}."

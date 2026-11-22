@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
+import respx
 from streamlit.testing.v1 import AppTest
 
 from stewards.monitors.publisher_notifications import PUBLISHER_LINK_TEXT
@@ -29,6 +30,7 @@ PAGES = [
     "30_feed_quality.py",
     "31_active_places_coverage.py",
     "32_feed_custom_properties.py",
+    "33_activity_coverage.py",
     "90_notebooks.py",
 ]
 
@@ -59,6 +61,7 @@ MONITOR_IDS = {
     "32_feed_custom_properties.py": "feed_custom_properties",
     "30_feed_quality.py": "feed_quality",
     "31_active_places_coverage.py": "active_places_coverage",
+    "33_activity_coverage.py": "activity_coverage",
 }
 
 
@@ -193,25 +196,54 @@ def test_quality_issues_toggle_narrows_the_table() -> None:
     assert len(app.dataframe[0].value) == 5
 
 
+def run_with_pairs(name: str) -> AppTest:
+    """A coverage page with its site-venue pairs asked for: the table loads on request."""
+    app = run(name)
+    app.button(key=f"load_pairs_{MONITOR_IDS[name]}").click().run()
+    return app
+
+
 @pytest.mark.parametrize("name", COVERAGE_PAGES)
-def test_coverage_page_has_four_figures_one_chart_and_one_table(name: str) -> None:
+def test_coverage_page_opens_with_figures_two_charts_and_no_table(
+    name: str, smoke_env: respx.MockRouter
+) -> None:
+    """The pairs are ten thousand rows; the first render must not wait for them."""
+    app = run(name)
+    assert not app.exception
+    # The region chart and the map's legend; the map itself is deck.gl.
+    assert len(app.get("vega_lite_chart")) == 2
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert len(app.dataframe) == 0
+    # The map's own "centre on" list is the only selectbox until the pairs load.
+    assert [s.key for s in app.selectbox] == [f"chart_{MONITOR_IDS[name]}_la_focus"]
+    assert [b.label for b in app.button if b.label] == ["Load site-venue pairs"]
+    assert not smoke_env[f"{MONITOR_IDS[name]}_mappings"].called
+    assert "Coverage by local authority" in [h.value for h in app.subheader]
+
+
+@pytest.mark.parametrize("name", COVERAGE_PAGES)
+def test_coverage_page_loads_the_table_on_request(name: str) -> None:
     from stewards.monitors.registry import get_monitor
 
     monitor = get_monitor(MONITOR_IDS[name])
-    app = run(name)
+    app = run_with_pairs(name)
+    assert not app.exception
     assert len(app.dataframe) == 1
-    assert len(app.get("vega_lite_chart")) == 1
-    assert len(app.selectbox) == len(monitor.filters)
+    assert len(app.get("vega_lite_chart")) == 2
+    filters = [s for s in app.selectbox if s.key != f"chart_{monitor.id}_la_focus"]
+    assert len(filters) == len(monitor.filters)
     # "primary pairs only" stands where the threshold toggle would
     assert len(app.toggle) == 1
     assert len(app.text_input) == 1
+    # The button has done its job and is gone.
+    assert not any(b.label == "Load site-venue pairs" for b in app.button)
 
 
 def test_coverage_table_carries_every_declared_column() -> None:
     from fixture_loader import load_sample
     from stewards.monitors.registry import get_monitor
 
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     frame = app.dataframe[0].value
     monitor = get_monitor("active_places_coverage")
     assert list(frame.columns) == [c.label for c in monitor.columns]
@@ -223,8 +255,9 @@ def test_coverage_primary_pairs_toggle_narrows_the_table() -> None:
 
     rows = load_sample("active_places_coverage_mappings")["data"]
     primary = sum(1 for row in rows if row["is_primary_for_venue"])
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     assert len(app.dataframe[0].value) == len(rows)
+    # A filter rerun keeps the table: the request outlives the click that made it.
     app.toggle[0].set_value(True).run()
     assert not app.exception
     assert len(app.dataframe[0].value) == primary
@@ -233,7 +266,7 @@ def test_coverage_primary_pairs_toggle_narrows_the_table() -> None:
 
 def test_the_coverage_page_states_the_run_figures_not_the_filtered_ones() -> None:
     """The four figures describe the whole estate; the table describes the pairs shown."""
-    app = run("31_active_places_coverage.py")
+    app = run_with_pairs("31_active_places_coverage.py")
     text = text_of(app)
     assert "26.4%" in text
     assert "7,351" in text
@@ -242,6 +275,119 @@ def test_the_coverage_page_states_the_run_figures_not_the_filtered_ones() -> Non
     # The run's own pair count was dropped as a figure: the caption above the table already
     # says how many rows there are, and the two disagreeing read as a bug.
     assert "10,034" not in text
+
+
+ACTIVITY_PAGE = "33_activity_coverage.py"
+ACTIVITY_FILTER = "filter_activity_coverage_activity"
+ACTIVITY_FOCUS = "chart_activity_coverage_districts_focus"
+
+
+def table_caption(app: AppTest) -> str:
+    return next(c.value for c in app.caption if "pairs shown" in c.value)
+
+
+def test_activity_page_has_three_figures_two_charts_a_map_and_one_table() -> None:
+    from fixture_loader import load_sample
+
+    app = run(ACTIVITY_PAGE)
+    assert not app.exception
+    # The ranking and the map's legend; the map itself is deck.gl.
+    assert len(app.get("vega_lite_chart")) == 2
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert [s.key for s in app.selectbox] == [ACTIVITY_FOCUS, ACTIVITY_FILTER]
+    assert app.selectbox(key=ACTIVITY_FILTER).value == "All activities"
+    assert [t.key for t in app.text_input] == ["search_activity_coverage"]
+    assert len(app.dataframe) == 1
+    assert len(app.dataframe[0].value) == len(
+        load_sample("activity_coverage_districts")["data"]
+    )
+    text = text_of(app)
+    for figure in ("683,255", "447,497", "288", "65.5%", "of 768 in the activity list"):
+        assert figure in text
+    assert "Top 20 activities" in [h.value for h in app.subheader]
+    assert "Actions available: none" in text
+    # Across all activities the map counts tags, and says so.
+    assert "counts once under each" in text
+
+
+def test_activity_table_carries_every_declared_column() -> None:
+    from stewards.monitors.registry import get_monitor
+
+    app = run(ACTIVITY_PAGE)
+    frame = app.dataframe[0].value
+    assert list(frame.columns) == [c.label for c in get_monitor("activity_coverage").columns]
+
+
+def test_the_activity_filter_narrows_the_map_and_the_table() -> None:
+    from fixture_loader import load_sample
+
+    rows = load_sample("activity_coverage_districts")["data"]
+    swimming = sum(1 for row in rows if row["activity"] == "Swimming")
+    app = run(ACTIVITY_PAGE)
+    app.selectbox(key=ACTIVITY_FILTER).set_value("Swimming").run()
+    assert not app.exception
+    frame = app.dataframe[0].value
+    assert len(frame) == swimming < len(rows)
+    assert set(frame["Activity"]) == {"Swimming"}
+    # One activity is an opportunity count, so the tag caveat goes.
+    assert "counts once under each" not in " ".join(c.value for c in app.caption)
+
+
+def test_the_local_authority_filter_narrows_the_table_with_the_activity() -> None:
+    app = run(ACTIVITY_PAGE)
+    app.selectbox(key=ACTIVITY_FOCUS).set_value("E08000025").run()
+    assert not app.exception
+    assert set(app.dataframe[0].value["Local authority"]) == {"Birmingham"}
+    assert "Narrowed to Birmingham" in table_caption(app)
+    app.selectbox(key=ACTIVITY_FILTER).set_value("Swimming").run()
+    frame = app.dataframe[0].value
+    assert list(zip(frame["Local authority"], frame["Activity"], strict=True)) == [
+        ("Birmingham", "Swimming")
+    ]
+
+
+def test_the_search_narrows_the_table_by_local_authority_name() -> None:
+    from fixture_loader import load_sample
+
+    rows = load_sample("activity_coverage_districts")["data"]
+    cardiff = sum(1 for row in rows if row["district_name"] == "Cardiff")
+    app = run(ACTIVITY_PAGE)
+    app.text_input(key="search_activity_coverage").input("cardiff").run()
+    assert not app.exception
+    frame = app.dataframe[0].value
+    assert set(frame["Local authority"]) == {"Cardiff"}
+    assert table_caption(app).startswith(f"{cardiff} of {len(rows)} ")
+    # The search narrows the table only; the map still draws.
+    assert len(app.get("deck_gl_json_chart")) == 1
+
+
+def test_a_search_with_no_match_renders_an_empty_state_not_an_error() -> None:
+    app = run(ACTIVITY_PAGE)
+    app.text_input(key="search_activity_coverage").input("Atlantis").run()
+    assert not app.exception
+    assert not app.dataframe
+    assert any("Clear the search" in i.value for i in app.info)
+
+
+def test_showing_the_whole_map_clears_the_local_authority() -> None:
+    from fixture_loader import load_sample
+
+    total = len(load_sample("activity_coverage_districts")["data"])
+    app = run(ACTIVITY_PAGE)
+    app.selectbox(key=ACTIVITY_FOCUS).set_value("E08000025").run()
+    app.button(key="chart_activity_coverage_districts_whole").click().run()
+    assert not app.exception
+    assert len(app.dataframe[0].value) == total
+
+
+def test_an_activity_and_district_with_nothing_shows_an_empty_state_not_an_error() -> None:
+    app = run(ACTIVITY_PAGE)
+    app.selectbox(key=ACTIVITY_FOCUS).set_value("E06000057").run()  # Northumberland
+    app.selectbox(key=ACTIVITY_FILTER).set_value("Football").run()
+    assert not app.exception
+    assert not app.dataframe
+    assert any("No activity is reported" in i.value for i in app.info)
+    assert table_caption(app).startswith("0 of 20 ")
 
 
 @pytest.mark.parametrize("name", SCHEMA_DRIFT_PAGES)

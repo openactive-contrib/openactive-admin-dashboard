@@ -1,0 +1,1396 @@
+{
+  "data": [
+    {
+      "period_start": "2026-05-01",
+      "period_end": "2026-05-31",
+      "in_progress": false,
+      "days_with_data": 20,
+      "days_with_feed_data": 0,
+      "datasets_crawled": 179,
+      "datasets_added": null,
+      "datasets_added_list": null,
+      "datasets_removed": null,
+      "datasets_removed_list": null,
+      "datasets_with_future": null,
+      "datasets_without_future": null,
+      "datasets_without_future_list": null,
+      "datasets_stopped": null,
+      "datasets_stopped_list": null,
+      "datasets_stopped_all_runs_failed": null,
+      "datasets_stopped_all_runs_failed_list": null,
+      "datasets_not_ingested": null,
+      "datasets_not_ingested_list": null
+    },
+    {
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "in_progress": false,
+      "days_with_data": 30,
+      "days_with_feed_data": 0,
+      "datasets_crawled": 181,
+      "datasets_added": 2,
+      "datasets_added_list": [
+        {
+          "dataset_url": "https://ledleisure.gs-signature.cloud/OpenActive/",
+          "dataset_name": "LED Community Leisure Ltd Sessions and Facilities",
+          "publisher_id": "pub_led-community-leisure-ltd",
+          "publisher_name": "LED Community Leisure Ltd"
+        },
+        {
+          "dataset_url": "https://inside.ledleisure.co.uk/OpenActive/",
+          "dataset_name": "LED Leisure Management Ltd Sessions and Facilities",
+          "publisher_id": "pub_led-leisure-management-ltd",
+          "publisher_name": "LED Leisure Management Ltd"
+        }
+      ],
+      "datasets_removed": 0,
+      "datasets_removed_list": [],
+      "datasets_with_future": null,
+      "datasets_without_future": null,
+      "datasets_without_future_list": null,
+      "datasets_stopped": null,
+      "datasets_stopped_list": null,
+      "datasets_stopped_all_runs_failed": null,
+      "datasets_stopped_all_runs_failed_list": null,
+      "datasets_not_ingested": null,
+      "datasets_not_ingested_list": null
+    },
+    {
+      "period_start": "2026-07-01",
+      "period_end": "2026-07-31",
+      "in_progress": false,
+      "days_with_data": 31,
+      "days_with_feed_data": 0,
+      "datasets_crawled": 179,
+      "datasets_added": 3,
+      "datasets_added_list": [
+        {
+          "dataset_url": "https://celticleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_celticleisure",
+          "publisher_name": "celticleisure"
+        },
+        {
+          "dataset_url": "https://chelmsfordcitysports.leisurecloud.net/OpenActive/",
+          "dataset_name": "chelmsfordcitysports.leisurecloud.net",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://westwight.gs-signature.cloud/OpenActive/",
+          "dataset_name": "West Wight Sports and Community Sessions and Facilities",
+          "publisher_id": "pub_west-wight-sports-and-community",
+          "publisher_name": "West Wight Sports and Community"
+        }
+      ],
+      "datasets_removed": 5,
+      "datasets_removed_list": [
+        {
+          "dataset_url": "https://dev.myeveryoneactive.com/OpenActive/",
+          "dataset_name": "Everyone Active Sessions and Facilities",
+          "publisher_id": "pub_everyone-active-dev",
+          "publisher_name": "Everyone Active (dev)"
+        },
+        {
+          "dataset_url": "https://fyldecoastymca.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Fylde Coast YMCA Sessions and Facilities",
+          "publisher_id": "pub_fylde-coast-ymca",
+          "publisher_name": "Fylde Coast YMCA"
+        },
+        {
+          "dataset_url": "https://inside.ledleisure.co.uk/OpenActive/",
+          "dataset_name": "LED Leisure Management Ltd Sessions and Facilities",
+          "publisher_id": "pub_led-leisure-management-ltd",
+          "publisher_name": "LED Leisure Management Ltd"
+        },
+        {
+          "dataset_url": "https://mws.ledleisure.co.uk/OpenActive/",
+          "dataset_name": "mws.ledleisure.co.uk",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://tmactive.leisurecloud.net/OpenActive/",
+          "dataset_name": "TM Active Sessions and Facilities",
+          "publisher_id": "pub_tm-active",
+          "publisher_name": "TM Active"
+        }
+      ],
+      "datasets_with_future": null,
+      "datasets_without_future": null,
+      "datasets_without_future_list": null,
+      "datasets_stopped": null,
+      "datasets_stopped_list": null,
+      "datasets_stopped_all_runs_failed": null,
+      "datasets_stopped_all_runs_failed_list": null,
+      "datasets_not_ingested": null,
+      "datasets_not_ingested_list": null
+    },
+    {
+      "period_start": "2026-08-01",
+      "period_end": "2026-08-31",
+      "in_progress": false,
+      "days_with_data": 25,
+      "days_with_feed_data": 11,
+      "datasets_crawled": 180,
+      "datasets_added": 2,
+      "datasets_added_list": [
+        {
+          "dataset_url": "https://teignbridge-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": "Teignbridge Leisure Sessions and Facilities",
+          "publisher_id": "pub_teignbridge-leisure",
+          "publisher_name": "Teignbridge Leisure"
+        },
+        {
+          "dataset_url": "https://www.willenonice.co.uk/openactive",
+          "dataset_name": "Willen On Ice — sessions",
+          "publisher_id": "pub_ice-leisure-willenonice",
+          "publisher_name": "Ice Leisure (willenonice)"
+        }
+      ],
+      "datasets_removed": 1,
+      "datasets_removed_list": [
+        {
+          "dataset_url": "https://uatbook.myeveryoneactive.com/OpenActive/",
+          "dataset_name": "Everyone Active Sessions and Facilities",
+          "publisher_id": "pub_everyone-active",
+          "publisher_name": "Everyone Active"
+        }
+      ],
+      "datasets_with_future": 155,
+      "datasets_without_future": 18,
+      "datasets_without_future_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://api.findmyfacility.com/v1/openactive",
+          "dataset_name": "Find My Facility OpenActive Dataset",
+          "publisher_id": "pub_find-my-facility",
+          "publisher_name": "Find My Facility"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "http://data.gomammoth.co.uk/",
+          "dataset_name": "GO Mammoth Sports and Fitness Activities",
+          "publisher_id": "pub_go-mammoth",
+          "publisher_name": "GO Mammoth"
+        },
+        {
+          "dataset_url": "https://lawntennisassociation.github.io/",
+          "dataset_name": "LTA Participation Campaigns ",
+          "publisher_id": "pub_lawn-tennis-association",
+          "publisher_name": "Lawn Tennis Association"
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://tma.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Tonbridge and Malling Leisure Trust Sessions and Facilities",
+          "publisher_id": "pub_tonbridge-and-malling-leisure-trust",
+          "publisher_name": "Tonbridge and Malling Leisure Trust"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped": 10,
+      "datasets_stopped_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://tma.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Tonbridge and Malling Leisure Trust Sessions and Facilities",
+          "publisher_id": "pub_tonbridge-and-malling-leisure-trust",
+          "publisher_name": "Tonbridge and Malling Leisure Trust"
+        }
+      ],
+      "datasets_stopped_all_runs_failed": 8,
+      "datasets_stopped_all_runs_failed_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        }
+      ],
+      "datasets_not_ingested": 7,
+      "datasets_not_ingested_list": [
+        {
+          "dataset_url": "https://anemoslimited.bookteq.com/api/open-active",
+          "dataset_name": "anemoslimited.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://beaconsfieldtownfc.bookteq.com/api/open-active",
+          "dataset_name": "Beaconsfield Town FC Facilities",
+          "publisher_id": "pub_beaconsfield-town-fc",
+          "publisher_name": "Beaconsfield Town FC"
+        },
+        {
+          "dataset_url": "https://data.runtogether.co.uk/",
+          "dataset_name": "data.runtogether.co.uk",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://hillviewprimaryschool.bookteq.com/api/open-active",
+          "dataset_name": "Hill View Primary School Facilities",
+          "publisher_id": "pub_hill-view-primary-school",
+          "publisher_name": "Hill View Primary School"
+        },
+        {
+          "dataset_url": "https://oldwhitgiftianscc.bookteq.com/api/open-active",
+          "dataset_name": "Old Whitgiftians Cricket Club Facilities",
+          "publisher_id": "pub_old-whitgiftians-cricket-club",
+          "publisher_name": "Old Whitgiftians Cricket Club"
+        },
+        {
+          "dataset_url": "https://openactive.goodgym.org/",
+          "dataset_name": "openactive.goodgym.org",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://ymcahumber.bookteq.com/api/open-active",
+          "dataset_name": "ymcahumber.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        }
+      ]
+    },
+    {
+      "period_start": "2026-09-01",
+      "period_end": "2026-09-30",
+      "in_progress": false,
+      "days_with_data": 29,
+      "days_with_feed_data": 25,
+      "datasets_crawled": 180,
+      "datasets_added": 1,
+      "datasets_added_list": [
+        {
+          "dataset_url": "https://dev.myeveryoneactive.com/OpenActive/",
+          "dataset_name": "Everyone Active Sessions and Facilities",
+          "publisher_id": "pub_everyone-active-dev",
+          "publisher_name": "Everyone Active (dev)"
+        }
+      ],
+      "datasets_removed": 1,
+      "datasets_removed_list": [
+        {
+          "dataset_url": "https://chelmsfordcitysports.leisurecloud.net/OpenActive/",
+          "dataset_name": "chelmsfordcitysports.leisurecloud.net",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        }
+      ],
+      "datasets_with_future": 154,
+      "datasets_without_future": 17,
+      "datasets_without_future_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://api.findmyfacility.com/v1/openactive",
+          "dataset_name": "Find My Facility OpenActive Dataset",
+          "publisher_id": "pub_find-my-facility",
+          "publisher_name": "Find My Facility"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "http://data.gomammoth.co.uk/",
+          "dataset_name": "GO Mammoth Sports and Fitness Activities",
+          "publisher_id": "pub_go-mammoth",
+          "publisher_name": "GO Mammoth"
+        },
+        {
+          "dataset_url": "https://lawntennisassociation.github.io/",
+          "dataset_name": "LTA Participation Campaigns ",
+          "publisher_id": "pub_lawn-tennis-association",
+          "publisher_name": "Lawn Tennis Association"
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://tma.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Tonbridge and Malling Leisure Trust Sessions and Facilities",
+          "publisher_id": "pub_tonbridge-and-malling-leisure-trust",
+          "publisher_name": "Tonbridge and Malling Leisure Trust"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped": 15,
+      "datasets_stopped_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://api.findmyfacility.com/v1/openactive",
+          "dataset_name": "Find My Facility OpenActive Dataset",
+          "publisher_id": "pub_find-my-facility",
+          "publisher_name": "Find My Facility"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://tma.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Tonbridge and Malling Leisure Trust Sessions and Facilities",
+          "publisher_id": "pub_tonbridge-and-malling-leisure-trust",
+          "publisher_name": "Tonbridge and Malling Leisure Trust"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped_all_runs_failed": 8,
+      "datasets_stopped_all_runs_failed_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        }
+      ],
+      "datasets_not_ingested": 9,
+      "datasets_not_ingested_list": [
+        {
+          "dataset_url": "https://anemoslimited.bookteq.com/api/open-active",
+          "dataset_name": "anemoslimited.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://beaconsfieldtownfc.bookteq.com/api/open-active",
+          "dataset_name": "Beaconsfield Town FC Facilities",
+          "publisher_id": "pub_beaconsfield-town-fc",
+          "publisher_name": "Beaconsfield Town FC"
+        },
+        {
+          "dataset_url": "https://api.premiertennis.co.uk/openactive",
+          "dataset_name": "Courtside Hubs CIC Sessions and Facilities",
+          "publisher_id": "pub_courtside-hubs-cic",
+          "publisher_name": "Courtside Hubs CIC"
+        },
+        {
+          "dataset_url": "https://data.runtogether.co.uk/",
+          "dataset_name": "data.runtogether.co.uk",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://hillviewprimaryschool.bookteq.com/api/open-active",
+          "dataset_name": "Hill View Primary School Facilities",
+          "publisher_id": "pub_hill-view-primary-school",
+          "publisher_name": "Hill View Primary School"
+        },
+        {
+          "dataset_url": "https://oldwhitgiftianscc.bookteq.com/api/open-active",
+          "dataset_name": "Old Whitgiftians Cricket Club Facilities",
+          "publisher_id": "pub_old-whitgiftians-cricket-club",
+          "publisher_name": "Old Whitgiftians Cricket Club"
+        },
+        {
+          "dataset_url": "https://openactive.goodgym.org/",
+          "dataset_name": "openactive.goodgym.org",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://ymcahumber.bookteq.com/api/open-active",
+          "dataset_name": "ymcahumber.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        }
+      ]
+    },
+    {
+      "period_start": "2026-10-01",
+      "period_end": "2026-10-31",
+      "in_progress": false,
+      "days_with_data": 31,
+      "days_with_feed_data": 31,
+      "datasets_crawled": 174,
+      "datasets_added": 1,
+      "datasets_added_list": [
+        {
+          "dataset_url": "https://www.harlowonice.co.uk/openactive",
+          "dataset_name": "Harlow On Ice — sessions",
+          "publisher_id": "pub_ice-leisure-harlowonice",
+          "publisher_name": "Ice Leisure (harlowonice)"
+        }
+      ],
+      "datasets_removed": 7,
+      "datasets_removed_list": [
+        {
+          "dataset_url": "https://anemoslimited.bookteq.com/api/open-active",
+          "dataset_name": "anemoslimited.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://beaconsfieldtownfc.bookteq.com/api/open-active",
+          "dataset_name": "Beaconsfield Town FC Facilities",
+          "publisher_id": "pub_beaconsfield-town-fc",
+          "publisher_name": "Beaconsfield Town FC"
+        },
+        {
+          "dataset_url": "https://hillviewprimaryschool.bookteq.com/api/open-active",
+          "dataset_name": "Hill View Primary School Facilities",
+          "publisher_id": "pub_hill-view-primary-school",
+          "publisher_name": "Hill View Primary School"
+        },
+        {
+          "dataset_url": "https://oldwhitgiftianscc.bookteq.com/api/open-active",
+          "dataset_name": "Old Whitgiftians Cricket Club Facilities",
+          "publisher_id": "pub_old-whitgiftians-cricket-club",
+          "publisher_name": "Old Whitgiftians Cricket Club"
+        },
+        {
+          "dataset_url": "https://shirleyhighschool.bookteq.com/api/open-active",
+          "dataset_name": "Shirley High School Facilities",
+          "publisher_id": "pub_shirley-high-school",
+          "publisher_name": "Shirley High School"
+        },
+        {
+          "dataset_url": "https://visionredbridge.gs-signature.cloud/OpenActive/",
+          "dataset_name": "Vision Redbridge Sessions and Facilities",
+          "publisher_id": "pub_vision-redbridge",
+          "publisher_name": "Vision Redbridge"
+        },
+        {
+          "dataset_url": "https://ymcahumber.bookteq.com/api/open-active",
+          "dataset_name": "ymcahumber.bookteq.com",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        }
+      ],
+      "datasets_with_future": 155,
+      "datasets_without_future": 15,
+      "datasets_without_future_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "http://data.gomammoth.co.uk/",
+          "dataset_name": "GO Mammoth Sports and Fitness Activities",
+          "publisher_id": "pub_go-mammoth",
+          "publisher_name": "GO Mammoth"
+        },
+        {
+          "dataset_url": "https://lawntennisassociation.github.io/",
+          "dataset_name": "LTA Participation Campaigns ",
+          "publisher_id": "pub_lawn-tennis-association",
+          "publisher_name": "Lawn Tennis Association"
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped": 13,
+      "datasets_stopped_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped_all_runs_failed": 8,
+      "datasets_stopped_all_runs_failed_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        }
+      ],
+      "datasets_not_ingested": 4,
+      "datasets_not_ingested_list": [
+        {
+          "dataset_url": "https://api.premiertennis.co.uk/openactive",
+          "dataset_name": "Courtside Hubs CIC Sessions and Facilities",
+          "publisher_id": "pub_courtside-hubs-cic",
+          "publisher_name": "Courtside Hubs CIC"
+        },
+        {
+          "dataset_url": "https://data.runtogether.co.uk/",
+          "dataset_name": "data.runtogether.co.uk",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://openactive.goodgym.org/",
+          "dataset_name": "openactive.goodgym.org",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        }
+      ]
+    },
+    {
+      "period_start": "2026-11-01",
+      "period_end": "2026-11-30",
+      "in_progress": true,
+      "days_with_data": 13,
+      "days_with_feed_data": 13,
+      "datasets_crawled": 173,
+      "datasets_added": 0,
+      "datasets_added_list": [],
+      "datasets_removed": 1,
+      "datasets_removed_list": [
+        {
+          "dataset_url": "https://leisuresk.leisurecloud.net/OpenActive/",
+          "dataset_name": "Leisure SK Sessions and Facilities",
+          "publisher_id": "pub_leisure-sk",
+          "publisher_name": "Leisure SK"
+        }
+      ],
+      "datasets_with_future": 149,
+      "datasets_without_future": 18,
+      "datasets_without_future_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://api.findmyfacility.com/v1/openactive",
+          "dataset_name": "Find My Facility OpenActive Dataset",
+          "publisher_id": "pub_find-my-facility",
+          "publisher_name": "Find My Facility"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "http://data.gomammoth.co.uk/",
+          "dataset_name": "GO Mammoth Sports and Fitness Activities",
+          "publisher_id": "pub_go-mammoth",
+          "publisher_name": "GO Mammoth"
+        },
+        {
+          "dataset_url": "https://lawntennisassociation.github.io/",
+          "dataset_name": "LTA Participation Campaigns ",
+          "publisher_id": "pub_lawn-tennis-association",
+          "publisher_name": "Lawn Tennis Association"
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://www.sportsuite.co.uk/odapikey/datasite",
+          "dataset_name": "SportSuite Activity Finder",
+          "publisher_id": "pub_sportsuite",
+          "publisher_name": "SportSuite"
+        },
+        {
+          "dataset_url": "https://thewoodroffeschool.bookteq.com/api/open-active",
+          "dataset_name": "The Woodroffe School Facilities",
+          "publisher_id": "pub_the-woodroffe-school",
+          "publisher_name": "The Woodroffe School"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped": 14,
+      "datasets_stopped_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "https://basingstokewellbeing.bookteq.com/api/open-active",
+          "dataset_name": "Basingstoke Wellbeing Facilities",
+          "publisher_id": "pub_basingstoke-wellbeing",
+          "publisher_name": "Basingstoke Wellbeing"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://api.findmyfacility.com/v1/openactive",
+          "dataset_name": "Find My Facility OpenActive Dataset",
+          "publisher_id": "pub_find-my-facility",
+          "publisher_name": "Find My Facility"
+        },
+        {
+          "dataset_url": "https://footballsamuraiacademylimited.bookteq.com/api/open-active",
+          "dataset_name": "Football Samurai Academy Limited  Facilities",
+          "publisher_id": "pub_football-samurai-academy-limited",
+          "publisher_name": "Football Samurai Academy Limited "
+        },
+        {
+          "dataset_url": "https://ajsports.bookteq.com/api/open-active",
+          "dataset_name": "Playfinder Facilities",
+          "publisher_id": "pub_playfinder",
+          "publisher_name": "Playfinder"
+        },
+        {
+          "dataset_url": "https://rslonline.leisurecloud.net/OpenActive/",
+          "dataset_name": "Redbridge Sports Centre Sessions and Facilities",
+          "publisher_id": "pub_redbridge-sports-centre",
+          "publisher_name": "Redbridge Sports Centre"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        },
+        {
+          "dataset_url": "https://waspsfootballclub.bookteq.com/api/open-active",
+          "dataset_name": "Wasps FC - Rugby in West London Facilities",
+          "publisher_id": "pub_wasps-fc-rugby-in-west-london",
+          "publisher_name": "Wasps FC - Rugby in West London"
+        }
+      ],
+      "datasets_stopped_all_runs_failed": 8,
+      "datasets_stopped_all_runs_failed_list": [
+        {
+          "dataset_url": "https://bridportleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_bridportleisure",
+          "publisher_name": "bridportleisure"
+        },
+        {
+          "dataset_url": "https://gll-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_gll",
+          "publisher_name": "gll"
+        },
+        {
+          "dataset_url": "https://horizon-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_horizon",
+          "publisher_name": "horizon"
+        },
+        {
+          "dataset_url": "https://jubileehall-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_jubileehall",
+          "publisher_name": "jubileehall"
+        },
+        {
+          "dataset_url": "https://lifeleisure-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lifeleisure",
+          "publisher_name": "lifeleisure"
+        },
+        {
+          "dataset_url": "https://lincsinspire-openactive.legendonlineservices.co.uk/OpenActive",
+          "dataset_name": " Sessions and Facilities",
+          "publisher_id": "pub_lincsinspire",
+          "publisher_name": "lincsinspire"
+        },
+        {
+          "dataset_url": "http://data.letsride.co.uk/",
+          "dataset_name": "British Cycling Let's Ride Sessions",
+          "publisher_id": "pub_british-cycling",
+          "publisher_name": "British Cycling"
+        },
+        {
+          "dataset_url": "https://sportstarta.github.io/",
+          "dataset_name": "SportStarta Open Activities",
+          "publisher_id": "pub_sportstarta-com",
+          "publisher_name": "SportStarta.com"
+        }
+      ],
+      "datasets_not_ingested": 6,
+      "datasets_not_ingested_list": [
+        {
+          "dataset_url": "https://api.premiertennis.co.uk/openactive",
+          "dataset_name": "Courtside Hubs CIC Sessions and Facilities",
+          "publisher_id": "pub_courtside-hubs-cic",
+          "publisher_name": "Courtside Hubs CIC"
+        },
+        {
+          "dataset_url": "https://data.runtogether.co.uk/",
+          "dataset_name": "data.runtogether.co.uk",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://www.englandsquash.com/openactive",
+          "dataset_name": "England Squash Sessions",
+          "publisher_id": "pub_england-squash",
+          "publisher_name": "England Squash"
+        },
+        {
+          "dataset_url": "https://marstonmoretaine.bookteq.com/api/open-active",
+          "dataset_name": "Marston Moretaine Playing Fields Facilities",
+          "publisher_id": "pub_marston-moretaine-playing-fields",
+          "publisher_name": "Marston Moretaine Playing Fields"
+        },
+        {
+          "dataset_url": "https://openactive.goodgym.org/",
+          "dataset_name": "openactive.goodgym.org",
+          "publisher_id": "pub_unknown",
+          "publisher_name": ""
+        },
+        {
+          "dataset_url": "https://strikersindoorsports.bookteq.com/api/open-active",
+          "dataset_name": "Strikers Indoor Football Facilities",
+          "publisher_id": "pub_strikers-indoor-football",
+          "publisher_name": "Strikers Indoor Football"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-11-13",
+    "generated_at": "2026-11-13T09:44:17Z",
+    "page": 1,
+    "page_size": 500,
+    "total": 7
+  }
+}

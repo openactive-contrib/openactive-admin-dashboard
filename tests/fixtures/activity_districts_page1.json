@@ -1,0 +1,121 @@
+{
+  "data": [
+    {
+      "district_code": "E06000057",
+      "district_name": "Northumberland",
+      "region_code": "E12000001",
+      "region_name": "North East",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Badminton",
+      "activity_id": "https://openactive.io/activity-list#c0360db0-a817-4bae-9167-40f89b49fc9e",
+      "opportunity_count": 28
+    },
+    {
+      "district_code": "E09000028",
+      "district_name": "Southwark",
+      "region_code": "E12000007",
+      "region_name": "London",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Badminton",
+      "activity_id": "https://openactive.io/activity-list#c0360db0-a817-4bae-9167-40f89b49fc9e",
+      "opportunity_count": 25
+    },
+    {
+      "district_code": "E08000025",
+      "district_name": "Birmingham",
+      "region_code": "E12000005",
+      "region_name": "West Midlands",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Badminton",
+      "activity_id": "https://openactive.io/activity-list#c0360db0-a817-4bae-9167-40f89b49fc9e",
+      "opportunity_count": 14
+    },
+    {
+      "district_code": "W06000015",
+      "district_name": "Cardiff",
+      "region_code": null,
+      "region_name": null,
+      "country_code": "W92000004",
+      "country_name": "Wales",
+      "activity": "Badminton",
+      "activity_id": "https://openactive.io/activity-list#c0360db0-a817-4bae-9167-40f89b49fc9e",
+      "opportunity_count": 12
+    },
+    {
+      "district_code": "S12000036",
+      "district_name": "City of Edinburgh",
+      "region_code": null,
+      "region_name": null,
+      "country_code": "S92000003",
+      "country_name": "Scotland",
+      "activity": "Badminton",
+      "activity_id": "https://openactive.io/activity-list#c0360db0-a817-4bae-9167-40f89b49fc9e",
+      "opportunity_count": 4
+    },
+    {
+      "district_code": "W06000015",
+      "district_name": "Cardiff",
+      "region_code": null,
+      "region_name": null,
+      "country_code": "W92000004",
+      "country_name": "Wales",
+      "activity": "Football",
+      "activity_id": "https://openactive.io/activity-list#0a5f732d-e806-4e51-ad40-0a7de0239c8c",
+      "opportunity_count": 8
+    },
+    {
+      "district_code": "E09000028",
+      "district_name": "Southwark",
+      "region_code": "E12000007",
+      "region_name": "London",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Football",
+      "activity_id": "https://openactive.io/activity-list#0a5f732d-e806-4e51-ad40-0a7de0239c8c",
+      "opportunity_count": 5
+    },
+    {
+      "district_code": "E09000028",
+      "district_name": "Southwark",
+      "region_code": "E12000007",
+      "region_name": "London",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Gym Workout",
+      "activity_id": "https://openactive.io/activity-list#08d9368c-6c6c-44a3-84ef-a42ed00d529a",
+      "opportunity_count": 2299
+    },
+    {
+      "district_code": "E06000057",
+      "district_name": "Northumberland",
+      "region_code": "E12000001",
+      "region_name": "North East",
+      "country_code": "E92000001",
+      "country_name": "England",
+      "activity": "Gym Workout",
+      "activity_id": "https://openactive.io/activity-list#08d9368c-6c6c-44a3-84ef-a42ed00d529a",
+      "opportunity_count": 280
+    },
+    {
+      "district_code": "W06000015",
+      "district_name": "Cardiff",
+      "region_code": null,
+      "region_name": null,
+      "country_code": "W92000004",
+      "country_name": "Wales",
+      "activity": "Gym Workout",
+      "activity_id": "https://openactive.io/activity-list#08d9368c-6c6c-44a3-84ef-a42ed00d529a",
+      "opportunity_count": 272
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T04:12:00Z",
+    "page": 1,
+    "page_size": 10,
+    "total": 20
+  }
+}

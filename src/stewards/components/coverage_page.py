@@ -3,8 +3,12 @@
 `quality_page.py` is this module's nearest neighbour: same shape, read differently. A
 coverage run reports how much of an external estate the fleet reaches — four figures from one
 endpoint, the site-venue pairs behind them from a second — so the page is header, blurb, four
-figures, the regional chart where a trend would be, filters, the table of pairs, and the
-selected pair's OpenActive side. Everything it shows was computed in `monitors.coverage`.
+figures, the regional chart where a trend would be, the local authority map, then the pairs:
+filters, table and the selected pair's OpenActive side. Everything it shows was computed in
+`monitors.coverage`.
+
+The pairs load on request. They are ten thousand rows over several pages, and most visits
+are for the figures and the map, so the page does not make every visitor wait for them.
 
 No email draft: a coverage gap is not a fault a publisher is contacted about, which is also
 why the monitor is informational and carries no sidebar pill.
@@ -19,10 +23,11 @@ from collections.abc import Sequence
 
 import streamlit as st
 
+from stewards import geography
 from stewards.api import repository
 from stewards.api.errors import ApiError
 from stewards.api.models import CoverageSnapshot
-from stewards.components import layout, theme
+from stewards.components import layout, map_chart, theme
 from stewards.components.errors import render_api_error
 from stewards.components.filters import ALL, FilterState
 from stewards.components.incident_table import render_table
@@ -85,6 +90,64 @@ def render_summary_chart(monitor: Monitor, snapshot: CoverageSnapshot) -> None:
             "The share of Active Places sites in each English region that an OpenActive "
             "venue matches, on any of the three channels."
         )
+
+
+def render_la_map(monitor: Monitor, snapshot: CoverageSnapshot) -> None:
+    """Coverage by local authority: the district-level picture the regional bars average."""
+    boundaries = geography.uk_local_authority_districts()
+    style = map_chart.map_style("Coverage %")
+    map_chart.render_map(
+        f"chart_{monitor.id}_la",
+        "Coverage by local authority",
+        lambda focus: coverage.local_authority_map(snapshot, boundaries, style, focus),
+        areas=coverage.map_areas(boundaries),
+        height=style.height,
+        focus_placeholder="Centre on a local authority…",
+        caption=coverage.map_note(snapshot, boundaries),
+        attribution=boundaries.attribution,
+        empty_message="This snapshot does not report a local authority breakdown.",
+    )
+
+
+def pairs_loaded_key(monitor: Monitor) -> str:
+    """Session flag set once the steward asks for the pairs, so filter reruns keep them."""
+    return f"pairs_loaded_{monitor.id}"
+
+
+def _request_pairs(key: str) -> None:
+    st.session_state[key] = True
+
+
+def render_mappings_section(monitor: Monitor) -> None:
+    """The pairs, fetched only once asked for.
+
+    The button sets the flag in its callback, which runs before the script does, so the run
+    the click starts already renders the table.
+    """
+    key = pairs_loaded_key(monitor)
+    if not st.session_state.get(key, False):
+        with card(f"pairs_{monitor.id}"):
+            st.subheader("Site-venue pairs", anchor=False, divider=False)
+            st.caption(coverage.PAIRS_PROMPT)
+            st.button(
+                "Load site-venue pairs",
+                key=f"load_pairs_{monitor.id}",
+                type="primary",
+                on_click=_request_pairs,
+                args=(key,),
+            )
+        return
+
+    try:
+        with loading("Loading site-venue pairs"):
+            mappings = repository.fetch_site_mappings(monitor.id, monitor.rows_id)
+    except ApiError as exc:
+        # The rows are a second endpoint. One that is not live costs the page its table, the
+        # way a missing trend costs a monitor page its chart — never the figures above it.
+        render_api_error(exc)
+        return
+
+    render_table_section(monitor, coverage.build_rows(mappings.data))
 
 
 def render_filters(monitor: Monitor, rows: Sequence[MappingRow]) -> FilterState:
@@ -170,7 +233,7 @@ def render_table_section(monitor: Monitor, rows: Sequence[MappingRow]) -> None:
 
 
 def render_coverage_page(monitor: Monitor) -> None:
-    """Header, blurb, figures, the regional chart, filters, table, selected pair, footer."""
+    """Header, blurb, figures, the regional chart, the map, the pairs on request, footer."""
     try:
         with loading("Loading the coverage snapshot"):
             response = repository.fetch_coverage(monitor.id)
@@ -183,16 +246,6 @@ def render_coverage_page(monitor: Monitor) -> None:
     render_blurb(monitor)
     render_stats(monitor, response.data)
     render_summary_chart(monitor, response.data)
-
-    try:
-        with loading("Loading site-venue pairs"):
-            mappings = repository.fetch_site_mappings(monitor.id, monitor.rows_id)
-    except ApiError as exc:
-        # The rows are a second endpoint. One that is not live costs the page its table, the
-        # way a missing trend costs a monitor page its chart — never the figures above it.
-        render_api_error(exc)
-        layout.render_footer(monitor.query, actions=NO_ACTIONS)
-        return
-
-    render_table_section(monitor, coverage.build_rows(mappings.data))
+    render_la_map(monitor, response.data)
+    render_mappings_section(monitor)
     layout.render_footer(monitor.query, actions=NO_ACTIONS)

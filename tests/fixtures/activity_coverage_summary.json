@@ -1,0 +1,18 @@
+{
+  "data": {
+    "activity_opportunities": 683255,
+    "labelled_opportunities": 447497,
+    "labelled_percentage": 65.5,
+    "linked_opportunities": 366272,
+    "linked_percentage": 53.6,
+    "activities_offered": 288,
+    "vocabulary_size": 768
+  },
+  "meta": {
+    "snapshot_date": "2026-08-21",
+    "generated_at": "2026-08-21T04:12:00Z",
+    "page": 1,
+    "page_size": 1,
+    "total": 1
+  }
+}
