@@ -649,28 +649,6 @@ def fetch_activity_summaries(
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_activity_summary(monitor_id: str) -> ActivityCoverageSummaryResponse:
-    return _fetch_activity_summary(monitor_id)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_top_activities(monitor_id: str, limit: int = TOP_ACTIVITY_LIMIT) -> TopActivityPage:
-    return _fetch_top_activities(monitor_id, limit)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_activity_districts(monitor_id: str) -> ActivityDistrictPage:
-    return _fetch_activity_districts(monitor_id)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def fetch_activity_summaries(
-    monitor_ids: tuple[str, ...],
-) -> dict[str, ActivityCoverageSummary]:
-    return _fetch_activity_summaries(monitor_ids)
-
-
-@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_schema_compliance() -> SchemaComplianceSnapshot:
     return _fetch_schema_compliance()
 

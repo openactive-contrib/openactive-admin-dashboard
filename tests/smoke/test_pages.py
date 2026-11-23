@@ -390,6 +390,7 @@ def test_an_activity_and_district_with_nothing_shows_an_empty_state_not_an_error
     assert any("No activity is reported" in i.value for i in app.info)
     assert table_caption(app).startswith("0 of 20 ")
 
+
 @pytest.mark.parametrize("name", SCHEMA_COMPLIANCE_PAGES)
 def test_schema_compliance_page_has_two_tabs_each_with_a_chart_and_a_table(name: str) -> None:
     """`AppTest` renders both tabs, so the counts are the two of them together: the feeds

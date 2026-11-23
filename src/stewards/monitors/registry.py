@@ -738,13 +738,13 @@ ACTIVITY_COVERAGE = Monitor(
     id="activity_coverage",
     name="Activity coverage",
     group=Group.COVERAGE,
-     # Context, not a queue: the beta namespace is how the specification is meant to grow, so
-    # a custom property is not a fault a publisher is contacted about. The card stays grey.
-    # See `monitors.schema_drift.assess_drift`.
+    # Context, not a queue: an opportunity with no listed activity is not a fault a publisher
+    # is contacted about, so the card stays grey. See
+    # `monitors.activity_coverage.assess_activity_coverage`.
     severity=Severity.INFORMATIONAL,
-    # Neither an incident list nor a quality snapshot: rows and a summary block in one read,
-    # with nothing that ages and nothing scored. See `monitors.schema_drift`.
-    source=Source.SCHEMA_DRIFT,
+    # Three resources — national figures, a national ranking and rows per district and
+    # activity — and none has history. See `monitors.activity_coverage`.
+    source=Source.ACTIVITY_COVERAGE,
     blurb=(
         "Which activities OpenActive opportunities name, and where in the UK they are "
         "offered. The chart and the map count activity tags: an opportunity tagged with two "
@@ -818,7 +818,7 @@ SCHEMA_COMPLIANCE = Monitor(
             help="Distinct required fields missing; select a row to see which",
         ),
         Col(
-             "mean_key_completeness",
+            "mean_key_completeness",
             "Key fields",
             ColKind.PERCENT,
             help="Mean completeness of the key recommended fields",
