@@ -12,7 +12,7 @@ from stewards.components import layout, nav, theme
 from stewards.components.errors import render_api_error
 from stewards.components.loading import loading
 from stewards.components.surface import card
-from stewards.monitors import coverage, quality, schema_compliance
+from stewards.monitors import activity_coverage, coverage, quality, schema_compliance
 from stewards.monitors.gauge import gauge_chart
 from stewards.monitors.overview import (
     Cards,
@@ -114,6 +114,15 @@ def tile_cards() -> Cards:
             ).items()
         }
     )
+    cards.update(
+        {
+            monitor_id: activity_coverage.tile_card(summary)
+            for monitor_id, summary in repository.fetch_activity_summaries(
+                monitor_ids(Source.ACTIVITY_COVERAGE)
+            ).items()
+        }
+    )
+
     return cards
 
 

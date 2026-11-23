@@ -93,6 +93,58 @@
         "sites_missing": 996,
         "coverage_pct": 23.9
       }
+    ],
+    "coverage_by_local_authority": [
+      {
+        "local_authority_code": "E07000063",
+        "local_authority_name": "Lewes",
+        "sites_total": 62,
+        "sites_matched": 2,
+        "sites_missing": 60,
+        "coverage_pct": 3.2,
+        "oa_venues": 6,
+        "oa_venues_unmatched": 4
+      },
+      {
+        "local_authority_code": "E08000025",
+        "local_authority_name": "Birmingham",
+        "sites_total": 540,
+        "sites_matched": 201,
+        "sites_missing": 339,
+        "coverage_pct": 37.2,
+        "oa_venues": 388,
+        "oa_venues_unmatched": 170
+      },
+      {
+        "local_authority_code": "E09000033",
+        "local_authority_name": "Westminster",
+        "sites_total": 118,
+        "sites_matched": 57,
+        "sites_missing": 61,
+        "coverage_pct": 48.3,
+        "oa_venues": 142,
+        "oa_venues_unmatched": 61
+      },
+      {
+        "local_authority_code": "E06000001",
+        "local_authority_name": "Hartlepool",
+        "sites_total": 51,
+        "sites_matched": 9,
+        "sites_missing": 42,
+        "coverage_pct": 17.6,
+        "oa_venues": 15,
+        "oa_venues_unmatched": 6
+      },
+      {
+        "local_authority_code": "E07000200",
+        "local_authority_name": "Babergh",
+        "sites_total": 73,
+        "sites_matched": null,
+        "sites_missing": null,
+        "coverage_pct": null,
+        "oa_venues": 14,
+        "oa_venues_unmatched": null
+      }
     ]
   },
   "meta": {

@@ -46,12 +46,17 @@ class Source(StrEnum):
     snapshots into one row per feed, judged against the standard's required and
     recommended fields. The custom-property half is shaped by `monitors.schema_drift`,
     which outlived the monitor that was named after it. See `monitors.schema_compliance`.
+    `ACTIVITY_COVERAGE` is a snapshot of which activities the fleet's opportunities name:
+    national figures, a national ranking and paginated rows per district and activity, three
+    resources with no history. A row counts activity tags, not opportunities, so it is none
+    of the others. See `monitors.activity_coverage`.
     """
 
     INCIDENTS = "incidents"
     QUALITY = "quality"
     COVERAGE = "coverage"
     SCHEMA_COMPLIANCE = "schema_compliance"
+    ACTIVITY_COVERAGE = "activity_coverage"
 
 
 class Severity(StrEnum):
@@ -729,6 +734,51 @@ ACTIVE_PLACES_COVERAGE = Monitor(
 )
 
 
+ACTIVITY_COVERAGE = Monitor(
+    id="activity_coverage",
+    name="Activity coverage",
+    group=Group.COVERAGE,
+     # Context, not a queue: the beta namespace is how the specification is meant to grow, so
+    # a custom property is not a fault a publisher is contacted about. The card stays grey.
+    # See `monitors.schema_drift.assess_drift`.
+    severity=Severity.INFORMATIONAL,
+    # Neither an incident list nor a quality snapshot: rows and a summary block in one read,
+    # with nothing that ages and nothing scored. See `monitors.schema_drift`.
+    source=Source.SCHEMA_DRIFT,
+    blurb=(
+        "Which activities OpenActive opportunities name, and where in the UK they are "
+        "offered. The chart and the map count activity tags: an opportunity tagged with two "
+        "activities counts once under each, so their totals exceed the opportunities "
+        "behind them. This snapshot only, with no trend."
+    ),
+    unit="of activity opportunities use the activity list",
+    # The card is a set of figures rather than a count, and the monitor supplies it along
+    # with its verdict. See `monitors.activity_coverage.tile_card`.
+    viz=Facts(),
+    columns=(
+        Col("district_name", "Local authority", ColKind.TEXT, primary=True),
+        Col("region_name", "Region", ColKind.TEXT),
+        Col("country_name", "Nation", ColKind.TEXT),
+        Col("activity", "Activity", ColKind.TEXT),
+        Col(
+            "opportunity_count",
+            "Opportunities",
+            ColKind.NUMBER,
+            help="Opportunities in this local authority tagged with this activity",
+        ),
+    ),
+    # Drawn above the map, and narrowing the map and the table together. The local
+    # authority filter is the map's own "centre on" picker, so the two cannot disagree.
+    filters=(FilterSpec("activity", "Activity"),),
+    sort_field="opportunity_count",
+    # Nothing here ages, so there is no contact threshold to filter on.
+    has_threshold_filter=False,
+    summary_field="district_name",
+    schedule="daily snapshot · UK",
+    query="activity_coverage_v1",
+    page="views/33_activity_coverage.py",
+)
+
 SCHEMA_COMPLIANCE = Monitor(
     id="schema_compliance",
     name="Schema compliance",
@@ -768,7 +818,7 @@ SCHEMA_COMPLIANCE = Monitor(
             help="Distinct required fields missing; select a row to see which",
         ),
         Col(
-            "mean_key_completeness",
+             "mean_key_completeness",
             "Key fields",
             ColKind.PERCENT,
             help="Mean completeness of the key recommended fields",
@@ -834,6 +884,7 @@ MONITOR_REGISTRY: tuple[Monitor, ...] = (
     DATASET_FUTURE_DECLINE,
     FEED_QUALITY,
     ACTIVE_PLACES_COVERAGE,
+    ACTIVITY_COVERAGE,
     SCHEMA_COMPLIANCE,
 )
 

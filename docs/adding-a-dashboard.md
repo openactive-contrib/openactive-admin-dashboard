@@ -105,10 +105,22 @@ is no `detail.` or `part.` prefix to learn.
 do not apply, keyed off the declared source, so the next monitor of any shape is validated
 the moment it lands.
 
+Two further reads exist beyond the table: `Source.SCHEMA_DRIFT` (see CLAUDE.md) and
+`Source.ACTIVITY_COVERAGE`. An **activity coverage** monitor reads three resources with no
+history — national figures (`activity_summary`), the nationally ranked activities
+(`top_activities`, one page of `repository.TOP_ACTIVITY_LIMIT`) and one row per local
+authority district and activity (`activity_districts`, paged) — shaped by
+`monitors/activity_coverage.py` and drawn by `components/activity_coverage_page.py`: three
+figures, the ranking chart, the UK district map with its activity filter, and the table
+beneath it. Its rows count *activity tags*: an opportunity tagged with two activities appears 3under both, so any total across activities is labelled "activity tags", never
+"opportunities". Its card is `Facts`, informational like the Active Places card. Sample
+payloads are `<id>_summary.json`, `<id>_top_activities.json` and `<id>_districts.json`.
+
+
 **Adding a fifth read is not a registry entry.** It is a `Source` member, a shaping module
 under `monitors/`, a page renderer under `components/`, endpoint functions for *both* URL
 shapes, models, repository reads and a branch in `overview_page.tile_cards`. Only reach for
-one when the data genuinely cannot be any of the four — as `COVERAGE` could not, because its
+one when the data genuinely cannot be any of the existing ones — as `COVERAGE` could not, because its
 rows page and its figures come from somewhere else.
 
 A read can also be retired. `Source.SCHEMA_DRIFT` backed a monitor of its own until its page
@@ -410,7 +422,12 @@ exactly as incidents are.
                  "venues_unmatched_pct": 52.2, "pairs": 10034},
     "coverage_by_region": [{"region_name": "London", "sites_total": 2826,
                             "sites_matched": 1110, "sites_missing": 1716,
-                            "coverage_pct": 39.3}]
+                            "coverage_pct": 39.3}],
+    "coverage_by_local_authority": [{"local_authority_code": "E07000063",
+                                     "local_authority_name": "Lewes", "sites_total": 62,
+                                     "sites_matched": 2, "sites_missing": 60,
+                                     "coverage_pct": 3.2, "oa_venues": 6,
+                                     "oa_venues_unmatched": 4}]
   },
   "meta": {"snapshot_date": "2026-08-21", "generated_at": "…", "total": 1}
 }
@@ -444,15 +461,73 @@ Which figures reach the page:
   must not appear to change what was measured. Its `pairs` count is the exception and is not
   modelled: the caption above the table already states how many rows there are, and two
   figures for the same thing read as a bug the moment a filter moves one of them.
-- `coverage_by_region` fills the one chart. The other breakdowns the payload carries —
-  ownership, management, facility type, local authority — are deliberately not modelled yet:
-  a field earns a line in `api/models.py` when something draws it.
-- the rows fill the table. `monitors/coverage.py` derives what the API does not send: the
+- `coverage_by_region` fills the bar chart, and `coverage_by_local_authority` the map below
+  it, joined to the bundled ONS boundaries on `local_authority_code` (a code the boundaries
+  do not carry is named in the map's caption, not dropped silently). The other breakdowns the
+  payload carries — ownership, management, facility type — are deliberately not modelled
+  yet: a field earns a line in `api/models.py` when something draws it.
+- the rows fill the table, fetched only once the steward presses "Load site-venue pairs":
+  most visits are for the figures and the map, and ten thousand rows over ten pages is the
+  slow part of the page. `monitors/coverage.py` derives what the API does not send: the
   venue's display name, the joined publisher and kind cells, the match channel's prose label
   and the similarity as a percentage.
 
+#### Adding a map to a view
+
+Any view with a figure per area can draw one; nothing in the map code knows about coverage.
+Build plain rows keyed by area code, then:
+
+```python
+# monitors/<view>.py — pure
+def my_map(snapshot, boundaries, style, focus=None) -> Choropleth | None:
+    return choropleth.choropleth(
+        boundaries.only(prefixes=("E",)),
+        rows, code_key="local_authority_code", value_field="coverage_pct",
+        tooltip=(TooltipField("coverage_pct", "Coverage", ".1f", "%"),
+                 TooltipField("sites_total", "Active Places sites", ",")),
+        style=style, focus=focus,
+    )
+
+# components/<view>_page.py — thin
+style = map_chart.map_style("Coverage %")
+map_chart.render_map(key, title, lambda focus: my_map(snapshot, boundaries, style, focus),
+                     areas=<the boundaries drawn>, height=style.height,
+                     attribution=boundaries.attribution, empty_message=…)
+```
+
+The tooltip is the area's name then one `Title: value` line per `TooltipField`, formatted
+with a Python format spec; a missing figure reads "Not reported". Test the row-shaping and
+the `choropleth` call against a synthetic boundary set; only `render_map` is in the
+component. Another boundary set is a `geography.BoundarySet` beside `UK_LAD_2024`: a WGS84
+GeoJSON (no `crs`) is used as it is, a British National Grid one is converted on load, and
+any other CRS is refused.
+
 The rows endpoint has its own name, so the registry entry declares `rows_id`. Deriving a
 suffix from the monitor id would point the read at a path that does not exist.
+
+`choropleth(..., log_scale=True)` shades by order of magnitude, for a count too skewed for a
+linear ramp (district activity totals run from 1 to tens of thousands); the legend then
+labels whole powers of ten as counts (1, 10, 100, 1k). `map_chart.render_map` takes
+`controls`, drawn under the title inside the map's fragment (a filter that recolours the
+map), and `after`, drawn below the card in the same fragment and handed the area the map is
+centred on (a table narrowed to it). The activity coverage page uses both: its local
+authority filter *is* the map's "centre on" picker, so the map and the table cannot disagree.
+
+### The activity coverage reads
+
+| Read | Admin path | Contract path |
+|---|---|---|
+| National figures | `/admin/<slug>/summary` | `/monitors/<id>/summary` |
+| Ranking | `/admin/<slug>/top-activities?page=1&page_size=20` | `/monitors/<id>/top-activities` |
+| District rows (paged, ≤1000) | `/admin/<slug>` | `/monitors/<id>/districts` |
+
+The summary is `{activity_opportunities, labelled_opportunities, labelled_percentage,
+activities_offered, vocabulary_size}` (plus `linked_*`, which the page deliberately leaves
+out). A ranking row is `{rank, activity, activity_id, opportunity_count, district_count}`; a
+district row is `{district_code, district_name, region_name, country_name, activity,
+activity_id, opportunity_count}`. `region_name` is null outside England, where ONS regions do
+not exist, and the row then takes its nation as its region. The summary failing costs the
+page; the ranking or the rows failing costs only their own section.
 
 ### Publisher notification list
 

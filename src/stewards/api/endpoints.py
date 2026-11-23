@@ -167,6 +167,47 @@ def custom_properties(
     )
 
 
+def activity_summary(style: Style, monitor_id: str, *, as_of: date) -> Endpoint:
+    """An activity coverage monitor's national figures: one object, no rows.
+
+    The fifth backing read is three resources under the monitor's own slug: this summary,
+    the national ranking (`top_activities`) and the per-district rows (`activity_districts`).
+    """
+    if style is Style.ADMIN:
+        return Endpoint(
+            f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}/summary", {"as_of": as_of.isoformat()}
+        )
+    return Endpoint(f"/monitors/{monitor_id}/summary")
+
+
+def top_activities(style: Style, monitor_id: str, *, as_of: date, limit: int) -> Endpoint:
+    """The nationally ranked activities, first `limit` of them: one page, never followed."""
+    if style is Style.ADMIN:
+        return Endpoint(
+            f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}/top-activities",
+            {"as_of": as_of.isoformat(), "page": 1, "page_size": limit},
+        )
+    return Endpoint(f"/monitors/{monitor_id}/top-activities", {"page": 1, "page_size": limit})
+
+
+def activity_districts(
+    style: Style,
+    monitor_id: str,
+    *,
+    as_of: date,
+    page: int = 1,
+    page_size: int = 1000,
+) -> Endpoint:
+    """One row per local authority district and activity, paginated. The admin API answers
+    it at the monitor's slug with no suffix: the rows are the resource."""
+    if style is Style.ADMIN:
+        return Endpoint(
+            f"{ADMIN_ROOT}/{monitor_slug(monitor_id)}",
+            {"as_of": as_of.isoformat(), "page": page, "page_size": page_size},
+        )
+    return Endpoint(f"/monitors/{monitor_id}/districts", {"page": page, "page_size": page_size})
+
+
 def ecosystem_growth(style: Style, *, as_of: date) -> Endpoint:
     """The ecosystem's monthly growth series: one row per calendar month, no paging.
 

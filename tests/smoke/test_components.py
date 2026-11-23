@@ -866,6 +866,8 @@ def _coverage_rows_missing_script() -> None:
     mappings_read = repository.fetch_site_mappings
     repository.fetch_coverage = snapshot  # type: ignore[assignment]
     repository.fetch_site_mappings = boom  # type: ignore[assignment]
+    # As though the steward had already asked for the pairs.
+    st.session_state["pairs_loaded_active_places_coverage"] = True
     try:
         render_coverage_page(get_monitor("active_places_coverage"))
     finally:
@@ -882,7 +884,7 @@ def test_a_rows_endpoint_that_is_not_live_costs_the_table_and_not_the_figures() 
     assert any("no data for this view yet" in error.value for error in app.error)
     assert "26.4%" in text
     assert any("Snapshot" in m.value for m in app.markdown)
-    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("vega_lite_chart")) == 2
     assert not app.dataframe
 
 
@@ -1531,3 +1533,174 @@ def test_a_month_whose_lists_were_not_computed_says_so() -> None:
     captions = [c.value for c in app.caption]
     assert captions.count("Not computed for this month.") == 6
     assert len(app.dataframe) == 1
+
+
+# --- the map card -------------------------------------------------------------------------
+
+
+def _map_script(with_chart: bool) -> None:
+    from fixture_loader import load_sample
+    from stewards.api.models import CoverageResponse
+    from stewards.components import map_chart
+    from stewards.geography import uk_local_authority_districts
+    from stewards.monitors import coverage
+
+    snapshot = CoverageResponse.model_validate(
+        load_sample("active_places_coverage_coverage")
+    ).data
+    boundaries = uk_local_authority_districts()
+    style = map_chart.map_style("Coverage %")
+    map_chart.render_map(
+        "map_test",
+        "A map",
+        lambda focus: (
+            coverage.local_authority_map(snapshot, boundaries, style, focus)
+            if with_chart
+            else None
+        ),
+        areas=coverage.map_areas(boundaries),
+        height=style.height,
+        caption="A note.",
+        attribution="Boundaries: somebody.",
+        empty_message="Nothing to draw.",
+    )
+
+
+def _view_of(app: AppTest) -> dict:
+    import json
+
+    return json.loads(app.get("deck_gl_json_chart")[0].proto.json)["initialViewState"]
+
+
+def test_a_map_card_draws_legend_map_controls_and_attribution() -> None:
+    from stewards.components.map_chart import MAP_HELP
+
+    app = run(_map_script, True)
+    assert [h.value for h in app.subheader] == ["A map"]
+    assert app.subheader[0].help == MAP_HELP
+    assert len(app.get("vega_lite_chart")) == 1  # the legend
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert [c.value for c in app.caption] == ["A note.", "Boundaries: somebody."]
+    assert len(app.selectbox) == 1
+    assert len(app.selectbox[0].options) == 296
+    # Zooming is the mouse's job; the one button is "show the whole map".
+    assert [b.key for b in app.button] == ["map_test_whole"]
+
+
+def test_centring_on_a_district_opens_the_map_on_it_and_clearing_it_opens_on_england() -> None:
+    app = run(_map_script, True)
+    england = _view_of(app)
+    app.selectbox[0].select("E09000033").run()  # Westminster
+    assert not app.exception
+    close = _view_of(app)
+    assert close["zoom"] > england["zoom"] + 3
+    assert app.session_state["map_test_view"] == 1
+
+    app.selectbox[0].select(None).run()
+    assert _view_of(app) == england
+    assert app.session_state["map_test_view"] == 2
+
+
+def test_showing_the_whole_map_clears_the_focus_and_remounts_the_map() -> None:
+    """The map is in a container keyed on the view revision, so a press mounts a fresh map at
+    its opening view even when that view has not changed."""
+    app = run(_map_script, True)
+    england = _view_of(app)
+    app.selectbox[0].select("E09000033").run()
+    app.button(key="map_test_whole").click().run()
+    assert not app.exception
+    assert app.session_state["map_test_focus"] is None
+    assert app.session_state["map_test_view"] == 2
+    assert _view_of(app) == england
+
+    app.button(key="map_test_whole").click().run()
+    assert app.session_state["map_test_view"] == 3
+    assert _view_of(app) == england
+
+
+def test_a_map_card_with_no_chart_says_so_and_draws_nothing_else() -> None:
+    app = run(_map_script, False)
+    assert len(app.get("vega_lite_chart")) == 0
+    assert len(app.get("deck_gl_json_chart")) == 0
+    assert len(app.selectbox) == 0
+    assert len(app.button) == 0
+    assert [c.value for c in app.caption] == ["Nothing to draw."]
+
+
+# --- the activity coverage page -------------------------------------------------------------
+
+
+def _activity_page_with_a_failing_read(failing: str) -> None:
+    import streamlit as st
+
+    from stewards.api import repository
+    from stewards.api.errors import ApiNotFound
+    from stewards.components.activity_coverage_page import render_activity_coverage_page
+    from stewards.monitors.registry import get_monitor
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise ApiNotFound("no endpoint")
+
+    st.cache_data.clear()
+    original = getattr(repository, failing)
+    setattr(repository, failing, boom)
+    try:
+        render_activity_coverage_page(get_monitor("activity_coverage"))
+    finally:
+        setattr(repository, failing, original)
+        st.cache_data.clear()
+
+
+def test_an_activity_page_whose_summary_is_not_live_says_so_and_shows_no_snapshot() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_activity_summary")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert not app.dataframe
+    assert not app.get("vega_lite_chart")
+    assert not any("Snapshot" in m.value for m in app.markdown)
+
+
+def test_a_ranking_that_is_not_live_costs_the_chart_and_not_the_map() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_top_activities")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert any("Snapshot" in m.value for m in app.markdown)
+    assert "Top 20 activities" not in [h.value for h in app.subheader]
+    # The map's legend only; the ranking is gone.
+    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("deck_gl_json_chart")) == 1
+    assert len(app.dataframe) == 1
+
+
+def test_district_rows_that_are_not_live_cost_the_map_and_not_the_figures() -> None:
+    app = run(_activity_page_with_a_failing_read, "fetch_activity_districts")
+    assert any("no data for this view yet" in error.value for error in app.error)
+    assert "683,255" in " ".join(m.value for m in app.markdown)
+    assert len(app.get("vega_lite_chart")) == 1
+    assert not app.get("deck_gl_json_chart")
+    assert not app.dataframe
+
+
+def _activity_empty_ranking_script() -> None:
+    from stewards.components.activity_coverage_page import render_top_activities
+    from stewards.monitors.registry import get_monitor
+
+    render_top_activities(get_monitor("activity_coverage"), ())
+
+
+def test_an_empty_ranking_says_so_rather_than_drawing_an_empty_axis() -> None:
+    app = run(_activity_empty_ranking_script)
+    assert not app.get("vega_lite_chart")
+    assert any("does not report a national ranking" in c.value for c in app.caption)
+
+
+def _activity_empty_map_script() -> None:
+    from stewards.components.activity_coverage_page import render_map_section
+    from stewards.monitors.registry import get_monitor
+
+    render_map_section(get_monitor("activity_coverage"), ())
+
+
+def test_no_district_rows_draw_a_caption_and_an_empty_table_not_a_grey_country() -> None:
+    app = run(_activity_empty_map_script)
+    assert not app.get("deck_gl_json_chart")
+    assert any("No local authority reports this activity" in c.value for c in app.caption)
+    assert any("No activity is reported" in i.value for i in app.info)

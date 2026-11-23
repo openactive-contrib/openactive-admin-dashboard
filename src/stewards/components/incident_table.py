@@ -71,10 +71,25 @@ def render_table(
     rag_columns: Sequence[str],
     key: str,
     empty_message: str,
+    selectable: bool = True,
 ) -> int | None:
-    """Render the table and return the selected row position, if any."""
+    """Render the table and return the selected row position, if any.
+
+    `selectable=False` is for a table with nothing behind a row to open: a row that can be
+    selected but opens nothing reads as broken.
+    """
     if frame.empty:
         st.info(empty_message)
+        return None
+
+    if not selectable:
+        st.dataframe(
+            style_rag(frame, tones, rag_columns),
+            column_config=column_config(columns),
+            hide_index=True,
+            width="stretch",
+            key=key,
+        )
         return None
 
     event = st.dataframe(

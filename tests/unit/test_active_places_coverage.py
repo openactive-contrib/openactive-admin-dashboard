@@ -7,18 +7,24 @@ a figure the batch reported as null, which is not a zero.
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import pytest
 
 from fixture_loader import load_sample
 from stewards.api.models import (
     CoverageGroup,
     CoverageHeadline,
+    CoverageLocalAuthority,
     CoverageResponse,
     CoverageSnapshot,
     SiteMapping,
     SiteMappingPage,
 )
+from stewards.geography import uk_local_authority_districts
 from stewards.monitors import coverage
+from stewards.monitors.choropleth import Choropleth, ChoroplethStyle, read_data_url
 from stewards.monitors.health import HealthState, Movement
 from stewards.monitors.overview import build_tiles, nav_badges, tile_label, tile_state
 from stewards.monitors.registry import Col, ColKind, Source, get_monitor, monitor_ids
@@ -486,3 +492,147 @@ def test_a_headline_without_a_rate_still_builds_a_tile(summary) -> None:
     tile = next(t for t in build_tiles(summary.data, {}, cards) if t.monitor is MONITOR)
     assert tile.value == EMPTY
     assert tile.state is Tone.GREY
+
+
+# --- the local authority map --------------------------------------------------------------
+
+
+def la(**overrides: object) -> CoverageLocalAuthority:
+    payload: dict[str, object] = {
+        "local_authority_code": "E07000063",
+        "local_authority_name": "Lewes",
+        "sites_total": 62,
+        "sites_matched": 2,
+        "coverage_pct": 3.2,
+        "oa_venues": 6,
+    }
+    payload.update(overrides)
+    return CoverageLocalAuthority.model_validate(payload)
+
+
+MAP_STYLE = ChoroplethStyle(
+    ramp=("#EEEEEE", "#111111"),
+    no_data="#CCCCCC",
+    stroke="#FFFFFF",
+    highlight="#000000",
+    label_colour="#555555",
+    tooltip_background="#FFFFFF",
+    tooltip_text="#000000",
+    tooltip_border="#DDDDDD",
+    legend_title="Coverage %",
+)
+
+
+def map_features(figure: Choropleth) -> list[dict[str, Any]]:
+    (layer,) = json.loads(figure.deck.to_json())["layers"]
+    return list(read_data_url(layer["data"])["features"])
+
+
+def test_each_reported_authority_becomes_a_row_keyed_by_its_code(
+    snapshot: CoverageSnapshot,
+) -> None:
+    rows = coverage.local_authority_rows(snapshot)
+    assert len(rows) == len(snapshot.coverage_by_local_authority)
+    assert rows[0] == {
+        "local_authority_code": "E07000063",
+        "name": "Lewes",
+        "coverage_pct": 3.2,
+        "sites_total": 62,
+        "sites_matched": 2,
+        "oa_venues": 6,
+    }
+
+
+def test_a_null_coverage_stays_null_rather_than_reading_as_zero(
+    snapshot: CoverageSnapshot,
+) -> None:
+    babergh = next(
+        row
+        for row in coverage.local_authority_rows(snapshot)
+        if row["local_authority_code"] == "E07000200"
+    )
+    assert babergh["coverage_pct"] is None
+
+
+def test_an_authority_with_no_code_is_dropped_and_a_blank_name_left_to_the_boundary() -> None:
+    snap = CoverageSnapshot(
+        coverage_by_local_authority=(
+            la(local_authority_code=" "),
+            la(local_authority_name=" "),
+        )
+    )
+    (row,) = coverage.local_authority_rows(snap)
+    assert "name" not in row
+
+
+def test_no_breakdown_is_no_rows_and_no_map() -> None:
+    empty = CoverageSnapshot()
+    assert coverage.local_authority_rows(empty) == []
+    assert (
+        coverage.local_authority_map(empty, uk_local_authority_districts(), MAP_STYLE) is None
+    )
+
+
+def test_the_map_draws_england_only_with_every_tooltip_field(
+    snapshot: CoverageSnapshot,
+) -> None:
+    figure = coverage.local_authority_map(snapshot, uk_local_authority_districts(), MAP_STYLE)
+    assert figure is not None
+    features = map_features(figure)
+    assert len(features) == 296
+    assert all(f["properties"]["code"].startswith("E") for f in features)
+    by_code = {f["properties"]["code"]: f["properties"] for f in features}
+    assert by_code["E07000063"]["tooltip"] == (
+        "Lewes\nCoverage: 3.2%\nActive Places sites: 62\nOpenActive venues: 6\nSites matched: 2"
+    )
+    # Reported with no rate: grey, and says so.
+    assert by_code["E07000200"]["fill"] == [204, 204, 204]
+    assert "Coverage: Not reported" in by_code["E07000200"]["tooltip"]
+    # Not in the snapshot at all: grey too.
+    assert by_code["E09000001"]["fill"] == [204, 204, 204]
+
+
+def test_the_caption_names_codes_the_boundaries_do_not_carry(
+    snapshot: CoverageSnapshot,
+) -> None:
+    boundaries = uk_local_authority_districts()
+    assert coverage.unmapped_authorities(snapshot, boundaries) == ()
+    assert coverage.map_note(snapshot, boundaries) == ""
+
+    # A Welsh code is a real boundary but not on an England map; a made-up one is on neither.
+    stray = CoverageSnapshot(
+        coverage_by_local_authority=(
+            la(),
+            la(local_authority_code="W06000001"),
+            la(local_authority_code="E99999999"),
+        )
+    )
+    assert coverage.unmapped_authorities(stray, boundaries) == ("E99999999", "W06000001")
+    assert "E99999999, W06000001" in coverage.map_note(stray, boundaries)
+
+
+def test_the_map_offers_englands_districts_to_centre_on() -> None:
+    areas = coverage.map_areas(uk_local_authority_districts())
+    assert len(areas.codes) == 296
+    assert areas.names["E09000033"] == "Westminster"
+
+
+def test_the_map_opens_on_england_or_on_the_district_asked_for(
+    snapshot: CoverageSnapshot,
+) -> None:
+    boundaries = uk_local_authority_districts()
+    whole = coverage.local_authority_map(snapshot, boundaries, MAP_STYLE)
+    westminster = coverage.local_authority_map(snapshot, boundaries, MAP_STYLE, "E09000033")
+    assert whole is not None
+    assert westminster is not None
+    england = json.loads(whole.deck.to_json())["initialViewState"]
+    close = json.loads(westminster.deck.to_json())["initialViewState"]
+    assert 52.0 < england["latitude"] < 54.0
+    assert close["latitude"] == pytest.approx(51.51, abs=0.02)
+    assert close["longitude"] == pytest.approx(-0.16, abs=0.03)
+    assert close["zoom"] > england["zoom"] + 3
+
+
+def test_the_pairs_prompt_states_no_count() -> None:
+    """The run's pair count and the rows fetched can differ; two numbers read as a bug."""
+    assert not any(ch.isdigit() for ch in coverage.PAIRS_PROMPT)

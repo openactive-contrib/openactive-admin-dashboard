@@ -536,6 +536,23 @@ class CoverageGroup(NullTolerantModel):
     coverage_pct: float | None = None
 
 
+class CoverageLocalAuthority(NullTolerantModel):
+    """One local authority district's coverage, keyed by its ONS code (`E07000063`).
+
+    The code, not the name, is what joins a row to its boundary on the map: names are
+    respelled between boundary releases, codes are not.
+    """
+
+    local_authority_code: str = ""
+    local_authority_name: str = ""
+    sites_total: int | None = None
+    sites_matched: int | None = None
+    sites_missing: int | None = None
+    coverage_pct: float | None = None
+    oa_venues: int | None = None
+    oa_venues_unmatched: int | None = None
+
+
 class CoverageParameters(NullTolerantModel):
     """The thresholds the run was computed at, for the page's own copy."""
 
@@ -556,6 +573,7 @@ class CoverageSnapshot(NullTolerantModel):
     parameters: CoverageParameters = Field(default_factory=CoverageParameters)
     source: CoverageSource = Field(default_factory=CoverageSource)
     coverage_by_region: tuple[CoverageGroup, ...] = ()
+    coverage_by_local_authority: tuple[CoverageLocalAuthority, ...] = ()
 
 
 class CoverageResponse(ApiModel):
@@ -566,8 +584,9 @@ class CoverageResponse(ApiModel):
 class SiteMapping(NullTolerantModel):
     """One site-venue pair: an Active Places site and an OpenActive venue matched to it.
 
-    The coordinates and the raw `oa_location_json` are deliberately not declared: the app
-    draws no map, and the distance the batch already computed is the figure a reader needs.
+    The coordinates and the raw `oa_location_json` are deliberately not declared: the page's
+    map is drawn per local authority from the snapshot's breakdown, not per pair, and the
+    distance the batch already computed is the figure a reader of a pair needs.
     """
 
     site_id: str = ""
@@ -596,6 +615,64 @@ class SiteMapping(NullTolerantModel):
 
 class SiteMappingPage(ApiModel):
     data: tuple[SiteMapping, ...] = ()
+    meta: Meta
+
+
+# --- activity coverage --------------------------------------------------------------------
+#
+# The fifth backing read: which activities the fleet's opportunities name, from three
+# resources. A summary object of national figures, the nationally ranked activities, and one
+# paginated row per local authority district and activity. None has history. A district row's
+# `opportunity_count` counts opportunities tagged with that activity there, so an opportunity
+# tagged with two activities counts once under each — the rows do not add up to an
+# opportunity total, and nothing here pretends they do.
+
+
+class ActivityCoverageSummary(NullTolerantModel):
+    """The national figures. `linked_*` is reported too and deliberately not declared: the
+    page leaves it out, and a field earns a line here when something draws it."""
+
+    activity_opportunities: int | None = None
+    labelled_opportunities: int | None = None
+    labelled_percentage: float | None = None
+    activities_offered: int | None = None
+    vocabulary_size: int | None = None
+
+
+class ActivityCoverageSummaryResponse(ApiModel):
+    data: ActivityCoverageSummary = Field(default_factory=ActivityCoverageSummary)
+    meta: Meta
+
+
+class TopActivity(NullTolerantModel):
+    """One activity in the national ranking."""
+
+    rank: int | None = None
+    activity: str = ""
+    activity_id: str = ""
+    opportunity_count: int | None = None
+    district_count: int | None = None
+
+
+class TopActivityPage(ApiModel):
+    data: tuple[TopActivity, ...] = ()
+    meta: Meta
+
+
+class ActivityDistrict(NullTolerantModel):
+    """One activity in one local authority district, keyed by the district's ONS code."""
+
+    district_code: str = ""
+    district_name: str = ""
+    region_name: str = ""
+    country_name: str = ""
+    activity: str = ""
+    activity_id: str = ""
+    opportunity_count: int | None = None
+
+
+class ActivityDistrictPage(ApiModel):
+    data: tuple[ActivityDistrict, ...] = ()
     meta: Meta
 
 

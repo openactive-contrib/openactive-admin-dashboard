@@ -9,6 +9,8 @@ dependencies = [
     "pydantic>=2.7",
     "pandas>=2.2",
     "pyyaml>=6.0",
+    # Maps: st.pydeck_chart takes a pydeck Deck, and monitors/choropleth.py builds one.
+    "pydeck>=0.9",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +55,7 @@ files = ["src/stewards"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["streamlit.*"]
+module = ["streamlit.*", "pydeck.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

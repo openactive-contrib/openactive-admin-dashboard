@@ -20,6 +20,8 @@ from stewards.api.endpoints import Style
 from stewards.api.errors import ApiNotFound
 from stewards.api.repository import (
     CUSTOM_PROPERTIES_MONITOR_ID,
+    _fetch_activity_districts,
+    _fetch_activity_summary,
     _fetch_coverage,
     _fetch_custom_properties,
     _fetch_ecosystem_growth,
@@ -27,11 +29,16 @@ from stewards.api.repository import (
     _fetch_quality,
     _fetch_site_mappings,
     _fetch_summary,
+    _fetch_top_activities,
     _fetch_trend,
 )
 from stewards.config import Settings
-from stewards.monitors import coverage, schema_drift
-from stewards.monitors.registry import ACTIVE_PLACES_COVERAGE, SINGLE_FEED_STALL
+from stewards.monitors import activity_coverage, coverage, schema_drift
+from stewards.monitors.registry import (
+    ACTIVE_PLACES_COVERAGE,
+    ACTIVITY_COVERAGE,
+    SINGLE_FEED_STALL,
+)
 from stewards.monitors.transforms import to_dataframe
 
 BASE = "http://localhost:5268"
@@ -316,6 +323,63 @@ def test_the_real_mapping_payload_fills_every_column_the_registry_declares(
     frame = coverage.to_dataframe(ACTIVE_PLACES_COVERAGE, coverage.build_rows(response.data))
     assert list(frame.columns) == [c.label for c in ACTIVE_PLACES_COVERAGE.columns]
     assert len(frame) == len(response.data)
+
+
+# --- activity coverage ---------------------------------------------------------------------
+
+ACTIVITY = f"{BASE}/admin/activity-coverage"
+
+
+@respx.mock
+def test_the_activity_summary_sits_under_the_monitor_slug(
+    client: StewardsClient, payload
+) -> None:
+    route = respx.get(f"{ACTIVITY}/summary").mock(
+        return_value=httpx.Response(200, json=payload("activity_coverage_summary"))
+    )
+    response = _fetch_activity_summary("activity_coverage", client, as_of=AS_OF)
+    assert response.data.labelled_opportunities == 447497
+    request = route.calls.last.request
+    assert request.url.params["as_of"] == AS_OF.isoformat()
+    assert request.url.params["token"] == "test-token"
+    assert "authorization" not in request.headers
+
+
+@respx.mock
+def test_the_top_activities_ask_for_twenty(client: StewardsClient, payload) -> None:
+    route = respx.get(f"{ACTIVITY}/top-activities").mock(
+        return_value=httpx.Response(200, json=payload("activity_coverage_top_activities"))
+    )
+    response = _fetch_top_activities("activity_coverage", 20, client, as_of=AS_OF)
+    assert len(response.data) == 20
+    assert route.calls.last.request.url.params["page_size"] == "20"
+
+
+@respx.mock
+def test_the_real_district_rows_fill_every_column_the_registry_declares(
+    client: StewardsClient, payload
+) -> None:
+    """The rows are the monitor slug itself, with no suffix."""
+    route = respx.get(ACTIVITY).mock(
+        return_value=httpx.Response(200, json=payload("activity_coverage_districts"))
+    )
+    response = _fetch_activity_districts("activity_coverage", client, as_of=AS_OF)
+    assert route.calls.last.request.url.params["page"] == "1"
+    frame = activity_coverage.to_dataframe(
+        ACTIVITY_COVERAGE, activity_coverage.build_rows(response.data)
+    )
+    assert list(frame.columns) == [c.label for c in ACTIVITY_COVERAGE.columns]
+    assert len(frame) == len(response.data)
+    assert not frame.isna().any().any()
+
+
+@respx.mock
+def test_an_activity_endpoint_this_deployment_has_not_built_raises_not_found(
+    client: StewardsClient,
+) -> None:
+    respx.get(f"{ACTIVITY}/summary").mock(return_value=httpx.Response(404))
+    with pytest.raises(ApiNotFound):
+        _fetch_activity_summary("activity_coverage", client, as_of=AS_OF)
 
 
 # --- the custom-property snapshot ---------------------------------------------------------
