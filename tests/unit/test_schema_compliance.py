@@ -132,6 +132,40 @@ def test_missing_required_fields_are_counted_once_across_opportunity_types() -> 
         [],
     )
     assert row.missing_required_count == 3
+    # And named once each, for the same reason: three distinct fields, three names.
+    assert row.missing_required_label == "location, name, startDate"
+
+
+def test_a_feed_missing_nothing_names_nothing() -> None:
+    assert _one({"feed_id": "f"}, []).missing_required_label == EMPTY
+
+
+def test_the_properties_cell_names_every_property_the_feed_publishes() -> None:
+    row = _one(
+        {"feed_id": "f"},
+        [
+            {
+                "feed_id": "f",
+                "custom_properties": [
+                    {"property": "beta:video", "entity_type": "Event"},
+                    {"property": "alternateName", "entity_type": "Place"},
+                    {"property": "beta:video", "entity_type": "Place"},
+                ],
+            }
+        ],
+    )
+    # Once each, alphabetically, however many entity types carry them.
+    assert row.custom_property_label == "alternateName, beta:video"
+    assert row.custom_property_count == 2
+
+
+def test_a_feed_with_no_properties_and_a_failed_read_both_name_nothing() -> None:
+    """The cell cannot tell them apart, and does not try: the caption above the table and
+    the count beside it already do."""
+    assert _one({"feed_id": "f"}, []).custom_property_label == EMPTY
+    (failed,) = _rows(_feed(), with_properties=False)
+    assert failed.custom_property_label == EMPTY
+    assert failed.custom_property_count is None
 
 
 def test_a_feed_with_no_version_reads_unknown() -> None:

@@ -815,7 +815,13 @@ SCHEMA_COMPLIANCE = Monitor(
             "missing_required_count",
             "Missing required",
             ColKind.NUMBER,
-            help="Distinct required fields missing; select a row to see which",
+            help="Distinct required fields missing",
+        ),
+        Col(
+            "missing_required_label",
+            "Missing fields",
+            ColKind.TEXT,
+            help="Which required fields are missing; hover a cell to read it in full",
         ),
         Col(
             "mean_key_completeness",
@@ -856,6 +862,12 @@ SCHEMA_COMPLIANCE = Monitor(
             "Custom properties",
             ColKind.NUMBER,
             help="Distinct properties outside the OpenActive vocabulary",
+        ),
+        Col(
+            "custom_property_label",
+            "Properties",
+            ColKind.TEXT,
+            help="Every custom property this feed uses; hover a cell to read it in full",
         ),
         Col("feed_url", "Endpoint", ColKind.LINK, help="Opens the publisher's feed endpoint"),
     ),

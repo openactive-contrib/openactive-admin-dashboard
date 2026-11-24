@@ -141,6 +141,18 @@ class ComplianceRow:
         )
 
     @property
+    def missing_required_label(self) -> str:
+        """The missing required fields as one cell, alphabetically.
+
+        Distinct across opportunity types, the way `missing_required_count` counts them: a
+        field absent from both SessionSeries and FacilityUse is one field, and naming it
+        twice beside a count of one would read as a bug. Which type omits what is the row
+        pop-up's job — see `missing_field_lines`.
+        """
+        names = {f for fields in self.missing_required_fields.values() for f in fields}
+        return ", ".join(sorted(names, key=str.lower)) or EMPTY
+
+    @property
     def key_completeness(self) -> dict[str, float | None]:
         """Each key field's completeness, 0-100. None where the assessment did not reach it,
         which is not the same as zero."""
@@ -188,6 +200,16 @@ class ComplianceRow:
         if self.properties is None:
             return 0
         return self.properties.property_count
+
+    @property
+    def custom_property_label(self) -> str:
+        """The feed's non-standard properties as one cell, alphabetically.
+
+        Blank for a feed that publishes none and for a failed custom-property read alike.
+        The caption above the table already tells those two apart, as it does for the count
+        beside this, and a cell cannot say it twice.
+        """
+        return self.properties.property_label if self.properties else EMPTY
 
     @property
     def outside_beta_count(self) -> int | None:

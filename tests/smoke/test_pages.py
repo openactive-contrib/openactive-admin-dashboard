@@ -435,7 +435,9 @@ def test_schema_compliance_verdict_filter_narrows_the_table_to_the_failing_feed(
     assert not app.exception
     frame = app.dataframe[0].value
     assert list(frame["Compliance"]) == ["Fail"]
+    # The count and the field it counts, side by side: the review asked for both.
     assert list(frame["Missing required"]) == [1]
+    assert list(frame["Missing fields"]) == ["activity"]
 
 
 def test_the_compliance_page_states_the_fleet_figures_not_the_filtered_ones() -> None:
