@@ -1206,6 +1206,53 @@ def test_the_pop_up_tells_a_failed_property_read_from_a_feed_that_publishes_none
     assert list(frame["Property"]) == ["beta:attendeeCount"]
 
 
+def _schema_compliance_unmatched_terms_script() -> None:
+    from stewards.api.models import FeedQualityFeed
+    from stewards.components.schema_compliance_page import render_unmatched_terms
+    from stewards.monitors import quality, schema_compliance
+
+    def row(**vocabularies: object) -> object:
+        feed = FeedQualityFeed.model_validate({"feed_id": "f", **vocabularies})
+        return schema_compliance.ComplianceRow(
+            quality=quality.build_rows((feed,))[0],
+            properties=None,
+            properties_reported=True,
+        )
+
+    # Named: the live shape of a feed publishing the right activities, wrongly encoded.
+    render_unmatched_terms(
+        row(
+            activity_vocabulary_adherence={
+                "adherence_pct": 0.0,
+                "items": 5448,
+                "label_match_only": 5448,
+                "top_unmatched": ["table tennis", "badminton"],
+            }
+        )
+    )
+    # Short of full, nothing named.
+    render_unmatched_terms(
+        row(activity_vocabulary_adherence={"adherence_pct": 49.52, "top_unmatched": []})
+    )
+    # At full adherence: nothing to draw at all.
+    render_unmatched_terms(row(activity_vocabulary_adherence={"adherence_pct": 100.0}))
+
+
+def test_the_pop_up_names_the_unmatched_terms_and_says_when_it_cannot() -> None:
+    """The terms go in a code block, not markdown: they are publisher strings, and one
+    containing an asterisk would otherwise come out as formatting."""
+    from stewards.monitors.schema_compliance import NONE_NAMED
+
+    app = run(_schema_compliance_unmatched_terms_script)
+    markdown = [m.value for m in app.markdown]
+    captions = [c.value for c in app.caption]
+
+    assert [c.value for c in app.code] == ["table tennis\nbadminton"]
+    assert any(NONE_NAMED in caption for caption in captions)
+    # The vocabulary at full adherence draws no heading, so there are two, not three.
+    assert markdown.count("**Terms that did not match**") == 2
+
+
 def _schema_compliance_unused_property_script() -> None:
     from stewards.api.models import CustomPropertyFeed, CustomPropertySummary, PropertyUsage
     from stewards.components import schema_compliance_page

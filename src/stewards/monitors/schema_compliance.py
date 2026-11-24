@@ -601,6 +601,43 @@ def vocabulary_frame(row: ComplianceRow) -> pd.DataFrame:
     return pd.DataFrame(records, columns=list(VOCABULARY_COLUMNS))
 
 
+#: Full adherence. A vocabulary at this has nothing left to name.
+FULL_ADHERENCE = 100.0
+
+#: Said for a vocabulary that fell short but whose assessment named no terms. Saying nothing
+#: would read as "nothing to fix", and two of today's activity assessments are in that state.
+NONE_NAMED = "no terms named in this snapshot"
+
+
+def unmatched_terms(row: ComplianceRow) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Each vocabulary that fell short, with the terms the assessment could not match.
+
+    The counts say how badly a feed did; these say what to go and fix, which is why they are
+    worth the space. Read them with the counts above: the same term list means one thing
+    beside a high `label_match_only` — the right activities in the wrong encoding, a line of
+    mapping code — and another beside a high `unrecognised`, where the feed is publishing
+    room codes or formats where activities belong.
+
+    A vocabulary at full adherence is left out; one that fell short but named nothing is kept
+    with an empty tuple, because the caller must say so rather than fall silent. Terms come
+    back exactly as the feed published them, for the caller to render verbatim.
+    """
+    found: list[tuple[str, tuple[str, ...]]] = []
+    for label, vocabulary in (
+        ("Activities", row.activity_vocabulary),
+        ("Facilities", row.facility_vocabulary),
+    ):
+        if vocabulary is None:
+            continue
+        if vocabulary.top_unmatched:
+            found.append((label, vocabulary.top_unmatched))
+            continue
+        adherence = vocabulary.adherence_pct
+        if adherence is not None and adherence < FULL_ADHERENCE:
+            found.append((label, ()))
+    return tuple(found)
+
+
 def missing_field_lines(row: ComplianceRow) -> tuple[str, ...]:
     """`SessionSeries: name, location` per opportunity type with a field missing."""
     return quality.missing_field_lines(row.quality)

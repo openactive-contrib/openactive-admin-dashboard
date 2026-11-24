@@ -227,6 +227,27 @@ def render_vocabularies(monitor: Monitor, row: ComplianceRow) -> None:
         width="stretch",
         key=f"vocabularies_{monitor.id}",
     )
+    render_unmatched_terms(row)
+
+
+def render_unmatched_terms(row: ComplianceRow) -> None:
+    """The terms the assessment could not match, as the feed published them.
+
+    The counts above say how badly a feed did; this says what to fix, so it is the part a
+    steward quotes in an email. Drawn in a code block rather than markdown deliberately:
+    these are free-form publisher strings, and an asterisk or a backtick in one would come
+    out as formatting instead of the term.
+    """
+    found = schema_compliance.unmatched_terms(row)
+    if not found:
+        return
+    st.markdown("**Terms that did not match**")
+    for label, terms in found:
+        if not terms:
+            st.caption(f"{label} · {schema_compliance.NONE_NAMED}")
+            continue
+        st.caption(f"{label} · {len(terms)} of the unmatched terms")
+        st.code("\n".join(terms), language=None)
 
 
 def render_feed_properties(monitor: Monitor, row: ComplianceRow) -> None:

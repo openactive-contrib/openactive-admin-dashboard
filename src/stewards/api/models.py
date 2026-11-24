@@ -426,9 +426,12 @@ class VocabularyAdherence(NullTolerantModel):
     count is optional for the same reason the `/summary` counts are — a batch that does not
     compute one sends null, and null is not zero.
 
-    `top_unmatched` is deliberately undeclared: the payload sends it, but its element shape
-    is not settled, and guessing wrong would raise `ApiContractError` on a page that could
-    otherwise render. `extra="ignore"` carries it until there is something to draw it with.
+    `top_unmatched` names up to ten of the terms that did not match. It is the only field
+    here that says what to fix rather than how badly the feed did, and the counts beside it
+    are what tell the three cases apart: a term matched by label alone is the right activity
+    in the wrong encoding, while an unrecognised one is a name the vocabulary has never
+    heard of. A vocabulary short of 100% sometimes names nothing at all, so an empty list is
+    not the same as nothing to fix.
     """
 
     #: Share of the feed's sampled items whose terms matched the vocabulary, 0-100.
@@ -450,6 +453,10 @@ class VocabularyAdherence(NullTolerantModel):
 
     #: No match of any kind. These are the items a search will not surface.
     unrecognised: int | None = None
+
+    #: Up to ten of the terms that did not match, as the feed published them. Empty when the
+    #: assessment named none, which a shortfall does not rule out.
+    top_unmatched: tuple[str, ...] = ()
 
 
 class FeedQualityFeed(NullTolerantModel):

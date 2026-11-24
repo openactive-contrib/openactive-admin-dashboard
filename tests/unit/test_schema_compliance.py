@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
+import pydantic
+import pytest
 
 from fixture_loader import load_sample
 from stewards.api.models import (
@@ -34,6 +36,7 @@ from stewards.monitors.schema_compliance import (
     tile_note,
     to_dataframe,
     tone_frame,
+    unmatched_terms,
     vocabulary_frame,
 )
 from stewards.monitors.thresholds import Tone, status_label, status_tone
@@ -474,13 +477,77 @@ def test_an_assessment_that_reported_no_counts_still_reads_as_assessed() -> None
     assert row.activity_vocabulary.unrecognised is None
 
 
-def test_an_unsettled_top_unmatched_does_not_cost_the_read() -> None:
-    """`top_unmatched` is not declared on the model, because its element shape is not
-    settled. Whatever it carries must be ignored rather than raise."""
+def test_the_unmatched_terms_read_as_the_feed_published_them() -> None:
+    named = {**ADHERENCE, "top_unmatched": ["5v5", "adult short tennis"]}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=named))
+    assert row.activity_vocabulary is not None
+    assert row.activity_vocabulary.top_unmatched == ("5v5", "adult short tennis")
+
+
+def test_an_absent_or_null_term_list_reads_as_empty_rather_than_raising() -> None:
+    for payload in ({**ADHERENCE}, {**ADHERENCE, "top_unmatched": None}):
+        (row,) = _rows(_feed(activity_vocabulary_adherence=payload))
+        assert row.activity_vocabulary is not None
+        assert row.activity_vocabulary.top_unmatched == ()
+
+
+def test_a_term_list_of_the_wrong_shape_is_refused_rather_than_dropped() -> None:
+    """The field is declared, so a change to its element shape stops the read instead of
+    quietly emptying the one part of the breakdown that says what to fix. The page already
+    has a state for `ApiContractError`; it has none for "this silently went blank"."""
     objects = {**ADHERENCE, "top_unmatched": [{"term": "Zumba Gold", "count": 3}]}
-    (row,) = _rows(_feed(activity_vocabulary_adherence=objects))
-    assert row.activity_adherence == 66.67
-    assert not hasattr(row.activity_vocabulary, "top_unmatched")
+    with pytest.raises(pydantic.ValidationError):
+        FeedQualityResponse.model_validate(
+            {"data": [_feed(activity_vocabulary_adherence=objects)], "meta": META}
+        )
+
+
+# --- the terms that did not match -----------------------------------------------------------
+
+
+def test_the_unmatched_terms_name_each_vocabulary_that_fell_short() -> None:
+    rows = build_rows(_snapshot())
+    named = _row(rows, "activeluton-openactive-legendonlineservices-co-uk-api-sessions")
+    assert unmatched_terms(named) == (("Activities", ("Zumba Gold", "Walking Netball")),)
+
+    # The same snapshot carries the other two states: a facility vocabulary at 100% names
+    # nothing, and one at 91.3% that named no terms is still reported.
+    at_full = "activeluton-openactive-legendonlineservices-co-uk-api-facility-uses-events"
+    full = _row(rows, at_full)
+    assert unmatched_terms(full) == ()
+    silent = _row(rows, "better-admin-org-uk-api-openactive-better-facility-uses")
+    assert unmatched_terms(silent) == (("Facilities", ()),)
+
+
+def test_a_vocabulary_at_full_adherence_names_nothing_at_all() -> None:
+    """Not an empty list for it: a line saying "nothing unmatched" beside a 100% bar is
+    noise, so the vocabulary is left out of the result entirely."""
+    full = {**ADHERENCE, "adherence_pct": 100.0, "top_unmatched": []}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=full))
+    assert unmatched_terms(row) == ()
+
+
+def test_a_vocabulary_short_of_full_that_names_nothing_is_still_reported() -> None:
+    """The boundary the live API actually produces: a feed with 53 of 105 items unrecognised
+    and an empty list. Dropping it would read as "nothing to fix"."""
+    silent = {**ADHERENCE, "adherence_pct": 49.52, "unrecognised": 53, "top_unmatched": []}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=silent))
+    assert unmatched_terms(row) == (("Activities", ()),)
+
+
+def test_both_vocabularies_are_named_in_order_when_both_fell_short() -> None:
+    (row,) = _rows(
+        _feed(
+            activity_vocabulary_adherence={**ADHERENCE, "top_unmatched": ["5v5"]},
+            facility_vocabulary_adherence={**ADHERENCE, "top_unmatched": ["court 2"]},
+        )
+    )
+    assert unmatched_terms(row) == (("Activities", ("5v5",)), ("Facilities", ("court 2",)))
+
+
+def test_a_feed_the_assessment_has_not_reached_names_nothing() -> None:
+    (row,) = _rows(_feed())
+    assert unmatched_terms(row) == ()
 
 
 # --- the vocabulary warning rule ------------------------------------------------------------
