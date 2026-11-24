@@ -159,7 +159,7 @@ def render_filters(monitor: Monitor, rows: Sequence[ComplianceRow]) -> FilterSta
     search = columns[0].text_input(
         "Search",
         key=f"search_{monitor.id}",
-        placeholder="Filter publishers, datasets or feeds…",
+        placeholder="Filter publishers, datasets, feeds, missing fields or properties…",
         label_visibility="collapsed",
     )
 

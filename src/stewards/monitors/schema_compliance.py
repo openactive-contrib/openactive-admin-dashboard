@@ -338,7 +338,13 @@ def filter_options(rows: Sequence[ComplianceRow], field: str) -> list[str]:
 
 
 def search_rows(rows: Iterable[ComplianceRow], term: str) -> list[ComplianceRow]:
-    """Case-insensitive match on publisher, dataset, feed name and feed id."""
+    """Case-insensitive match on publisher, dataset, feed name, feed id, the missing
+    required fields and the custom properties.
+
+    The last two are what the table's two name columns show, so a steward can type
+    `location` or `beta:video` and get every feed the column would have them scroll for.
+    The retired drift page searched its property names the same way.
+    """
     needle = term.strip().lower()
     if not needle:
         return list(rows)
@@ -348,7 +354,14 @@ def search_rows(rows: Iterable[ComplianceRow], term: str) -> list[ComplianceRow]
         if needle
         in " ".join(
             part.lower()
-            for part in (row.publisher_name, row.dataset_name, row.feed_name, row.feed_id)
+            for part in (
+                row.publisher_name,
+                row.dataset_name,
+                row.feed_name,
+                row.feed_id,
+                row.missing_required_label,
+                row.custom_property_label,
+            )
         )
     ]
 

@@ -271,6 +271,43 @@ def test_search_matches_the_feed_id() -> None:
     assert [row.feed_id for row in apply_filters(rows, search="ALP")] == ["alpha"]
 
 
+def test_search_matches_a_missing_required_field_by_name() -> None:
+    """The point of the Missing fields column: find every feed short of one field without
+    reading 377 rows."""
+    rows = _rows(
+        _feed("short", missing_required_fields={"SessionSeries": ["location"]}),
+        _feed("also-short", missing_required_fields={"FacilityUse": ["activity", "location"]}),
+        _feed("whole"),
+    )
+    found = [row.feed_id for row in apply_filters(rows, search="location")]
+    assert sorted(found) == ["also-short", "short"]
+
+
+def test_search_matches_a_custom_property_by_name() -> None:
+    """As the retired drift page's search did."""
+    rows = build_rows(
+        SchemaComplianceSnapshot(
+            quality=FeedQualityResponse.model_validate(
+                {"data": [_feed("uses-it"), _feed("plain")], "meta": META}
+            ),
+            custom_properties=CustomPropertyResponse.model_validate(
+                {
+                    "data": [
+                        {
+                            "feed_id": "uses-it",
+                            "custom_properties": [
+                                {"property": "beta:video", "entity_type": "Event"}
+                            ],
+                        }
+                    ],
+                    "meta": META,
+                }
+            ),
+        )
+    )
+    assert [row.feed_id for row in apply_filters(rows, search="BETA:VIDEO")] == ["uses-it"]
+
+
 # --- the table -----------------------------------------------------------------------------
 
 COLUMNS = (
