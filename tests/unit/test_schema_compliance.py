@@ -20,6 +20,7 @@ from stewards.monitors.registry import Col, ColKind
 from stewards.monitors.schema_compliance import (
     FIELD_WARNING_BELOW,
     KEY_FIELDS,
+    MIXED,
     NOT_ASSESSED,
     VOCABULARY_COLUMNS,
     VOCABULARY_WARNING_BELOW,
@@ -31,6 +32,7 @@ from stewards.monitors.schema_compliance import (
     key_field_averages,
     page_stats,
     resolve,
+    shortfall_kind,
     sort_rows,
     tile_card,
     tile_note,
@@ -548,6 +550,104 @@ def test_both_vocabularies_are_named_in_order_when_both_fell_short() -> None:
 def test_a_feed_the_assessment_has_not_reached_names_nothing() -> None:
     (row,) = _rows(_feed())
     assert unmatched_terms(row) == ()
+
+
+# --- what kind of shortfall it is -----------------------------------------------------------
+
+
+def test_the_issue_is_whichever_kind_there_is_most_of() -> None:
+    """Dominant, not exclusive: the live shape is a feed with 3193 label-only terms and 868
+    unrecognised, which is a mapping problem with some noise, not an unreadable feed."""
+    mostly_label = {
+        **ADHERENCE,
+        "adherence_pct": 0.0,
+        "items": 4061,
+        "valid_id": 0,
+        "label_match_only": 3193,
+        "unrecognised": 868,
+    }
+    (row,) = _rows(_feed(activity_vocabulary_adherence=mostly_label))
+    assert row.vocabulary_issue == "label only"
+
+
+def test_the_other_way_round_reads_as_unrecognised() -> None:
+    mostly_unknown = {
+        **ADHERENCE,
+        "adherence_pct": 0.0,
+        "items": 35361,
+        "valid_id": 0,
+        "label_match_only": 1273,
+        "unrecognised": 34088,
+    }
+    (row,) = _rows(_feed(activity_vocabulary_adherence=mostly_unknown))
+    assert row.vocabulary_issue == "unrecognised"
+
+
+def test_two_kinds_level_on_one_vocabulary_read_as_mixed() -> None:
+    """The boundary: with nothing to separate them, naming one would be a coin toss."""
+    level = {**ADHERENCE, "adherence_pct": 50.0, "label_match_only": 6, "unrecognised": 6}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=level))
+    assert row.vocabulary_issue == MIXED
+
+
+def test_two_vocabularies_failing_differently_read_as_mixed() -> None:
+    (row,) = _rows(
+        _feed(
+            activity_vocabulary_adherence={
+                **ADHERENCE,
+                "label_match_only": 9,
+                "unrecognised": 0,
+            },
+            facility_vocabulary_adherence={
+                **ADHERENCE,
+                "label_match_only": 0,
+                "unrecognised": 9,
+            },
+        )
+    )
+    assert row.vocabulary_issue == MIXED
+
+
+def test_two_vocabularies_failing_the_same_way_name_that_way_once() -> None:
+    same = {**ADHERENCE, "label_match_only": 0, "unrecognised": 9}
+    (row,) = _rows(
+        _feed(activity_vocabulary_adherence=same, facility_vocabulary_adherence=same)
+    )
+    assert row.vocabulary_issue == "unrecognised"
+
+
+def test_a_whole_feed_and_an_unassessed_one_both_read_em_dash() -> None:
+    full = {**ADHERENCE, "adherence_pct": 100.0, "top_unmatched": []}
+    (whole,) = _rows(_feed(activity_vocabulary_adherence=full))
+    assert whole.vocabulary_issue == EMPTY
+    (unassessed,) = _rows(_feed())
+    assert unassessed.vocabulary_issue == EMPTY
+
+
+def test_a_shortfall_the_counts_do_not_explain_reads_em_dash_not_a_guess() -> None:
+    """Short of full with every count null or zero: there is no kind to name, so the cell
+    says nothing rather than picking the first one."""
+    unexplained = {"adherence_pct": 40.0}
+    (row,) = _rows(_feed(activity_vocabulary_adherence=unexplained))
+    assert shortfall_kind(row.activity_vocabulary) is None
+    assert row.vocabulary_issue == EMPTY
+    # It is still a vocabulary that fell short, so the pop-up still reports it.
+    assert unmatched_terms(row) == (("Activities", ()),)
+
+
+def test_the_sample_snapshot_classifies_each_of_its_shortfalls() -> None:
+    """Over the real payload rather than a hand-built one, including the tie: the facility
+    assessment at 91.3% reports one invalid id and one label-only term, which is nothing to
+    choose between."""
+    rows = build_rows(_snapshot())
+    issues = {
+        row.feed_id: row.vocabulary_issue for row in rows if row.vocabulary_issue != EMPTY
+    }
+    assert issues == {
+        "activeluton-openactive-legendonlineservices-co-uk-api-sessions": "unrecognised",
+        "better-admin-org-uk-api-openactive-better-facility-uses": MIXED,
+        "better-admin-org-uk-api-openactive-better-slots": "unrecognised",
+    }
 
 
 # --- the vocabulary warning rule ------------------------------------------------------------

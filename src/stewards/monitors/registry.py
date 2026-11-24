@@ -858,6 +858,13 @@ SCHEMA_COMPLIANCE = Monitor(
             warn_below=90.0,
         ),
         Col(
+            "vocabulary_issue",
+            "Vocabulary issue",
+            ColKind.TEXT,
+            help="What kind the unmatched terms are. Label only is the right activity in "
+            "the wrong encoding; unrecognised is a name the vocabulary does not have",
+        ),
+        Col(
             "custom_property_count",
             "Custom properties",
             ColKind.NUMBER,

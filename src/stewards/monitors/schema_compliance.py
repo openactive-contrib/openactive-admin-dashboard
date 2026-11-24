@@ -192,6 +192,25 @@ class ComplianceRow:
         return self.activity_adherence is not None or self.facility_adherence is not None
 
     @property
+    def vocabulary_issue(self) -> str:
+        """What kind of thing this feed's unmatched terms are, for scanning the table.
+
+        The percentage beside it says how much did not match; this says what sort, which is
+        the difference between the right activities in the wrong encoding — one line of a
+        publisher's mapping code — and room codes published where activities belong. Both
+        read 0%, and the table is what stewards scan.
+
+        `MIXED` where the feed's two vocabularies fail differently, and an em dash where
+        nothing fell short or the counts do not explain it.
+        """
+        kinds = {
+            kind for _, vocabulary in _fell_short(self) if (kind := shortfall_kind(vocabulary))
+        }
+        if not kinds:
+            return EMPTY
+        return kinds.pop() if len(kinds) == 1 else MIXED
+
+    @property
     def custom_property_count(self) -> int | None:
         """Distinct non-standard properties. Zero when the feed uses none, None when the
         custom-property read failed or the snapshot did not count them."""
@@ -609,6 +628,62 @@ FULL_ADHERENCE = 100.0
 NONE_NAMED = "no terms named in this snapshot"
 
 
+#: How a shortfall breaks down, paired with the word the table uses for it. Every one is a
+#: count on `VocabularyAdherence`, and together with `valid_id` they account for `items`.
+SHORTFALL_KINDS = (
+    ("label_match_only", "label only"),
+    ("unrecognised", "unrecognised"),
+    ("other_scheme", "other scheme"),
+    ("invalid_id", "invalid id"),
+)
+
+#: Said when a feed's shortfall is not of one kind: two kinds level on the same vocabulary,
+#: or its two vocabularies failing differently.
+MIXED = "mixed"
+
+
+def _fell_short(row: ComplianceRow) -> tuple[tuple[str, VocabularyAdherence], ...]:
+    """The vocabularies the assessment reported and found short of full adherence.
+
+    One definition for the two things that need it — what to name, and what kind the
+    shortfall is — so a vocabulary cannot be short for one and whole for the other.
+    """
+    return tuple(
+        (label, vocabulary)
+        for label, vocabulary in (
+            ("Activities", row.activity_vocabulary),
+            ("Facilities", row.facility_vocabulary),
+        )
+        if vocabulary is not None
+        and (
+            bool(vocabulary.top_unmatched)
+            or (
+                vocabulary.adherence_pct is not None
+                and vocabulary.adherence_pct < FULL_ADHERENCE
+            )
+        )
+    )
+
+
+def shortfall_kind(vocabulary: VocabularyAdherence) -> str | None:
+    """Which kind of non-match there is most of, or `MIXED` where two are level.
+
+    Dominant rather than exclusive, deliberately. Almost no feed fails in only one way —
+    of the nineteen activity vocabularies at 0% today, thirteen carry some label-only terms
+    but only one carries nothing else — so an "entirely label-only" rule would file twelve
+    of the interesting feeds under `MIXED` and throw away the signal.
+
+    None when the assessment reported no counts to explain the shortfall. The caller says
+    nothing rather than guessing a kind.
+    """
+    counts = [(getattr(vocabulary, field) or 0, word) for field, word in SHORTFALL_KINDS]
+    most = max(count for count, _ in counts)
+    if not most:
+        return None
+    leaders = [word for count, word in counts if count == most]
+    return leaders[0] if len(leaders) == 1 else MIXED
+
+
 def unmatched_terms(row: ComplianceRow) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Each vocabulary that fell short, with the terms the assessment could not match.
 
@@ -622,20 +697,7 @@ def unmatched_terms(row: ComplianceRow) -> tuple[tuple[str, tuple[str, ...]], ..
     with an empty tuple, because the caller must say so rather than fall silent. Terms come
     back exactly as the feed published them, for the caller to render verbatim.
     """
-    found: list[tuple[str, tuple[str, ...]]] = []
-    for label, vocabulary in (
-        ("Activities", row.activity_vocabulary),
-        ("Facilities", row.facility_vocabulary),
-    ):
-        if vocabulary is None:
-            continue
-        if vocabulary.top_unmatched:
-            found.append((label, vocabulary.top_unmatched))
-            continue
-        adherence = vocabulary.adherence_pct
-        if adherence is not None and adherence < FULL_ADHERENCE:
-            found.append((label, ()))
-    return tuple(found)
+    return tuple((label, vocabulary.top_unmatched) for label, vocabulary in _fell_short(row))
 
 
 def missing_field_lines(row: ComplianceRow) -> tuple[str, ...]:
