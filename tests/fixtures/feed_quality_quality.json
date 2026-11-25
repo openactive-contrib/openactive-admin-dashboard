@@ -28,7 +28,17 @@
       "warnings": [],
       "errors": [],
       "missing_required_fields": {},
-      "last_assessed": "2026-08-21T01:56:24.156787Z"
+      "last_assessed": "2026-08-21T01:56:24.156787Z",
+      "facility_vocabulary_adherence": {
+        "adherence_pct": 100.0,
+        "invalid_id": 0,
+        "items": 48,
+        "label_match_only": 0,
+        "other_scheme": 0,
+        "top_unmatched": [],
+        "unrecognised": 0,
+        "valid_id": 48
+      }
     },
     {
       "feed_id": "activeluton-openactive-legendonlineservices-co-uk-api-sessions",
@@ -58,7 +68,20 @@
       "warnings": [],
       "errors": [],
       "missing_required_fields": {},
-      "last_assessed": "2026-08-21T01:56:24.156787Z"
+      "last_assessed": "2026-08-21T01:56:24.156787Z",
+      "activity_vocabulary_adherence": {
+        "adherence_pct": 66.67,
+        "invalid_id": 0,
+        "items": 12,
+        "label_match_only": 0,
+        "other_scheme": 0,
+        "top_unmatched": [
+          "Zumba Gold",
+          "Walking Netball"
+        ],
+        "unrecognised": 4,
+        "valid_id": 8
+      }
     },
     {
       "feed_id": "activeluton-openactive-legendonlineservices-co-uk-api-facility-uses",
@@ -124,7 +147,17 @@
           "activity"
         ]
       },
-      "last_assessed": "2026-08-21T01:56:24.156787Z"
+      "last_assessed": "2026-08-21T01:56:24.156787Z",
+      "facility_vocabulary_adherence": {
+        "adherence_pct": 91.3,
+        "invalid_id": 1,
+        "items": 23,
+        "label_match_only": 1,
+        "other_scheme": 0,
+        "top_unmatched": [],
+        "unrecognised": 0,
+        "valid_id": 21
+      }
     },
     {
       "feed_id": "better-admin-org-uk-api-openactive-better-slots",
@@ -154,7 +187,19 @@
       "warnings": [],
       "errors": [],
       "missing_required_fields": {},
-      "last_assessed": "2026-08-21T01:56:24.156787Z"
+      "last_assessed": "2026-08-21T01:56:24.156787Z",
+      "activity_vocabulary_adherence": {
+        "adherence_pct": 78.5,
+        "invalid_id": 0,
+        "items": 200,
+        "label_match_only": 0,
+        "other_scheme": 13,
+        "top_unmatched": [
+          "Bootcamp"
+        ],
+        "unrecognised": 30,
+        "valid_id": 157
+      }
     },
     {
       "feed_id": "opendata-leisurecloud-live-api-feeds-ChelmsfordCitySports-live-slots",

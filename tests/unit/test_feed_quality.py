@@ -552,3 +552,21 @@ def test_a_score_band_labels_itself() -> None:
 
 def test_the_assessment_timestamp_is_parsed(snapshot: FeedQualityResponse) -> None:
     assert isinstance(snapshot.summary.newest_assessment, datetime)
+
+
+def test_a_row_carries_the_vocabulary_figures_without_drawing_them(
+    rows: tuple[quality.QualityRow, ...],
+) -> None:
+    """The quality table does not show vocabulary adherence; the compliance monitor reads it
+    off these rows, so it has to survive the trip even though nothing here draws it."""
+    carried = [row for row in rows if row.activity_vocabulary or row.facility_vocabulary]
+    assert carried
+    drawn = {col.field for col in MONITOR.columns}
+    assert "activity_vocabulary" not in drawn
+    assert "facility_vocabulary" not in drawn
+
+
+def test_a_feed_the_assessment_did_not_reach_carries_no_vocabulary_figures() -> None:
+    (row,) = quality.build_rows((FeedQualityFeed(feed_id="f"),))
+    assert row.activity_vocabulary is None
+    assert row.facility_vocabulary is None

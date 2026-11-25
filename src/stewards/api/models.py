@@ -418,6 +418,47 @@ class FeedQualitySummary(NullTolerantModel):
     newest_assessment: datetime | None = None
 
 
+class VocabularyAdherence(NullTolerantModel):
+    """How far one feed's activities or facilities use a controlled vocabulary.
+
+    Sparse by design, and that is the point: the nightly job assesses a rolling five-day
+    window, so a feed it did not reach carries no figure at all rather than a zero. Every
+    count is optional for the same reason the `/summary` counts are — a batch that does not
+    compute one sends null, and null is not zero.
+
+    `top_unmatched` names up to ten of the terms that did not match. It is the only field
+    here that says what to fix rather than how badly the feed did, and the counts beside it
+    are what tell the three cases apart: a term matched by label alone is the right activity
+    in the wrong encoding, while an unrecognised one is a name the vocabulary has never
+    heard of. A vocabulary short of 100% sometimes names nothing at all, so an empty list is
+    not the same as nothing to fix.
+    """
+
+    #: Share of the feed's sampled items whose terms matched the vocabulary, 0-100.
+    adherence_pct: float | None = None
+
+    items: int | None = None
+
+    #: Matched by identifier — the standard's own way of referring to a term.
+    valid_id: int | None = None
+
+    #: An identifier was given but is not in the vocabulary.
+    invalid_id: int | None = None
+
+    #: Matched on label alone, so the term is right but the reference is not.
+    label_match_only: int | None = None
+
+    #: Referred to a vocabulary other than the expected one.
+    other_scheme: int | None = None
+
+    #: No match of any kind. These are the items a search will not surface.
+    unrecognised: int | None = None
+
+    #: Up to ten of the terms that did not match, as the feed published them. Empty when the
+    #: assessment named none, which a shortfall does not rule out.
+    top_unmatched: tuple[str, ...] = ()
+
+
 class FeedQualityFeed(NullTolerantModel):
     """One feed's quality assessment in this snapshot."""
 
@@ -452,6 +493,11 @@ class FeedQualityFeed(NullTolerantModel):
     missing_required_fields: dict[str, tuple[str, ...]] = Field(default_factory=dict)
 
     last_assessed: datetime | None = None
+
+    #: Vocabulary adherence for the feed's activities and facilities. None for a feed the
+    #: five-day assessment window did not reach, which is not zero adherence.
+    activity_vocabulary_adherence: VocabularyAdherence | None = None
+    facility_vocabulary_adherence: VocabularyAdherence | None = None
 
 
 class FeedQualityResponse(ApiModel):
@@ -742,6 +788,22 @@ class CustomPropertyResponse(ApiModel):
     data: tuple[CustomPropertyFeed, ...] = ()
     summary: CustomPropertySummary = Field(default_factory=CustomPropertySummary)
     meta: Meta
+
+
+class SchemaComplianceSnapshot(BaseModel):
+    """The two reads the schema compliance page joins, fetched together.
+
+    Not an API response: the page has no endpoint of its own, it combines the quality
+    snapshot (version, missing required fields, completeness) with the custom-property
+    snapshot (non-standard properties). The quality read is required. The custom-property
+    read is `None` when it failed, so the page can still show compliance and say the
+    properties are not available, rather than losing the whole view.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    quality: FeedQualityResponse
+    custom_properties: CustomPropertyResponse | None = None
 
 
 # --- publisher notifications --------------------------------------------------------------

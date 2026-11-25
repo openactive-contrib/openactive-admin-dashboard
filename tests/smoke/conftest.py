@@ -11,6 +11,7 @@ import respx
 from fixture_loader import load_sample
 from stewards import config
 from stewards.api import client as client_module
+from stewards.api.repository import CUSTOM_PROPERTIES_MONITOR_ID
 
 BASE = "https://api.test/api/v1"
 
@@ -30,9 +31,10 @@ QUALITY_IDS = ("feed_quality",)
 #: incidents, no trend and no `/summary` entry.
 COVERAGE_IDS = ("active_places_coverage",)
 
-#: Monitors backed by a custom-property snapshot: one read, rows and a summary block, and no
-#: incidents, no trend and no `/summary` entry.
-SCHEMA_DRIFT_IDS = ("feed_custom_properties",)
+#: The custom-property snapshot: one read, rows and a summary block. No monitor is named
+#: after it any more — the compliance page joins it with the quality read — but the endpoint
+#: still carries that slug, and the repository constant is where it is spelled.
+CUSTOM_PROPERTY_IDS = (CUSTOM_PROPERTIES_MONITOR_ID,)
 
 #: Monitors backed by activity coverage: three reads — national figures, the ranking and the
 #: district rows — and no incidents, no trend and no `/summary` entry.
@@ -88,7 +90,7 @@ def smoke_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[respx.MockRouter]:
             mock.get(
                 f"{BASE}/monitors/{monitor_id}/mappings", name=f"{monitor_id}_mappings"
             ).mock(return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_mappings")))
-        for monitor_id in SCHEMA_DRIFT_IDS:
+        for monitor_id in CUSTOM_PROPERTY_IDS:
             mock.get(f"{BASE}/monitors/{monitor_id}/properties").mock(
                 return_value=httpx.Response(200, json=load_sample(f"{monitor_id}_properties"))
             )
