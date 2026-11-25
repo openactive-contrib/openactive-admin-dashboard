@@ -12,6 +12,8 @@ say what to do about it.
   new monitor: registry entry, page, home-page card, API contract, sample data and tests.
 - [Deployment]({% link deployment.md %}) — the container image, the GHCR-to-Azure
   pipeline, and the manual set-up behind it.
+- [Metrics snapshot store]({% link metrics-snapshot-store.md %}) — the monthly record
+  behind the KPI measures: where it lives, what it holds, and why it holds raw fields.
 
 ## Runbooks
 
