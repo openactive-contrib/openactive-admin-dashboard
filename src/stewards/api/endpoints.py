@@ -15,6 +15,7 @@ Pure: no httpx, no Streamlit, and no clock — `as_of` is passed in so routing i
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
@@ -103,6 +104,17 @@ def summary(style: Style, *, as_of: date) -> Endpoint:
     if style is Style.ADMIN:
         return Endpoint(f"{ADMIN_ROOT}/summary", {"as_of": as_of.isoformat()})
     return Endpoint("/summary")
+
+
+def analytics_summary(style: Style) -> Endpoint:
+    """The public analytics summary, the one read this app makes outside `/admin`.
+
+    Not the fleet summary above. It is a different surface of the same service, with its
+    own token, and it carries `number_of_facilities`, which no admin endpoint reports. The
+    monthly metric capture is its only caller, so it takes no `as_of`: it reports whatever
+    the service last published.
+    """
+    return Endpoint("/summary" if style is Style.ADMIN else "/analytics/summary")
 
 
 def coverage(style: Style, monitor_id: str, *, as_of: date) -> Endpoint:
@@ -208,22 +220,29 @@ def activity_districts(
     return Endpoint(f"/monitors/{monitor_id}/districts", {"page": page, "page_size": page_size})
 
 
-def ecosystem_growth(style: Style, *, as_of: date) -> Endpoint:
+def ecosystem_growth(style: Style, *, as_of: date, months: int | None = None) -> Endpoint:
     """The ecosystem's monthly growth series: one row per calendar month, no paging.
 
     Not a monitor read, so it does not hang off a monitor id. The admin API names it
     `ecosystem-growth-trend`; the contract shape files it under `/ecosystem`.
+
+    `months` is how far back to reach. Omitting it takes the API's own default, which is
+    the twelve the growth page draws; the metric backfill asks for more, because the crawl
+    figure is the one measure with history to recover.
     """
+    reach: dict[str, str | int] = {} if months is None else {"months": months}
     if style is Style.ADMIN:
-        return Endpoint(f"{ADMIN_ROOT}/ecosystem-growth-trend", {"as_of": as_of.isoformat()})
-    return Endpoint("/ecosystem/growth")
+        return Endpoint(
+            f"{ADMIN_ROOT}/ecosystem-growth-trend", {"as_of": as_of.isoformat(), **reach}
+        )
+    return Endpoint("/ecosystem/growth", reach)
 
 
 # --- publisher notifications --------------------------------------------------------------
 #
 # Stored steward work rows rather than a daily snapshot: the same in both shapes, and no
-# `as_of`, because a row is whatever was last saved, not a replay of a day's batch. These are
-# the only resources the app writes to.
+# `as_of`, because a row is whatever was last saved, not a replay of a day's batch. The app
+# writes here and to the metric snapshots below, and to nothing else.
 
 NOTIFICATIONS = "publisher-notifications"
 
@@ -249,3 +268,46 @@ def publisher_notification(style: Style, notification_id: str) -> Endpoint:
     a `/` or `?` in it must not turn into a different path or a query string.
     """
     return Endpoint(f"{_notifications_root(style)}/{quote(notification_id, safe='')}")
+
+
+# --- metric snapshots -----------------------------------------------------------------------
+#
+# The only read on this API that is a history. Every other endpoint reports current state,
+# because the tables behind them are overwritten each night, so the measures defined as a
+# trend have nothing to read until a month is captured here. No `as_of`: a row is a figure
+# recorded for a month, not a replay of a day's batch. This path is also where the monthly
+# capture job POSTs its measurements.
+
+METRIC_SNAPSHOTS = "metric-snapshots"
+
+
+def metric_snapshots(
+    style: Style,
+    *,
+    sources: Sequence[str] = (),
+    fields: Sequence[str] = (),
+    start: date | None = None,
+    end: date | None = None,
+    page: int = 1,
+    page_size: int = 500,
+) -> Endpoint:
+    """The captured series, newest period first. Its path is also where a batch is POSTed.
+
+    Every filter is optional, and leaving one out means every value rather than none.
+    `sources` and `fields` go as one comma-separated `source` and `field`, which the API
+    reads as "any of these". `start` and `end` are inclusive and compare against the
+    period; they travel as `from` and `to`, neither of which can be a parameter name here.
+    """
+    root = (
+        f"{ADMIN_ROOT}/{METRIC_SNAPSHOTS}" if style is Style.ADMIN else f"/{METRIC_SNAPSHOTS}"
+    )
+    params: dict[str, str | int] = {}
+    if sources:
+        params["source"] = ",".join(sources)
+    if fields:
+        params["field"] = ",".join(fields)
+    if start is not None:
+        params["from"] = start.isoformat()
+    if end is not None:
+        params["to"] = end.isoformat()
+    return Endpoint(root, {**params, "page": page, "page_size": page_size})

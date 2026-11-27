@@ -7,15 +7,20 @@ registry entry rather than an edit to the shared incident model.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from pydantic import ValidationError
 
+from fixture_loader import load_sample
 from stewards.api.models import (
+    ActivityCoverageSummary,
+    AnalyticsSummary,
     CoverageSnapshot,
     DetailModel,
     Incident,
+    MetricMeasurement,
+    MetricSnapshotPage,
     NotificationProblem,
     OrphanedChildrenDetail,
     OrphanKind,
@@ -36,7 +41,7 @@ def incident(**overrides: object) -> Incident:
     return Incident.model_validate(base | overrides)
 
 
-# --- folding a monitor's own measurements into detail --------------------------------------
+# --- folding a monitor's own measurements into detail -------------------------------------
 
 
 def test_an_undeclared_top_level_key_is_kept_in_detail() -> None:
@@ -92,7 +97,7 @@ def test_folding_survives_a_round_trip_through_the_model() -> None:
     assert twice.detail == {"orphan_count": 7}
 
 
-# --- an incident that reports no age -------------------------------------------------------
+# --- an incident that reports no age ------------------------------------------------------
 
 
 def test_the_age_fields_are_optional() -> None:
@@ -122,7 +127,7 @@ def test_the_fields_that_identify_an_incident_are_still_required(field: str) -> 
         Incident.model_validate(payload)
 
 
-# --- an explicit null in a detail payload --------------------------------------------------
+# --- an explicit null in a detail payload -------------------------------------------------
 
 
 def test_a_null_collection_falls_back_to_the_empty_default() -> None:
@@ -161,7 +166,7 @@ def test_a_real_value_is_untouched() -> None:
     assert detail.by_kind[0].kind == "Slot"
 
 
-# --- the two shares --------------------------------------------------------------------
+# --- the two shares -----------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -335,3 +340,102 @@ def test_a_snapshot_without_the_breakdown_has_none() -> None:
 def test_a_null_breakdown_reads_as_none_rather_than_failing() -> None:
     snapshot = CoverageSnapshot.model_validate({"coverage_by_local_authority": None})
     assert snapshot.coverage_by_local_authority == ()
+
+
+# --- the activity coverage figures --------------------------------------------------------
+
+
+def test_both_the_labelled_and_the_linked_share_are_read() -> None:
+    """They move independently, and which one the measure means is still unsettled."""
+    summary = ActivityCoverageSummary.model_validate(
+        load_sample("activity_coverage_summary")["data"]
+    )
+    assert summary.labelled_percentage == 65.5
+    assert summary.linked_percentage == 53.6
+    assert summary.linked_opportunities is not None
+
+
+# --- the analytics summary ----------------------------------------------------------------
+
+
+def test_the_analytics_summary_parses_its_flat_payload() -> None:
+    summary = AnalyticsSummary.model_validate(load_sample("analytics_summary"))
+    assert summary.number_of_facilities == 7708
+    assert summary.number_of_publishers == 172
+    assert summary.percentage_of_local_authorities == 68
+
+
+def test_the_analytics_dateline_arrives_as_date_and_is_read_as_a_day() -> None:
+    """That surface has no `meta`, so `date` is the whole provenance of its figures."""
+    summary = AnalyticsSummary.model_validate(load_sample("analytics_summary"))
+    assert summary.generated_at == datetime.fromisoformat("2026-11-25T03:19:42+00:00")
+    assert summary.snapshot_date == date(2026, 11, 25)
+
+
+def test_an_analytics_summary_with_no_dateline_has_no_day() -> None:
+    assert AnalyticsSummary.model_validate({}).snapshot_date is None
+
+
+def test_a_missing_analytics_figure_is_none_rather_than_zero() -> None:
+    summary = AnalyticsSummary.model_validate({"number_of_facilities": None})
+    assert summary.number_of_facilities is None
+
+
+# --- metric snapshots ---------------------------------------------------------------------
+
+
+def test_a_snapshot_page_parses_and_ignores_undeclared_keys() -> None:
+    page = MetricSnapshotPage.model_validate(load_sample("metric_snapshots"))
+    assert len(page.data) == 3
+    assert page.meta.total == 3
+
+    feeds, completeness, crawled = page.data
+    assert (feeds.period, feeds.source, feeds.field) == (date(2026, 11, 1), "summary", "feeds")
+    assert feeds.denominator is None
+    assert completeness.value == 88.4231
+    assert completeness.denominator == 242
+    assert crawled.captured_at == datetime.fromisoformat("2026-12-01T07:14:02+00:00")
+
+
+def test_a_captured_null_stays_null() -> None:
+    """A figure the batch did not compute is stored as null, and null is not zero."""
+    page = MetricSnapshotPage.model_validate(load_sample("metric_snapshots"))
+    assert page.data[-1].value is None
+
+
+def test_a_count_shares_the_column_with_a_rate_and_so_reads_as_a_float() -> None:
+    page = MetricSnapshotPage.model_validate(load_sample("metric_snapshots"))
+    assert page.data[0].value == 446
+
+
+def test_an_empty_snapshot_page_has_no_rows() -> None:
+    sample = load_sample("metric_snapshots")
+    page = MetricSnapshotPage.model_validate({"data": [], "meta": sample["meta"]})
+    assert page.data == ()
+
+
+def test_a_measurement_sends_iso_dates_and_keeps_a_null_value() -> None:
+    payload = MetricMeasurement(
+        period=date(2026, 11, 1),
+        source="ecosystem_growth",
+        field="datasets_crawled",
+        value=None,
+        snapshot_date=date(2026, 11, 30),
+    ).to_payload()
+
+    assert payload["period"] == "2026-11-01"
+    assert payload["snapshot_date"] == "2026-11-30"
+    assert payload["value"] is None
+
+
+def test_a_measurement_does_not_send_captured_at() -> None:
+    """The store sets it on insert, and the API ignores it if a caller supplies one."""
+    payload = MetricMeasurement(
+        period=date(2026, 11, 1), source="summary", field="feeds", value=446
+    ).to_payload()
+    assert "captured_at" not in payload
+
+
+def test_a_measurement_needs_a_period_a_source_and_a_field() -> None:
+    with pytest.raises(ValidationError):
+        MetricMeasurement.model_validate({"source": "summary", "field": "feeds", "value": 1})

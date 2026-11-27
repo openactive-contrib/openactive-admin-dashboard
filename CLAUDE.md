@@ -84,6 +84,22 @@ path, with pre-checks naming the rules that take precedence on the same dataset)
 because the API echoes a requested date back) is today's and every read is complete.
 `docs/publisher-notification-job.md` is the full account.
 
+A monthly job records the KPI framework's figures:
+`.github/workflows/capture-metrics.yml` runs `python -m stewards.metrics` at 08:00 UTC on the
+1st to the 5th, for the month just ended. The endpoints behind those figures keep no history,
+so a month nobody captures is lost; the store is a BigQuery table behind
+`/admin/metric-snapshots` on the monitoring API, which owns the table and the endpoint while
+this repository owns the job. A row is a **source field, not a finished measure**
+(`completeness_location`, never "KPI4"), so a definition that changes later is recomputed over
+every month already stored. `metrics/measurements.py` builds the rows — including the
+volume-weighted completeness the payload does not carry — and `__main__.py` reads what the
+store already holds and sends only what is missing, because a measurement may be captured once
+and a re-sent month would be refused in full. It reads the public `/summary` as well as
+`/admin`, on the same client: the API gates that surface on `Api:AccessToken` rather than
+`Api:AdminToken`, and this deployment gives both the same value. `metrics/backfill.py` recovers
+`datasets_crawled`, the one measure with history behind it, and is dispatch-only.
+`docs/metrics-capture-job.md` is the full account.
+
 The sidebar's **Ecosystem** section (between Overview and Availability) holds pages about the
 ecosystem as a whole rather than faults in it. They are **not monitors**: no registry entry, no
 overview card and no count pill, so `nav.build_navigation` lists them itself. Its one page today
@@ -136,6 +152,9 @@ src/stewards/
                              slack.py (all Streamlit-free), __main__.py (the runner)
   outreach/                  the daily notification job: rules.py (the decision tree),
                              keys.py, decide.py, reconcile.py (all pure), __main__.py
+  metrics/                   the monthly metric capture: measurements.py (one response ->
+                             rows, pure), __main__.py (the runner), backfill.py (the
+                             one-off crawl-figure recovery)
   notebooks.py               the notebook manifest: models, YAML parsing, Colab/GitHub URLs
   geography.py               map boundaries: GeoJSON -> WGS84 Boundaries (code, name,
                              geometry), converting British National Grid on load (OS
@@ -213,14 +232,24 @@ tests/
    (`entity`, `email_fields`, `summary_field`), never a monitor id in the renderer. CSV export was removed from the header on request — do not
    reintroduce a download button without being asked.
 
-   **The one exception is the publisher notification list** (`/admin/publisher-notifications`):
-   stewards may PATCH and DELETE its rows, and nothing else, and the daily job
-   (`stewards.outreach`) may POST and PATCH them. `client.post`/`client.patch`/`client.delete`
-   exist for it alone. PATCH overwrites every column, so a save always starts from
-   `PublisherNotification.to_body()` and changes only the form's five fields; `problems`
-   goes back exactly as read. Every write clears the list's 30-second cache. There is no
-   create in the app; only the job creates rows, and it never changes status, stakeholder,
-   contact or date contacted. Do not add writes to any other resource without being asked.
+   **Two resources are written to, and no others.**
+
+   **The publisher notification list** (`/admin/publisher-notifications`): stewards may PATCH
+   and DELETE its rows, and nothing else, and the daily job (`stewards.outreach`) may POST and
+   PATCH them. `client.patch` and `client.delete` exist for it alone. PATCH overwrites every
+   column, so a save always starts from `PublisherNotification.to_body()` and changes only the
+   form's five fields; `problems` goes back exactly as read. Every write clears the list's
+   30-second cache. There is no create in the app; only the job creates rows, and it never
+   changes status, stakeholder, contact or date contacted.
+
+   **The metric snapshot store** (`/admin/metric-snapshots`): the monthly capture job
+   (`stewards.metrics`) POSTs a batch of measurements, and nothing else writes there. A
+   measurement may be captured once; the API refuses the whole batch with 409 if any of it is
+   already stored, and names what clashed in `ApiError.detail`. There is no update or delete
+   route, so a period captured wrongly is corrected in BigQuery rather than from here. The app
+   only ever reads the series.
+
+   Do not add writes to any other resource without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
    snapshot). A page that failed to load renders `render_error_header`

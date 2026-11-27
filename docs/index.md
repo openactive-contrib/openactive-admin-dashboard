@@ -21,6 +21,8 @@ say what to do about it.
   contacting about open problems, and how to record that you did.
 - [Publisher notification job]({% link publisher-notification-job.md %}) — the daily job
   that fills the notification list, and the rules it raises problems by.
+- [Metric capture job]({% link metrics-capture-job.md %}) — the monthly job that records
+  the KPI framework's figures, because the endpoints behind them keep no history.
 
 Figures in the dashboard come from a daily BigQuery batch, so every page there states the
 snapshot date it was built from.

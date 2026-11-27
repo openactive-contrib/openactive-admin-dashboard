@@ -26,6 +26,7 @@ from stewards.api.models import (
     ActivityCoverageSummaryResponse,
     ActivityDistrict,
     ActivityDistrictPage,
+    AnalyticsSummary,
     CoverageResponse,
     CoverageSnapshot,
     CustomPropertyFeed,
@@ -34,6 +35,9 @@ from stewards.api.models import (
     FeedQualityResponse,
     FeedQualitySummary,
     IncidentPage,
+    MetricMeasurement,
+    MetricSnapshotPage,
+    MetricSnapshotRow,
     PublisherNotification,
     PublisherNotificationBody,
     PublisherNotificationDocument,
@@ -79,6 +83,19 @@ def _fetch_summary(
     client = client or get_client()
     endpoint = endpoints.summary(client.style, as_of=as_of or date.today())
     return _parse(SummaryResponse, client.get(endpoint.path, endpoint.params), endpoint.path)
+
+
+def _fetch_analytics_summary(client: StewardsClient | None = None) -> AnalyticsSummary:
+    """The public surface's national figures, which is where the facility count lives.
+
+    The API checks this surface against `Api:AccessToken` rather than the `Api:AdminToken`
+    the `/admin` routes use, so a deployment that sets the two differently needs a client
+    built with the other token. There is no `as_of`: the service reports its latest run and
+    dates it with `date`.
+    """
+    client = client or get_client()
+    endpoint = endpoints.analytics_summary(client.style)
+    return _parse(AnalyticsSummary, client.get(endpoint.path, endpoint.params), endpoint.path)
 
 
 def _fetch_incidents(
@@ -478,15 +495,22 @@ def _fetch_schema_compliance_snapshots(
 
 
 def _fetch_ecosystem_growth(
-    client: StewardsClient | None = None, as_of: date | None = None
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+    *,
+    months: int | None = None,
 ) -> EcosystemGrowthResponse:
     """The ecosystem's monthly growth series, oldest or newest first as the API sends it.
 
     No paging loop: one row per calendar month will not reach a page in the life of this
     app. A response that says otherwise is logged rather than silently trimmed.
+
+    `months` reaches further back than the API's default, for the metric backfill.
     """
     client = client or get_client()
-    endpoint = endpoints.ecosystem_growth(client.style, as_of=as_of or date.today())
+    endpoint = endpoints.ecosystem_growth(
+        client.style, as_of=as_of or date.today(), months=months
+    )
     response = _parse(
         EcosystemGrowthResponse, client.get(endpoint.path, endpoint.params), endpoint.path
     )
@@ -581,6 +605,71 @@ def _delete_publisher_notification(
     client.delete(endpoint.path)
 
 
+def _fetch_metric_snapshots(
+    client: StewardsClient | None = None,
+    *,
+    sources: Sequence[str] = (),
+    fields: Sequence[str] = (),
+    start: date | None = None,
+    end: date | None = None,
+) -> MetricSnapshotPage:
+    """Captured measurements, paging inside this function as the other list reads do.
+
+    No `as_of`: these rows are a history rather than a day's batch, so there is nothing to
+    ask a snapshot for. An omitted filter means every value, not none.
+    """
+    client = client or get_client()
+
+    def request(page: int) -> endpoints.Endpoint:
+        return endpoints.metric_snapshots(
+            client.style,
+            sources=sources,
+            fields=fields,
+            start=start,
+            end=end,
+            page=page,
+            page_size=PAGE_SIZE,
+        )
+
+    endpoint = request(1)
+    first = _parse(
+        MetricSnapshotPage, client.get(endpoint.path, endpoint.params), endpoint.path
+    )
+
+    rows: list[MetricSnapshotRow] = list(first.data)
+    page = 1
+    while len(rows) < first.meta.total and rows and page < MAX_PAGES:
+        page += 1
+        nxt_endpoint = request(page)
+        nxt = _parse(
+            MetricSnapshotPage,
+            client.get(nxt_endpoint.path, nxt_endpoint.params),
+            nxt_endpoint.path,
+        )
+        if not nxt.data:
+            break
+        rows.extend(nxt.data)
+    if len(rows) < first.meta.total:
+        log.warning("Fetched %d of %d metric snapshots", len(rows), first.meta.total)
+    return MetricSnapshotPage(data=tuple(rows), meta=first.meta)
+
+
+def _capture_metrics(
+    measurements: Sequence[MetricMeasurement], client: StewardsClient | None = None
+) -> tuple[MetricSnapshotRow, ...]:
+    """Capture a batch of measurements, and return them as the store wrote them.
+
+    The API takes the batch whole or refuses it whole: a measurement already captured
+    raises `ApiConflict`, and `detail` names which ones. Nothing here retries, splits or
+    re-sends — whether a refusal is a harmless retry or a month left unwritten is the
+    capture job's judgement to make.
+    """
+    client = client or get_client()
+    path = endpoints.metric_snapshots(client.style).path
+    payload = client.post(path, [m.to_payload() for m in measurements])
+    return _parse(MetricSnapshotPage, payload, path).data
+
+
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_summary() -> SummaryResponse:
     return _fetch_summary()
@@ -663,6 +752,13 @@ def fetch_schema_compliance_snapshots(
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def fetch_ecosystem_growth() -> EcosystemGrowthResponse:
     return _fetch_ecosystem_growth()
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def fetch_metric_snapshots() -> MetricSnapshotPage:
+    """The whole captured series. Filtering happens locally over it, as everywhere else in
+    this app: the series is a few hundred rows a year, and one read serves every view."""
+    return _fetch_metric_snapshots()
 
 
 @st.cache_data(ttl=NOTIFICATIONS_TTL, show_spinner=False)

@@ -288,3 +288,89 @@ def test_contract_ecosystem_growth_hangs_off_the_ecosystem() -> None:
     endpoint = endpoints.ecosystem_growth(Style.CONTRACT, as_of=AS_OF)
     assert endpoint.path == "/ecosystem/growth"
     assert endpoint.params == {}
+
+
+def test_ecosystem_growth_takes_the_api_default_reach_when_given_none() -> None:
+    """The growth page draws the API's own twelve months; only the backfill asks further."""
+    assert "months" not in endpoints.ecosystem_growth(Style.ADMIN, as_of=AS_OF).params
+
+
+@pytest.mark.parametrize("style", [Style.ADMIN, Style.CONTRACT])
+def test_ecosystem_growth_can_reach_further_back(style: Style) -> None:
+    endpoint = endpoints.ecosystem_growth(style, as_of=AS_OF, months=60)
+    assert endpoint.params["months"] == 60
+
+
+# --- the analytics summary ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("style", "path"),
+    [(Style.ADMIN, "/summary"), (Style.CONTRACT, "/analytics/summary")],
+)
+def test_the_analytics_summary_routes_in_both_shapes(style: Style, path: str) -> None:
+    assert endpoints.analytics_summary(style) == endpoints.Endpoint(path)
+
+
+def test_the_analytics_summary_is_not_the_admin_summary() -> None:
+    """Same word, two surfaces, two tokens. Routing them to one path would read the
+    fleet summary with the analytics token and quietly get a 401."""
+    assert (
+        endpoints.analytics_summary(Style.ADMIN).path
+        != endpoints.summary(Style.ADMIN, as_of=AS_OF).path
+    )
+
+
+def test_the_analytics_summary_sends_no_snapshot_date() -> None:
+    assert endpoints.analytics_summary(Style.ADMIN).params == {}
+
+
+# --- metric snapshots -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("style", "root"),
+    [(Style.ADMIN, "/admin/metric-snapshots"), (Style.CONTRACT, "/metric-snapshots")],
+)
+def test_metric_snapshots_route_in_both_shapes(style: Style, root: str) -> None:
+    assert endpoints.metric_snapshots(style) == endpoints.Endpoint(
+        root, {"page": 1, "page_size": 500}
+    )
+
+
+def test_an_unfiltered_snapshot_list_sends_no_filters() -> None:
+    """Omitting a filter has to mean every value. Sending an empty `source=` would mean
+    none, and the list would come back empty."""
+    params = endpoints.metric_snapshots(Style.ADMIN).params
+    assert set(params) == {"page", "page_size"}
+
+
+def test_snapshot_filters_travel_as_one_comma_separated_value_each() -> None:
+    endpoint = endpoints.metric_snapshots(
+        Style.ADMIN,
+        sources=("feed_quality", "summary"),
+        fields=("average_score",),
+    )
+    assert endpoint.params["source"] == "feed_quality,summary"
+    assert endpoint.params["field"] == "average_score"
+
+
+def test_a_snapshot_period_range_travels_as_from_and_to() -> None:
+    endpoint = endpoints.metric_snapshots(
+        Style.ADMIN, start=date(2026, 5, 1), end=date(2026, 11, 1)
+    )
+    assert endpoint.params["from"] == "2026-05-01"
+    assert endpoint.params["to"] == "2026-11-01"
+
+
+def test_one_end_of_a_snapshot_period_range_is_enough() -> None:
+    endpoint = endpoints.metric_snapshots(Style.ADMIN, start=date(2026, 5, 1))
+    assert endpoint.params["from"] == "2026-05-01"
+    assert "to" not in endpoint.params
+
+
+def test_the_snapshot_list_pages_and_sends_no_snapshot_date() -> None:
+    endpoint = endpoints.metric_snapshots(Style.ADMIN, page=2, page_size=1000)
+    assert endpoint.params["page"] == 2
+    assert endpoint.params["page_size"] == 1000
+    assert "as_of" not in endpoint.params

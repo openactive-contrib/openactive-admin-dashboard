@@ -1,0 +1,39 @@
+{
+  "data": [
+    {
+      "period": "2026-11-01",
+      "source": "summary",
+      "field": "feeds",
+      "value": 446,
+      "denominator": null,
+      "snapshot_date": "2026-11-30",
+      "captured_at": "2026-12-01T07:14:02Z"
+    },
+    {
+      "period": "2026-11-01",
+      "source": "feed_quality",
+      "field": "completeness_location_weighted",
+      "value": 88.4231,
+      "denominator": 242,
+      "snapshot_date": "2026-11-30",
+      "captured_at": "2026-12-01T07:14:02Z"
+    },
+    {
+      "period": "2026-11-01",
+      "source": "ecosystem_growth",
+      "field": "datasets_crawled",
+      "value": null,
+      "denominator": null,
+      "snapshot_date": "2026-11-30",
+      "captured_at": "2026-12-01T07:14:02Z",
+      "undeclared": "ignored"
+    }
+  ],
+  "meta": {
+    "snapshot_date": "2026-12-01",
+    "generated_at": "2026-12-01T07:14:03Z",
+    "total": 3,
+    "page": 1,
+    "page_size": 500
+  }
+}
