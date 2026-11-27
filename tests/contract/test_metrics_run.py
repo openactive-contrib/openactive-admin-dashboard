@@ -15,11 +15,7 @@ from stewards.api.models import MetricMeasurement
 from stewards.metrics import __main__ as runner
 
 BASE = "https://admin.test"
-ENV = {
-    "ADMIN_API_BASE_URL": f"{BASE}/",
-    "ADMIN_API_TOKEN": "admin-token",
-    "ANALYTICS_API_TOKEN": "analytics-token",
-}
+ENV = {"ADMIN_API_BASE_URL": f"{BASE}/", "ADMIN_API_TOKEN": "admin-token"}
 DECEMBER = datetime(2026, 12, 1, 8, 0, tzinfo=UTC)
 NOVEMBER = date(2026, 11, 1)
 SNAPSHOTS = f"{BASE}/admin/metric-snapshots"
@@ -155,16 +151,16 @@ def test_a_clean_run_captures_the_month() -> None:
 
 
 @respx.mock
-def test_each_surface_is_read_with_its_own_token() -> None:
-    """They are not interchangeable: the admin token on the public surface is a 401."""
+def test_the_two_summaries_are_read_as_two_resources() -> None:
+    """Same word, two surfaces. Routing them to one path would capture the fleet summary
+    twice and lose the facility count."""
     mock_api(respx.mock)
     respx.post(SNAPSHOTS).respond(201, json=load_sample("metric_snapshots"))
 
     runner.run(ENV, now=DECEMBER)
 
-    by_path = {call.request.url.path: call.request.url.params["token"] for call in respx.calls}
-    assert by_path["/admin/summary"] == "admin-token"
-    assert by_path["/summary"] == "analytics-token"
+    paths = {call.request.url.path for call in respx.calls}
+    assert {"/summary", "/admin/summary"} <= paths
 
 
 @respx.mock
@@ -236,10 +232,7 @@ def _every_field() -> list[tuple[str, str]]:
     with respx.mock:
         mock_api(respx.mock)
         collected = runner.collect(
-            runner.StewardsClient(runner.admin_settings(ENV)),
-            runner.StewardsClient(runner.analytics_settings(ENV)),
-            NOVEMBER,
-            date(2026, 12, 1),
+            runner.StewardsClient(runner.admin_settings(ENV)), NOVEMBER, date(2026, 12, 1)
         )
     return [(m.source, m.field) for m in collected.measurements]
 

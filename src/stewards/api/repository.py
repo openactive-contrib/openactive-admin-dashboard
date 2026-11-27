@@ -88,9 +88,10 @@ def _fetch_summary(
 def _fetch_analytics_summary(client: StewardsClient | None = None) -> AnalyticsSummary:
     """The public surface's national figures, which is where the facility count lives.
 
-    It answers to the analytics token rather than the admin one, so the caller passes a
-    client built with that token. There is no `as_of`: the service reports its latest run
-    and dates it with `date`.
+    The API checks this surface against `Api:AccessToken` rather than the `Api:AdminToken`
+    the `/admin` routes use, so a deployment that sets the two differently needs a client
+    built with the other token. There is no `as_of`: the service reports its latest run and
+    dates it with `date`.
     """
     client = client or get_client()
     endpoint = endpoints.analytics_summary(client.style)

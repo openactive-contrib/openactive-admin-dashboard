@@ -10,11 +10,10 @@ failed the first time — is completed by the next run rather than refused as a 
 A month already captured in full writes nothing and exits 0; that is what the repeated
 schedule is for.
 
-Reads `ADMIN_API_BASE_URL`, `ADMIN_API_TOKEN` and `ANALYTICS_API_TOKEN` from the
-environment. The last is the public surface's token, which the facility count needs, and it
-is not interchangeable with the admin one. Writes a markdown report to
-`$GITHUB_STEP_SUMMARY` when that is set. Exits 1 when a read failed, when a write was
-rejected, or when the period is one that cannot be captured.
+Reads `ADMIN_API_BASE_URL` and `ADMIN_API_TOKEN` from the environment, the same two the
+other jobs use. Writes a markdown report to `$GITHUB_STEP_SUMMARY` when that is set. Exits
+1 when a read failed, when a write was rejected, or when the period is one that cannot be
+captured.
 """
 
 from __future__ import annotations
@@ -29,10 +28,9 @@ from pathlib import Path
 
 import httpx
 
-from stewards.alerts.__main__ import TIMEOUT, MissingConfig, _require, admin_settings
+from stewards.alerts.__main__ import TIMEOUT, MissingConfig, admin_settings
 from stewards.alerts.evaluate import uk_today
 from stewards.api.client import StewardsClient
-from stewards.api.endpoints import Style
 from stewards.api.errors import ApiConflict, ApiError
 from stewards.api.models import MetricMeasurement
 from stewards.api.repository import (
@@ -45,7 +43,6 @@ from stewards.api.repository import (
     _fetch_quality,
     _fetch_summary,
 )
-from stewards.config import Settings
 from stewards.metrics import measurements
 
 ACTIVITY_MONITOR_ID = "activity_coverage"
@@ -53,20 +50,6 @@ ACTIVITY_MONITOR_ID = "activity_coverage"
 
 class PeriodRefused(RuntimeError):
     """The month asked for is not one that can be captured."""
-
-
-def analytics_settings(env: Mapping[str, str]) -> Settings:
-    """The public surface: the same service, a different token.
-
-    The two tokens are not interchangeable, so this is a client of its own rather than a
-    parameter on the admin one.
-    """
-    return Settings(
-        api_base_url=_require(env, "ADMIN_API_BASE_URL").rstrip("/"),
-        api_token=_require(env, "ANALYTICS_API_TOKEN"),
-        api_style=Style.ADMIN,
-        api_token_param="token",
-    )
 
 
 def previous_month(today: date) -> date:
@@ -97,9 +80,7 @@ class Collected:
     failures: tuple[str, ...]
 
 
-def collect(
-    admin: StewardsClient, analytics: StewardsClient, period: date, today: date
-) -> Collected:
+def collect(client: StewardsClient, period: date, today: date) -> Collected:
     """Every measurement the month needs, carrying on past a read that fails.
 
     A failed read costs its own measurements and nothing else: the rest are still captured,
@@ -118,29 +99,30 @@ def collect(
     read(
         "feed quality",
         lambda: measurements.feed_quality_measurements(
-            period, _fetch_quality(QUALITY_MONITOR_ID, admin, as_of=today)
+            period, _fetch_quality(QUALITY_MONITOR_ID, client, as_of=today)
         ),
     )
     read(
         "activity coverage",
         lambda: measurements.activity_measurements(
-            period, _fetch_activity_summary(ACTIVITY_MONITOR_ID, admin, as_of=today)
+            period, _fetch_activity_summary(ACTIVITY_MONITOR_ID, client, as_of=today)
         ),
     )
     read(
         "fleet summary",
-        lambda: measurements.summary_measurements(period, _fetch_summary(admin, as_of=today)),
+        lambda: measurements.summary_measurements(period, _fetch_summary(client, as_of=today)),
     )
+    # The public surface, not `/admin`. The API checks it against `Api:AccessToken` rather
+    # than `Api:AdminToken`, but this deployment gives both the same value, so it rides on
+    # the same client.
     read(
         "analytics summary",
-        lambda: measurements.analytics_measurements(
-            period, _fetch_analytics_summary(analytics)
-        ),
+        lambda: measurements.analytics_measurements(period, _fetch_analytics_summary(client)),
     )
     read(
         "ecosystem growth",
         lambda: measurements.ecosystem_measurements(
-            period, _fetch_ecosystem_growth(admin, as_of=today)
+            period, _fetch_ecosystem_growth(client, as_of=today)
         ),
     )
     return Collected(tuple(rows), tuple(failures))
@@ -242,13 +224,12 @@ def run(
     month = period or previous_month(today)
     check_period(month, today)
 
-    admin = StewardsClient(admin_settings(env), api_transport, TIMEOUT)
-    analytics = StewardsClient(analytics_settings(env), api_transport, TIMEOUT)
+    client = StewardsClient(admin_settings(env), api_transport, TIMEOUT)
     problems: list[str] = []
     try:
-        collected = collect(admin, analytics, month, today)
+        collected = collect(client, month, today)
         try:
-            stored = _fetch_metric_snapshots(admin, start=month, end=month).data
+            stored = _fetch_metric_snapshots(client, start=month, end=month).data
         except ApiError as exc:
             print(f"Nothing captured, the store would not answer: {exc}", file=sys.stderr)
             _summarise(env, f"## Metric capture for {month:%B %Y}\n\nNothing captured: {exc}\n")
@@ -256,10 +237,9 @@ def run(
 
         batch = unstored(collected.measurements, stored)
         if batch and not dry_run:
-            problems = capture(admin, batch)
+            problems = capture(client, batch)
     finally:
-        admin.close()
-        analytics.close()
+        client.close()
 
     text = report(month, collected, batch, dry_run=dry_run, problems=problems)
     print(text)

@@ -130,13 +130,18 @@ a capture cannot be undone: the run prints the measurements it would store and w
 nothing. **period** takes the first day of a month, and defaults to the month just ended.
 
 ```bash
-ADMIN_API_BASE_URL=… ADMIN_API_TOKEN=… ANALYTICS_API_TOKEN=… \
-  uv run python -m stewards.metrics --dry-run
+ADMIN_API_BASE_URL=… ADMIN_API_TOKEN=… uv run python -m stewards.metrics --dry-run
 ```
 
-`ANALYTICS_API_TOKEN` is the public surface's token, for the facility count. It is **not**
-interchangeable with the admin one, and it is the only secret this job needs beyond the two
-the other jobs already use.
+The job needs no secrets beyond the `ADMIN_API_BASE_URL` and `ADMIN_API_TOKEN` the other two
+jobs already use.
+
+One thing to know if the deployment ever changes: the public `/summary` is gated on the API's
+`Api:AccessToken` while `/admin` is gated on `Api:AdminToken`. They are two settings, and this
+deployment gives them the same value, which is why one client reads both. A deployment that
+sets them differently would answer 403 on the public read — costing the facility count and
+nothing else, named in the run summary — and would need a second client built with the other
+token.
 
 ## The backfill
 

@@ -51,8 +51,6 @@ jobs:
       - env:
           ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL }}
           ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
-          # The public surface's token, for the facility count. Not the admin one.
-          ANALYTICS_API_TOKEN: ${{ secrets.ANALYTICS_API_TOKEN }}
           # Through the environment rather than into the command line, so a hand-typed
           # period cannot become part of the shell line.
           PERIOD: ${{ inputs.period }}

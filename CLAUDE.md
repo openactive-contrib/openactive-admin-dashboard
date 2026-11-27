@@ -94,8 +94,9 @@ this repository owns the job. A row is a **source field, not a finished measure*
 every month already stored. `metrics/measurements.py` builds the rows — including the
 volume-weighted completeness the payload does not carry — and `__main__.py` reads what the
 store already holds and sends only what is missing, because a measurement may be captured once
-and a re-sent month would be refused in full. It reads both surfaces, so it needs
-`ANALYTICS_API_TOKEN` as well as the admin token. `metrics/backfill.py` recovers
+and a re-sent month would be refused in full. It reads the public `/summary` as well as
+`/admin`, on the same client: the API gates that surface on `Api:AccessToken` rather than
+`Api:AdminToken`, and this deployment gives both the same value. `metrics/backfill.py` recovers
 `datasets_crawled`, the one measure with history behind it, and is dispatch-only.
 `docs/metrics-capture-job.md` is the full account.
 
