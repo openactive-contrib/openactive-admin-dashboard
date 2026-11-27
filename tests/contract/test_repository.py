@@ -24,12 +24,14 @@ from stewards.api.errors import (
     ApiUnavailable,
 )
 from stewards.api.models import (
+    AnalyticsSummary,
     CoverageResponse,
     CustomPropertyResponse,
     EcosystemGrowthResponse,
     FeedQualityResponse,
     GrowthDataset,
     IncidentPage,
+    MetricMeasurement,
     PublisherNotificationBody,
     PublisherNotificationPage,
     SiteMappingPage,
@@ -41,16 +43,19 @@ from stewards.api.repository import (
     MAPPING_PAGE_SIZE,
     PAGE_SIZE,
     TOP_ACTIVITY_LIMIT,
+    _capture_metrics,
     _create_publisher_notification,
     _delete_publisher_notification,
     _fetch_activity_districts,
     _fetch_activity_summaries,
     _fetch_activity_summary,
+    _fetch_analytics_summary,
     _fetch_coverage,
     _fetch_coverage_snapshots,
     _fetch_custom_properties,
     _fetch_ecosystem_growth,
     _fetch_incidents,
+    _fetch_metric_snapshots,
     _fetch_monitor_trends,
     _fetch_publisher_notification_summary,
     _fetch_publisher_notifications,
@@ -71,6 +76,8 @@ API_PREFIX = prefix(Style.CONTRACT)
 BASE = f"https://api.test{API_PREFIX}"
 INCIDENTS = f"{BASE}/monitors/single_feed_stall/incidents"
 NOTIFICATIONS = f"{BASE}/publisher-notifications"
+ANALYTICS = f"{BASE}/analytics/summary"
+SNAPSHOTS = f"{BASE}/metric-snapshots"
 
 
 @pytest.fixture
@@ -1179,3 +1186,188 @@ def test_ecosystem_growth_timeout_is_unavailable(client: StewardsClient) -> None
     respx.get(GROWTH).mock(side_effect=httpx.ReadTimeout("slow"))
     with pytest.raises(ApiUnavailable):
         _fetch_ecosystem_growth(client)
+
+
+# --- the analytics summary -----------------------------------------------------------
+
+
+@respx.mock
+def test_the_analytics_summary_returns_a_model(client: StewardsClient) -> None:
+    respx.get(ANALYTICS).mock(
+        return_value=httpx.Response(200, json=load_sample("analytics_summary"))
+    )
+    summary = _fetch_analytics_summary(client)
+    assert isinstance(summary, AnalyticsSummary)
+    assert summary.number_of_facilities == 7708
+    assert summary.snapshot_date == date(2026, 11, 25)
+
+
+@respx.mock
+def test_the_analytics_summary_asks_for_no_snapshot(client: StewardsClient) -> None:
+    """It is a different surface, with no daily batch to name a day of."""
+    route = respx.get(ANALYTICS).mock(
+        return_value=httpx.Response(200, json=load_sample("analytics_summary"))
+    )
+    _fetch_analytics_summary(client)
+    assert "as_of" not in route.calls.last.request.url.params
+
+
+@respx.mock
+def test_a_malformed_analytics_summary_is_a_contract_error(client: StewardsClient) -> None:
+    respx.get(ANALYTICS).mock(
+        return_value=httpx.Response(200, json={"number_of_facilities": "lots"})
+    )
+    with pytest.raises(ApiContractError, match="/analytics/summary"):
+        _fetch_analytics_summary(client)
+
+
+# --- metric snapshots ----------------------------------------------------------------
+
+
+def snapshot_payload(rows: list[dict[str, object]], total: int) -> dict[str, object]:
+    sample = load_sample("metric_snapshots")
+    return {"data": rows, "meta": {**sample["meta"], "total": total}}
+
+
+@respx.mock
+def test_metric_snapshots_return_rows(client: StewardsClient) -> None:
+    respx.get(SNAPSHOTS).mock(
+        return_value=httpx.Response(200, json=load_sample("metric_snapshots"))
+    )
+    page = _fetch_metric_snapshots(client)
+    assert len(page.data) == 3
+    assert page.data[0].field == "feeds"
+    assert page.data[-1].value is None
+
+
+@respx.mock
+def test_an_unfiltered_snapshot_read_sends_no_filters_and_no_snapshot_date(
+    client: StewardsClient,
+) -> None:
+    route = respx.get(SNAPSHOTS).mock(
+        return_value=httpx.Response(200, json=load_sample("metric_snapshots"))
+    )
+    _fetch_metric_snapshots(client)
+
+    params = route.calls.last.request.url.params
+    assert set(params) == {"page", "page_size"}
+    assert "as_of" not in params
+
+
+@respx.mock
+def test_snapshot_filters_reach_the_request(client: StewardsClient) -> None:
+    route = respx.get(SNAPSHOTS).mock(
+        return_value=httpx.Response(200, json=load_sample("metric_snapshots"))
+    )
+    _fetch_metric_snapshots(
+        client,
+        sources=("ecosystem_growth",),
+        fields=("datasets_crawled",),
+        start=date(2026, 5, 1),
+        end=date(2026, 11, 1),
+    )
+
+    params = route.calls.last.request.url.params
+    assert params["source"] == "ecosystem_growth"
+    assert params["field"] == "datasets_crawled"
+    assert params["from"] == "2026-05-01"
+    assert params["to"] == "2026-11-01"
+
+
+@respx.mock
+def test_a_long_series_is_paged_through(client: StewardsClient) -> None:
+    rows = load_sample("metric_snapshots")["data"]
+    respx.get(SNAPSHOTS).mock(
+        side_effect=[
+            httpx.Response(200, json=snapshot_payload(rows[:2], total=3)),
+            httpx.Response(200, json=snapshot_payload(rows[2:], total=3)),
+        ]
+    )
+    page = _fetch_metric_snapshots(client)
+    assert [row.field for row in page.data] == [
+        "feeds",
+        "completeness_location_weighted",
+        "datasets_crawled",
+    ]
+
+
+@respx.mock
+def test_an_empty_series_reads_as_no_rows(client: StewardsClient) -> None:
+    respx.get(SNAPSHOTS).mock(
+        return_value=httpx.Response(200, json=snapshot_payload([], total=0))
+    )
+    assert _fetch_metric_snapshots(client).data == ()
+
+
+@respx.mock
+def test_a_malformed_snapshot_list_is_a_contract_error(client: StewardsClient) -> None:
+    respx.get(SNAPSHOTS).mock(return_value=httpx.Response(200, json={"data": [{}]}))
+    with pytest.raises(ApiContractError, match="metric-snapshots"):
+        _fetch_metric_snapshots(client)
+
+
+# --- capturing a month ---------------------------------------------------------------
+
+
+def measurement(**overrides: object) -> MetricMeasurement:
+    base: dict[str, object] = {
+        "period": date(2026, 11, 1),
+        "source": "summary",
+        "field": "feeds",
+        "value": 446,
+    }
+    return MetricMeasurement.model_validate(base | overrides)
+
+
+@respx.mock
+def test_a_capture_posts_a_flat_array_and_returns_what_was_stored(
+    client: StewardsClient,
+) -> None:
+    route = respx.post(SNAPSHOTS).mock(
+        return_value=httpx.Response(201, json=load_sample("metric_snapshots"))
+    )
+    stored = _capture_metrics([measurement(), measurement(field="datasets")], client=client)
+
+    sent = json.loads(route.calls.last.request.content)
+    assert [row["field"] for row in sent] == ["feeds", "datasets"]
+    assert sent[0]["period"] == "2026-11-01"
+    # A capture is not a page read, so it carries no paging.
+    assert "page" not in route.calls.last.request.url.params
+    assert stored[0].captured_at is not None
+
+
+@respx.mock
+def test_a_capture_keeps_a_null_value_rather_than_dropping_it(
+    client: StewardsClient,
+) -> None:
+    """Null means the batch did not compute the figure. Dropping it would make the store
+    silently miss a field rather than record that it was not available."""
+    route = respx.post(SNAPSHOTS).mock(
+        return_value=httpx.Response(201, json=load_sample("metric_snapshots"))
+    )
+    _capture_metrics([measurement(value=None)], client=client)
+
+    sent = json.loads(route.calls.last.request.content)
+    assert sent[0]["value"] is None
+
+
+@respx.mock
+def test_an_already_captured_measurement_is_a_conflict_that_names_itself(
+    client: StewardsClient,
+) -> None:
+    body = {
+        "message": "These measurements have already been captured. Nothing was written.",
+        "measurements": ["2026-11-01|summary|feeds"],
+    }
+    respx.post(SNAPSHOTS).mock(return_value=httpx.Response(409, json=body))
+
+    with pytest.raises(ApiConflict) as caught:
+        _capture_metrics([measurement()], client=client)
+    assert caught.value.detail == body
+
+
+@respx.mock
+def test_a_malformed_capture_reply_is_a_contract_error(client: StewardsClient) -> None:
+    respx.post(SNAPSHOTS).mock(return_value=httpx.Response(201, json={"data": [{}]}))
+    with pytest.raises(ApiContractError, match="metric-snapshots"):
+        _capture_metrics([measurement()], client=client)
