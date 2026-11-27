@@ -220,15 +220,22 @@ def activity_districts(
     return Endpoint(f"/monitors/{monitor_id}/districts", {"page": page, "page_size": page_size})
 
 
-def ecosystem_growth(style: Style, *, as_of: date) -> Endpoint:
+def ecosystem_growth(style: Style, *, as_of: date, months: int | None = None) -> Endpoint:
     """The ecosystem's monthly growth series: one row per calendar month, no paging.
 
     Not a monitor read, so it does not hang off a monitor id. The admin API names it
     `ecosystem-growth-trend`; the contract shape files it under `/ecosystem`.
+
+    `months` is how far back to reach. Omitting it takes the API's own default, which is
+    the twelve the growth page draws; the metric backfill asks for more, because the crawl
+    figure is the one measure with history to recover.
     """
+    reach: dict[str, str | int] = {} if months is None else {"months": months}
     if style is Style.ADMIN:
-        return Endpoint(f"{ADMIN_ROOT}/ecosystem-growth-trend", {"as_of": as_of.isoformat()})
-    return Endpoint("/ecosystem/growth")
+        return Endpoint(
+            f"{ADMIN_ROOT}/ecosystem-growth-trend", {"as_of": as_of.isoformat(), **reach}
+        )
+    return Endpoint("/ecosystem/growth", reach)
 
 
 # --- publisher notifications --------------------------------------------------------------

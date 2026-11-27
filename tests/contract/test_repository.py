@@ -1371,3 +1371,12 @@ def test_a_malformed_capture_reply_is_a_contract_error(client: StewardsClient) -
     respx.post(SNAPSHOTS).mock(return_value=httpx.Response(201, json={"data": [{}]}))
     with pytest.raises(ApiContractError, match="metric-snapshots"):
         _capture_metrics([measurement()], client=client)
+
+
+@respx.mock
+def test_ecosystem_growth_can_ask_for_more_months(client: StewardsClient) -> None:
+    route = respx.get(f"{BASE}/ecosystem/growth").mock(
+        return_value=httpx.Response(200, json=load_sample("ecosystem_growth"))
+    )
+    _fetch_ecosystem_growth(client, months=60)
+    assert route.calls.last.request.url.params["months"] == "60"

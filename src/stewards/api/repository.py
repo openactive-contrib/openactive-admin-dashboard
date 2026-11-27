@@ -494,15 +494,22 @@ def _fetch_schema_compliance_snapshots(
 
 
 def _fetch_ecosystem_growth(
-    client: StewardsClient | None = None, as_of: date | None = None
+    client: StewardsClient | None = None,
+    as_of: date | None = None,
+    *,
+    months: int | None = None,
 ) -> EcosystemGrowthResponse:
     """The ecosystem's monthly growth series, oldest or newest first as the API sends it.
 
     No paging loop: one row per calendar month will not reach a page in the life of this
     app. A response that says otherwise is logged rather than silently trimmed.
+
+    `months` reaches further back than the API's default, for the metric backfill.
     """
     client = client or get_client()
-    endpoint = endpoints.ecosystem_growth(client.style, as_of=as_of or date.today())
+    endpoint = endpoints.ecosystem_growth(
+        client.style, as_of=as_of or date.today(), months=months
+    )
     response = _parse(
         EcosystemGrowthResponse, client.get(endpoint.path, endpoint.params), endpoint.path
     )

@@ -290,6 +290,17 @@ def test_contract_ecosystem_growth_hangs_off_the_ecosystem() -> None:
     assert endpoint.params == {}
 
 
+def test_ecosystem_growth_takes_the_api_default_reach_when_given_none() -> None:
+    """The growth page draws the API's own twelve months; only the backfill asks further."""
+    assert "months" not in endpoints.ecosystem_growth(Style.ADMIN, as_of=AS_OF).params
+
+
+@pytest.mark.parametrize("style", [Style.ADMIN, Style.CONTRACT])
+def test_ecosystem_growth_can_reach_further_back(style: Style) -> None:
+    endpoint = endpoints.ecosystem_growth(style, as_of=AS_OF, months=60)
+    assert endpoint.params["months"] == 60
+
+
 # --- the analytics summary ------------------------------------------------------------------
 
 
