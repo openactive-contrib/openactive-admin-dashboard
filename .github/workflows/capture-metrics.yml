@@ -1,0 +1,64 @@
+name: Capture monthly metrics
+
+# Records last month's figures in the metric snapshot store, so the measures defined as a
+# trend have a series to read. The endpoints behind them keep no history, so a month that
+# is never captured cannot be recovered afterwards. The job is src/stewards/metrics.
+#
+# It runs on five days rather than one because GitHub can delay or drop a scheduled run.
+# Each run captures only what is missing, so a day on which the month is already complete
+# writes nothing and exits cleanly: the later days cost nothing and are there as retries.
+on:
+  schedule:
+    # 08:00 UTC on the 1st to the 5th, for the month just ended. UTC rather than UK time
+    # on purpose: the constraint is the admin API's output cache, which holds yesterday's
+    # figures until 07:00 UTC, and an hour's margin should not move with the clocks.
+    - cron: "0 8 1-5 * *"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: First day of the month to capture, e.g. 2026-11-01. Defaults to the month just ended.
+        type: string
+      dry_run:
+        description: Print the measurements in the log instead of capturing them
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Never two captures of the same month at once. The store refuses a duplicate, but one of
+# the two would then report a failure for work the other had just done.
+concurrency:
+  group: capture-metrics
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: Capture the month
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --locked
+
+      - env:
+          ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL }}
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+          # The public surface's token, for the facility count. Not the admin one.
+          ANALYTICS_API_TOKEN: ${{ secrets.ANALYTICS_API_TOKEN }}
+          # Through the environment rather than into the command line, so a hand-typed
+          # period cannot become part of the shell line.
+          PERIOD: ${{ inputs.period }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          args=()
+          if [ -n "$PERIOD" ]; then args+=(--period "$PERIOD"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          uv run python -m stewards.metrics "${args[@]}"

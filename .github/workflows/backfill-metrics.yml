@@ -1,0 +1,54 @@
+name: Backfill the crawl figure
+
+# A one-off, run by hand. `datasets_crawled` is the only measure with history behind it,
+# so its past months can be recovered from the growth endpoint rather than waited for.
+# The job is src/stewards/metrics/backfill.py.
+#
+# Safe to run twice: months already captured are left alone, and a month still in progress
+# is left to the monthly capture. There is no schedule — once it has caught up, the
+# monthly job keeps the series going.
+on:
+  workflow_dispatch:
+    inputs:
+      months:
+        description: How far back to ask, in months. The endpoint caps this at 60.
+        type: string
+      dry_run:
+        description: Print the months in the log instead of capturing them
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capture-metrics
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    name: Recover the past months
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --locked
+
+      # No analytics token: this reads one admin endpoint.
+      - env:
+          ADMIN_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL }}
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+          MONTHS: ${{ inputs.months }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          args=()
+          if [ -n "$MONTHS" ]; then args+=(--months "$MONTHS"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          uv run python -m stewards.metrics.backfill "${args[@]}"
