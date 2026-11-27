@@ -282,9 +282,12 @@ def test_an_unreported_summary_reads_em_dash_never_zero() -> None:
     assert stats[1].sub.startswith(EMPTY)
 
 
-def test_the_linked_figures_are_left_out(summary_data: ActivityCoverageSummary) -> None:
-    """Reported by the API and deliberately not shown."""
-    assert not hasattr(summary_data, "linked_opportunities")
+def test_the_linked_figures_are_read_but_not_shown(
+    summary_data: ActivityCoverageSummary,
+) -> None:
+    """The model declares them so the monthly metric capture can record both shares. The
+    page is unchanged: it still draws the labelled one only."""
+    assert summary_data.linked_opportunities == 366272
     stats = activity_coverage.page_stats(summary_data)
     assert not any("366,272" in s.value or "53.6" in s.sub for s in stats)
 

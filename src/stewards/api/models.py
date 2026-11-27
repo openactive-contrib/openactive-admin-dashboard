@@ -636,12 +636,20 @@ class SiteMappingPage(ApiModel):
 
 
 class ActivityCoverageSummary(NullTolerantModel):
-    """The national figures. `linked_*` is reported too and deliberately not declared: the
-    page leaves it out, and a field earns a line here when something draws it."""
+    """The national figures.
+
+    `labelled_*` and `linked_*` answer different questions — whether an opportunity carries
+    an activity label at all, and whether that label matches the OpenActive activity list —
+    and they move independently. The page draws only the labelled share, but both are
+    declared because the monthly metric capture records both: which of the two the measure
+    means is unsettled, and keeping one would decide it by accident.
+    """
 
     activity_opportunities: int | None = None
     labelled_opportunities: int | None = None
     labelled_percentage: float | None = None
+    linked_opportunities: int | None = None
+    linked_percentage: float | None = None
     activities_offered: int | None = None
     vocabulary_size: int | None = None
 
@@ -1028,4 +1036,82 @@ class EcosystemGrowthPeriod(ApiModel):
 
 class EcosystemGrowthResponse(ApiModel):
     data: tuple[EcosystemGrowthPeriod, ...]
+    meta: Meta
+
+
+# --- the analytics summary ----------------------------------------------------------------
+#
+# The public surface rather than `/admin`, and the one read this app makes outside it. A flat
+# object: no `data`/`meta` envelope, no paging, and its own `date` instead of a snapshot. The
+# monthly metric capture is its only caller — `number_of_facilities` lives here and nowhere
+# else — so it is modelled for what that needs rather than for a page.
+
+
+class AnalyticsSummary(NullTolerantModel):
+    """The national figures the public API publishes."""
+
+    number_of_opportunities: int | None = None
+    number_of_publishers: int | None = None
+    number_of_activities: int | None = None
+    number_of_facility_types: int | None = None
+    number_of_facilities: int | None = None
+    number_of_activity_providers: int | None = None
+    percentage_of_local_authorities: float | None = None
+
+    #: When the service last rebuilt these figures, under the key `date`. Renamed here
+    #: because a field called `date` would shadow the date type the rest of this file uses.
+    generated_at: datetime | None = Field(default=None, alias="date")
+
+    @property
+    def snapshot_date(self) -> date | None:
+        """The day of `generated_at`, to store beside a captured measurement."""
+        return self.generated_at.date() if self.generated_at else None
+
+
+# --- metric snapshots ---------------------------------------------------------------------
+#
+# The one read on this API that is a history, and the second resource the app writes to. A row
+# is a source field recorded for a month — `completeness_location`, never "KPI4" — so a measure
+# whose definition changes later can still be recomputed for every period already captured.
+#
+# `meta.snapshot_date` on these responses is just the day the request was served. The rows are a
+# history and there is no daily batch behind them to date, so a row carries its own
+# `snapshot_date`: the day's data the figure was read from.
+
+
+class MetricMeasurement(ApiModel):
+    """One measurement, as the monthly capture POSTs it.
+
+    No `captured_at`: BigQuery sets it on insert and the API ignores it if sent.
+    """
+
+    #: The month this figure describes, given as its first day.
+    period: date
+    source: str
+    field: str
+
+    #: Counts and rates share this column, so a count comes back as a float. Null means the
+    #: figure was not computed, which is not the same as zero.
+    value: float | None = None
+
+    #: What `value` is out of, for a rate or a volume-weighted mean. Null for a plain count.
+    denominator: float | None = None
+
+    #: The `meta.snapshot_date` of the response the figure was read from.
+    snapshot_date: date | None = None
+
+    def to_payload(self) -> dict[str, Any]:
+        """JSON-ready: dates as ISO strings. A null value is sent rather than dropped — the
+        store keeps it, and reads it back as "not computed" rather than as zero."""
+        return self.model_dump(mode="json")
+
+
+class MetricSnapshotRow(MetricMeasurement):
+    """One captured measurement as the store returns it."""
+
+    captured_at: datetime | None = None
+
+
+class MetricSnapshotPage(ApiModel):
+    data: tuple[MetricSnapshotRow, ...] = ()
     meta: Meta
