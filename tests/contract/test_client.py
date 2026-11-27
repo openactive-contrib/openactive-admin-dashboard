@@ -31,6 +31,13 @@ LIST_URL = f"{BASE}{API_PREFIX}{LIST_PATH}"
 ROW_PATH = f"{LIST_PATH}/pn_dummy-leisure"
 ROW_URL = f"{BASE}{API_PREFIX}{ROW_PATH}"
 
+BATCH_PATH = "/metric-snapshots"
+BATCH_URL = f"{BASE}{API_PREFIX}{BATCH_PATH}"
+BATCH = [
+    {"period": "2026-11-01", "source": "summary", "field": "feeds", "value": 446},
+    {"period": "2026-11-01", "source": "summary", "field": "datasets", "value": 172},
+]
+
 
 @pytest.fixture
 def client(settings: Settings) -> StewardsClient:
@@ -216,3 +223,76 @@ def test_a_write_body_is_never_in_an_exception_message(client: StewardsClient) -
     with pytest.raises(ApiUnavailable) as caught:
         client.patch(ROW_PATH, {"contact": "dummy.publisher@example.org"})
     assert "example.org" not in str(caught.value)
+
+
+# --- writing a batch ----------------------------------------------------------------------
+
+
+@respx.mock
+def test_post_sends_a_batch_as_a_json_array(client: StewardsClient) -> None:
+    """A metric capture is a flat array, not an object. The API takes or refuses it whole."""
+    route = respx.post(BATCH_URL).mock(
+        return_value=httpx.Response(201, json={"data": BATCH, "meta": {}})
+    )
+
+    assert client.post(BATCH_PATH, BATCH) == {"data": BATCH, "meta": {}}
+
+    sent = json.loads(route.calls.last.request.content)
+    assert isinstance(sent, list)
+    assert sent == BATCH
+
+
+@respx.mock
+def test_a_refused_batch_names_what_clashed(client: StewardsClient) -> None:
+    """Which measurements clashed is the difference between a retry that found the month
+    already captured and a batch that went unwritten."""
+    body = {
+        "message": "These measurements have already been captured. Nothing was written.",
+        "measurements": ["2026-11-01|summary|feeds"],
+    }
+    respx.post(BATCH_URL).mock(return_value=httpx.Response(409, json=body))
+
+    with pytest.raises(ApiConflict) as caught:
+        client.post(BATCH_PATH, BATCH)
+    assert caught.value.detail == body
+
+
+@respx.mock
+def test_a_rejected_batch_carries_its_reason(client: StewardsClient) -> None:
+    body = {"message": "The same measurement appears more than once in this batch."}
+    respx.post(BATCH_URL).mock(return_value=httpx.Response(400, json=body))
+
+    with pytest.raises(ApiContractError) as caught:
+        client.post(BATCH_PATH, BATCH)
+    assert caught.value.detail == body
+
+
+@respx.mock
+def test_a_refusal_with_no_readable_body_has_no_detail(client: StewardsClient) -> None:
+    respx.post(BATCH_URL).mock(return_value=httpx.Response(409, text="<html>nginx</html>"))
+
+    with pytest.raises(ApiConflict) as caught:
+        client.post(BATCH_PATH, BATCH)
+    assert caught.value.detail is None
+
+
+@respx.mock
+def test_only_the_documented_refusals_carry_a_detail(client: StewardsClient) -> None:
+    """A 500 is the deployment's business, not the caller's, so its body is not kept."""
+    respx.post(BATCH_URL).mock(return_value=httpx.Response(500, json={"message": "boom"}))
+
+    with pytest.raises(ApiUnavailable) as caught:
+        client.post(BATCH_PATH, BATCH)
+    assert caught.value.detail is None
+
+
+@respx.mock
+def test_a_refusal_message_names_the_path_and_not_the_body(client: StewardsClient) -> None:
+    respx.post(BATCH_URL).mock(
+        return_value=httpx.Response(409, json={"measurements": ["2026-11-01|summary|feeds"]})
+    )
+
+    with pytest.raises(ApiConflict) as caught:
+        client.post(BATCH_PATH, BATCH)
+    assert BATCH_PATH in str(caught.value)
+    assert "2026-11-01" not in str(caught.value)

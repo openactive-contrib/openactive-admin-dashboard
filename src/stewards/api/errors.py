@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 
 class ApiError(RuntimeError):
-    """Base class for every stewards API failure."""
+    """Base class for every stewards API failure.
+
+    `detail` is the API's own error body, where the contract says it sends one: a refused
+    capture names the measurements it refused, and the monthly job has to tell a batch that
+    was already captured from one that only partly clashed. It is None otherwise, and it is
+    never rendered on a page — a page shows the message.
+    """
+
+    def __init__(self, message: str, detail: Any = None) -> None:
+        super().__init__(message)
+        self.detail = detail
 
 
 class ApiUnavailable(ApiError):

@@ -213,14 +213,24 @@ tests/
    (`entity`, `email_fields`, `summary_field`), never a monitor id in the renderer. CSV export was removed from the header on request — do not
    reintroduce a download button without being asked.
 
-   **The one exception is the publisher notification list** (`/admin/publisher-notifications`):
-   stewards may PATCH and DELETE its rows, and nothing else, and the daily job
-   (`stewards.outreach`) may POST and PATCH them. `client.post`/`client.patch`/`client.delete`
-   exist for it alone. PATCH overwrites every column, so a save always starts from
-   `PublisherNotification.to_body()` and changes only the form's five fields; `problems`
-   goes back exactly as read. Every write clears the list's 30-second cache. There is no
-   create in the app; only the job creates rows, and it never changes status, stakeholder,
-   contact or date contacted. Do not add writes to any other resource without being asked.
+   **Two resources are written to, and no others.**
+
+   **The publisher notification list** (`/admin/publisher-notifications`): stewards may PATCH
+   and DELETE its rows, and nothing else, and the daily job (`stewards.outreach`) may POST and
+   PATCH them. `client.patch` and `client.delete` exist for it alone. PATCH overwrites every
+   column, so a save always starts from `PublisherNotification.to_body()` and changes only the
+   form's five fields; `problems` goes back exactly as read. Every write clears the list's
+   30-second cache. There is no create in the app; only the job creates rows, and it never
+   changes status, stakeholder, contact or date contacted.
+
+   **The metric snapshot store** (`/admin/metric-snapshots`): the monthly capture job
+   (`stewards.metrics`) POSTs a batch of measurements, and nothing else writes there. A
+   measurement may be captured once; the API refuses the whole batch with 409 if any of it is
+   already stored, and names what clashed in `ApiError.detail`. There is no update or delete
+   route, so a period captured wrongly is corrected in BigQuery rather than from here. The app
+   only ever reads the series.
+
+   Do not add writes to any other resource without being asked.
 6. **Every data page shows the snapshot timestamp** from the API `meta.snapshot_date`, via
    `components.layout.render_header`, which is the whole header bar (crumb, title,
    snapshot). A page that failed to load renders `render_error_header`
